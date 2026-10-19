@@ -9,13 +9,6 @@ npm install
 npm run dev
 ```
 
-## Verificar
-
-```bash
-npm run build
-npm run lint
-```
-
 O build verifica os tipos antes de gerar a pasta `dist`.
 
 ## Estrutura
@@ -41,10 +34,3 @@ src/
 ├── index.css               # Entrada do Tailwind e tema global
 └── main.tsx                # Inicialização do React
 ```
-
-As pastas vazias usam `.gitkeep` para serem versionadas no Git.
-A tela inicial está em `pages/HomePage.tsx`. Os componentes de domínio e as rotas serão implementados conforme as funcionalidades forem definidas.
-
-Referências de configuração:
-- https://tailwindcss.com/docs/installation/using-vite
-- https://typescript-eslint.io/getting-started/
