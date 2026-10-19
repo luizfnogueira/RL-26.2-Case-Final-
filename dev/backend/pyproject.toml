@@ -1,0 +1,10 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "API desenvolvida com FastAPI"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["fastapi[standard]"]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
