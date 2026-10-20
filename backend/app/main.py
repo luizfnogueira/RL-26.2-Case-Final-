@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import CORS_ORIGINS
+from app.core.errors import register_error_handlers
 
 app = FastAPI(title="Backend API", version="0.1.0")
+register_error_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
