@@ -1,0 +1,26 @@
+{
+  "periodo_referencia": "2026-09",
+  "status_analise": "disponivel",
+  "motivo_indisponibilidade": null,
+  "items": [
+    {
+      "id_uc": "UC-DEMO-001",
+      "municipio": "Recife",
+      "bairro": "Boa Vista",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-001",
+      "posicao": 1,
+      "motivos": [
+        "Variação de consumo identificada pela análise de exemplo."
+      ],
+      "energia_estimada_recuperar": {
+        "valor": 120.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-09"
+      }
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1
+}

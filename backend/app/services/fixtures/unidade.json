@@ -1,0 +1,89 @@
+{
+  "periodo_referencia": "2026-09",
+  "cadastro": {
+    "id_uc": "UC-DEMO-001",
+    "nome_titular": "Titular de exemplo",
+    "logradouro": "Rua de Exemplo",
+    "numero": "100",
+    "bairro": "Boa Vista",
+    "municipio": "Recife",
+    "uf": "PE",
+    "cep": "00000000",
+    "classe": "Residencial",
+    "subgrupo_tarifario": "B1",
+    "alimentador": "ALM-DEMO-001",
+    "data_ligacao": "2022-07-01",
+    "status": "ATIVA",
+    "latitude": null,
+    "longitude": null
+  },
+  "consumo": [
+    {
+      "valor": 250.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-08"
+    },
+    {
+      "valor": 300.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-09"
+    }
+  ],
+  "faturas": [
+    {
+      "id_fatura": "FT-DEMO-001",
+      "mes_referencia": "2026-09",
+      "valor_energia": 180.0,
+      "tributos": 60.0,
+      "valor_total": 240.0,
+      "moeda": "BRL",
+      "bandeira_tarifaria": "Verde",
+      "data_emissao": "2026-09-27",
+      "data_vencimento": "2026-10-08",
+      "data_pagamento": null,
+      "status": "ABERTA"
+    }
+  ],
+  "medidores": [
+    {
+      "id_medidor": "MD-DEMO-001",
+      "modelo": "MODELO-DEMO",
+      "tipo": "ELETRONICO",
+      "data_instalacao": "2022-07-01",
+      "data_retirada": null,
+      "data_ultima_manutencao": null,
+      "status": "ATIVO"
+    }
+  ],
+  "geracao_distribuida": [
+    {
+      "potencia_kwp": 5.0,
+      "data_conexao": "2025-02-01",
+      "modalidade": "GERACAO NA PROPRIA UC",
+      "energia_injetada_kwh_media_mensal": 200.0
+    }
+  ],
+  "interrupcoes": [
+    {
+      "id_ocorrencia": "OC-DEMO-001",
+      "alimentador": "ALM-DEMO-001",
+      "tipo": "FALTA DE ENERGIA",
+      "causa": "NAO IDENTIFICADA",
+      "data_abertura": "2026-09-10T10:00:00-03:00",
+      "data_encerramento": "2026-09-10T11:00:00-03:00",
+      "duracao_min": 60.0
+    }
+  ],
+  "chamados": [
+    {
+      "protocolo": "AT-DEMO-001",
+      "canal": "SITE",
+      "assunto": "FALTA DE ENERGIA",
+      "subassunto": null,
+      "data_abertura": "2026-09-10T10:05:00-03:00",
+      "data_fechamento": "2026-09-10T11:05:00-03:00",
+      "nota_satisfacao": null,
+      "historico": []
+    }
+  ]
+}
