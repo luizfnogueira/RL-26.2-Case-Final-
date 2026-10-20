@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id_uc": "UC-DEMO-001",
+      "nome_titular": "Titular de exemplo",
+      "municipio": "Recife",
+      "bairro": "Boa Vista",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-001",
+      "status": "ATIVA"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1
+}

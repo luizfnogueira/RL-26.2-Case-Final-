@@ -1,0 +1,38 @@
+{
+  "resposta": "No cenário simulado, receita faturada e consumo cresceram 20%. A decomposição entre preço e volume ainda não está disponível.",
+  "contexto": {
+    "periodo_atual": "2026-09",
+    "periodo_comparacao": "2026-08",
+    "municipio": "Recife",
+    "bairro": null,
+    "classe": "Residencial",
+    "alimentador": null
+  },
+  "indicadores_utilizados": [
+    {
+      "nome": "receita_faturada",
+      "valor": 120000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2026-09"
+    },
+    {
+      "nome": "receita_faturada",
+      "valor": 100000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2026-08"
+    },
+    {
+      "nome": "consumo",
+      "valor": 150000.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-09"
+    },
+    {
+      "nome": "consumo",
+      "valor": 125000.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-08"
+    }
+  ],
+  "gerado_em": "2026-10-20T10:00:00-03:00"
+}

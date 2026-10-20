@@ -1,0 +1,23 @@
+{
+  "periodo_referencia": "2026-09",
+  "items": [
+    {
+      "alimentador": "ALM-DEMO-001",
+      "status_calculo": "indisponivel",
+      "motivo_indisponibilidade": "METODOLOGIA_PENDENTE",
+      "dec": {
+        "valor": null,
+        "unidade": "h/UC",
+        "periodo_referencia": "2026-09"
+      },
+      "fec": {
+        "valor": null,
+        "unidade": "interrupcoes/UC",
+        "periodo_referencia": "2026-09"
+      }
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1
+}

@@ -1,0 +1,62 @@
+{
+  "filtros": {
+    "periodo_atual": "2026-09",
+    "periodo_comparacao": "2026-08",
+    "municipio": "Recife",
+    "bairro": null,
+    "classe": "Residencial",
+    "alimentador": null
+  },
+  "indicadores": {
+    "receita_faturada": {
+      "atual": {
+        "valor": 120000.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-09"
+      },
+      "comparacao": {
+        "valor": 100000.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-08"
+      },
+      "variacao_percentual": {
+        "valor": 20.0,
+        "unidade": "%",
+        "periodo_referencia": "2026-09"
+      }
+    },
+    "consumo": {
+      "atual": {
+        "valor": 150000.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-09"
+      },
+      "comparacao": {
+        "valor": 125000.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-08"
+      },
+      "variacao_percentual": {
+        "valor": 20.0,
+        "unidade": "%",
+        "periodo_referencia": "2026-09"
+      }
+    }
+  },
+  "analise_preco_volume": {
+    "periodo_atual": "2026-09",
+    "periodo_comparacao": "2026-08",
+    "status": "indisponivel",
+    "motivo_indisponibilidade": "METODOLOGIA_PENDENTE",
+    "efeito_preco": {
+      "valor": null,
+      "unidade": "BRL",
+      "periodo_referencia": "2026-09"
+    },
+    "efeito_volume": {
+      "valor": null,
+      "unidade": "BRL",
+      "periodo_referencia": "2026-09"
+    }
+  }
+}
