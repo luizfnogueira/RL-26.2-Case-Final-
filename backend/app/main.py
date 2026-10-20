@@ -1,12 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import CORS_ORIGINS
 from app.core.errors import register_error_handlers
+from app.core.exceptions import AppException
+
 from app.routers import dashboard, ia, inspecoes, operacao, unidades
 
 app = FastAPI(
-    title="Backend API",
+    title="V-Energy Grid 360 API",
     version="0.1.0",
     description="API de teste do front. Rotas funcionais usam exemplos fictícios do P1, sem banco ou IA. POST/PATCH não persistem alterações.",
 )
@@ -21,6 +24,14 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.to_dict(),
+    )
 
 
 @app.get("/")
