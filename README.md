@@ -22,7 +22,12 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
    CREATE DATABASE vgrid360 OWNER vgrid;
    ```
 
-   No Fedora, troque `ident` por `scram-sha-256` nas linhas `host` de `/var/lib/pgsql/data/pg_hba.conf` e rode `sudo systemctl restart postgresql`.
+   No Fedora, libere o login por senha (senão o seed falha com `autenticação do tipo Ident falhou`):
+
+   ```bash
+   sudo sed -i -E 's/^(host\s+all\s+all\s+(127\.0\.0\.1\/32|::1\/128)\s+)ident/\1scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
+   sudo systemctl restart postgresql
+   ```
 
 2. Instale o backend:
 
