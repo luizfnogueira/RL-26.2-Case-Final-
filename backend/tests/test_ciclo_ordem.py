@@ -2,6 +2,7 @@ from datetime import date, datetime
 import pytest
 
 from app.core.exceptions import (
+    AppException,
     JustificativaObrigatoriaException,
     OrdemAtivaExistenteException,
     OrdemNaoEncontradaException,
@@ -69,6 +70,13 @@ class TestCriacaoOrdem:
         assert exc_info.value.status_code == 404
         assert exc_info.value.codigo == "UC_INEXISTENTE"
         assert "UC999999" in exc_info.value.mensagem
+
+    def test_criar_ordem_com_dict_invalido_lanca_dados_invalidos(self, service: OrdemInspecaoService):
+        with pytest.raises(AppException) as exc_info:
+            service.criar_ordem({"id_uc": "UC100001"})
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.codigo == "DADOS_INVALIDOS"
 
     def test_criar_ordem_duplicada_quando_aberta_lanca_409(self, service: OrdemInspecaoService):
         dados1 = OrdemInspecaoCreate(
@@ -339,7 +347,7 @@ class TestValidacaoResultadoCampo:
                 observacoes="Sem irregularidade mas informou tipo",
             )
 
-    def test_concluir_via_service_com_dict_invalido_lanca_resultado_incompleto(
+    def test_concluir_via_service_com_dict_invalido_lanca_dados_invalidos(
         self, service: OrdemInspecaoService
     ):
         ordem = service.criar_ordem(
@@ -347,7 +355,7 @@ class TestValidacaoResultadoCampo:
         )
         service.avancar_para_campo(ordem.id_ordem)
 
-        with pytest.raises(ResultadoIncompletoException) as exc_info:
+        with pytest.raises(AppException) as exc_info:
             service.concluir_ordem(
                 ordem.id_ordem,
                 {
@@ -356,8 +364,8 @@ class TestValidacaoResultadoCampo:
                     "observacoes": "Desvio",
                 },
             )
-        assert exc_info.value.status_code == 400
-        assert exc_info.value.codigo == "RESULTADO_INCOMPLETO"
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.codigo == "DADOS_INVALIDOS"
 
 
 class TestCancelamentoOrdem:

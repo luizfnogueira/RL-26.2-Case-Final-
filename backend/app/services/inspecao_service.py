@@ -3,6 +3,7 @@ from typing import Any, Optional, Union
 from pydantic import ValidationError
 
 from app.core.exceptions import (
+    AppException,
     JustificativaObrigatoriaException,
     OrdemAtivaExistenteException,
     OrdemNaoEncontradaException,
@@ -44,9 +45,11 @@ class OrdemInspecaoService:
             try:
                 dados = OrdemInspecaoCreate(**dados)
             except ValidationError as e:
-                raise ResultadoIncompletoException(
-                    f"Dados inválidos para criação da ordem: {e.errors()}"
-                )
+                raise AppException(
+                    "Dados inválidos para criação da ordem.",
+                    codigo="DADOS_INVALIDOS",
+                    status_code=422,
+                ) from e
 
         id_uc = dados.id_uc.strip()
 
@@ -172,9 +175,11 @@ class OrdemInspecaoService:
             try:
                 resultado_validado = ResultadoInspecao(**resultado)
             except (ValidationError, ValueError) as e:
-                raise ResultadoIncompletoException(
-                    f"Resultado de campo incompleto ou inválido: {e}"
-                )
+                raise AppException(
+                    "Resultado de campo inválido.",
+                    codigo="DADOS_INVALIDOS",
+                    status_code=422,
+                ) from e
         elif isinstance(resultado, ResultadoInspecao):
             resultado_validado = resultado
         else:
