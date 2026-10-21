@@ -1,5 +1,6 @@
 from app.core.exceptions import (
     AppException,
+    CenarioStubIndisponivelException,
     JustificativaObrigatoriaException,
     OrdemAtivaExistenteException,
     OrdemNaoEncontradaException,
@@ -10,6 +11,7 @@ from app.core.exceptions import (
 
 __all__ = [
     "AppException",
+    "CenarioStubIndisponivelException",
     "UCInexistenteException",
     "OrdemAtivaExistenteException",
     "OrdemNaoEncontradaException",

@@ -1,89 +1,324 @@
 {
-  "periodo_referencia": "2026-09",
+  "periodo_referencia": "2025-07/2026-06",
   "cadastro": {
     "id_uc": "UC-DEMO-001",
-    "nome_titular": "Titular de exemplo",
+    "nome_titular": "Titular de exemplo 001",
+    "municipio": "Recife",
+    "bairro": "Boa Vista",
+    "classe": "Residencial",
+    "alimentador": "ALM-DEMO-001",
+    "status": "ATIVA",
+    "cpf_cnpj_mascarado": "***.456.789-**",
+    "telefone": null,
     "logradouro": "Rua de Exemplo",
     "numero": "100",
-    "bairro": "Boa Vista",
-    "municipio": "Recife",
     "uf": "PE",
-    "cep": "00000000",
-    "classe": "Residencial",
+    "cep": "00000-000",
     "subgrupo_tarifario": "B1",
-    "alimentador": "ALM-DEMO-001",
-    "data_ligacao": "2022-07-01",
-    "status": "ATIVA",
+    "data_ligacao": "2018-03-12",
     "latitude": null,
     "longitude": null
   },
   "consumo": [
     {
-      "valor": 250.0,
-      "unidade": "kWh",
-      "periodo_referencia": "2026-08"
+      "mes": "2025-07",
+      "atual": {
+        "valor": 305,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07"
+      },
+      "ano_anterior": {
+        "valor": 312,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-07"
+      },
+      "tipo_leitura": "REAL"
     },
     {
-      "valor": 300.0,
-      "unidade": "kWh",
-      "periodo_referencia": "2026-09"
+      "mes": "2025-08",
+      "atual": {
+        "valor": 298,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-08"
+      },
+      "ano_anterior": {
+        "valor": 301,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-08"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2025-09",
+      "atual": {
+        "valor": 310,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-09"
+      },
+      "ano_anterior": {
+        "valor": 296,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-09"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2025-10",
+      "atual": {
+        "valor": 322,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-10"
+      },
+      "ano_anterior": {
+        "valor": 315,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-10"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2025-11",
+      "atual": {
+        "valor": 335,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-11"
+      },
+      "ano_anterior": {
+        "valor": 329,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-11"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2025-12",
+      "atual": {
+        "valor": 352,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-12"
+      },
+      "ano_anterior": {
+        "valor": 340,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-12"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-01",
+      "atual": {
+        "valor": 361,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-01"
+      },
+      "ano_anterior": {
+        "valor": 348,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-01"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-02",
+      "atual": {
+        "valor": 344,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-02"
+      },
+      "ano_anterior": {
+        "valor": 339,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-02"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-03",
+      "atual": {
+        "valor": 330,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-03"
+      },
+      "ano_anterior": {
+        "valor": 325,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-03"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-04",
+      "atual": {
+        "valor": 318,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-04"
+      },
+      "ano_anterior": {
+        "valor": 309,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-04"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-05",
+      "atual": {
+        "valor": 301,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-05"
+      },
+      "ano_anterior": {
+        "valor": 290,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-05"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-06",
+      "atual": {
+        "valor": 412,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-06"
+      },
+      "ano_anterior": {
+        "valor": 298,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-06"
+      },
+      "tipo_leitura": "ESTIMADA"
     }
   ],
-  "faturas": [
+  "diagnostico_conta": {
+    "conta_alta": true,
+    "veredito": "Conta alta: o último mês ficou acima do mesmo mês do ano anterior e da média de 12 meses.",
+    "ultimo_mes": {
+      "valor": 412,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-06"
+    },
+    "mesmo_mes_ano_anterior": {
+      "valor": 298,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-06"
+    },
+    "media_12_meses": {
+      "valor": 332.33,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "variacao_percentual": {
+      "valor": 38.255,
+      "unidade": "%",
+      "periodo_referencia": "2026-06"
+    },
+    "leitura_estimada": true,
+    "alerta": "Leitura ESTIMADA em 2026-06: o consumo pode ser ajustado na próxima leitura real."
+  },
+  "faturas_abertas": [
     {
-      "id_fatura": "FT-DEMO-001",
-      "mes_referencia": "2026-09",
-      "valor_energia": 180.0,
-      "tributos": 60.0,
-      "valor_total": 240.0,
+      "id_fatura": "FT-DEMO-012",
+      "mes_referencia": "2026-06",
+      "valor_energia": 370.8,
+      "tributos": 115.2,
+      "valor_total": 486.0,
       "moeda": "BRL",
-      "bandeira_tarifaria": "Verde",
-      "data_emissao": "2026-09-27",
-      "data_vencimento": "2026-10-08",
+      "bandeira_tarifaria": "Amarela",
+      "data_emissao": "2026-07-01",
+      "data_vencimento": "2026-07-12",
       "data_pagamento": null,
       "status": "ABERTA"
     }
   ],
-  "medidores": [
+  "faturas_pagas": [
     {
-      "id_medidor": "MD-DEMO-001",
-      "modelo": "MODELO-DEMO",
-      "tipo": "ELETRONICO",
-      "data_instalacao": "2022-07-01",
-      "data_retirada": null,
-      "data_ultima_manutencao": null,
-      "status": "ATIVO"
+      "id_fatura": "FT-DEMO-011",
+      "mes_referencia": "2026-05",
+      "valor_energia": 270.9,
+      "tributos": 84.1,
+      "valor_total": 355.0,
+      "moeda": "BRL",
+      "bandeira_tarifaria": "Verde",
+      "data_emissao": "2026-06-01",
+      "data_vencimento": "2026-06-12",
+      "data_pagamento": "2026-06-10",
+      "status": "PAGA"
     }
   ],
-  "geracao_distribuida": [
-    {
-      "potencia_kwp": 5.0,
-      "data_conexao": "2025-02-01",
-      "modalidade": "GERACAO NA PROPRIA UC",
-      "energia_injetada_kwh_media_mensal": 200.0
+  "medidor": {
+    "id_medidor": "MD-DEMO-001",
+    "modelo": "MODELO-DEMO",
+    "tipo": "ELETRONICO",
+    "data_instalacao": "2018-03-12",
+    "data_retirada": null,
+    "data_ultima_manutencao": "2024-11-05",
+    "status": "ATIVO",
+    "ultima_leitura": {
+      "data": "2026-06-28",
+      "leitura_kwh": 18452.0,
+      "tipo_leitura": "ESTIMADA"
     }
-  ],
-  "interrupcoes": [
+  },
+  "geracao_distribuida": {
+    "potencia_kwp": 5.0,
+    "data_conexao": "2025-02-01",
+    "modalidade": "GERACAO NA PROPRIA UC",
+    "energia_injetada_media_mensal": {
+      "valor": 200.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-07/2026-06"
+    }
+  },
+  "interrupcoes_recentes": [
+    {
+      "id_ocorrencia": "OC-DEMO-002",
+      "alimentador": "ALM-DEMO-001",
+      "tipo": "FALTA DE ENERGIA",
+      "causa": "NAO INFORMADA",
+      "data_abertura": "2026-06-14T19:20:00-03:00",
+      "data_encerramento": "2026-06-14T21:05:00-03:00",
+      "duracao_min": 105.0
+    },
     {
       "id_ocorrencia": "OC-DEMO-001",
       "alimentador": "ALM-DEMO-001",
       "tipo": "FALTA DE ENERGIA",
-      "causa": "NAO IDENTIFICADA",
-      "data_abertura": "2026-09-10T10:00:00-03:00",
-      "data_encerramento": "2026-09-10T11:00:00-03:00",
-      "duracao_min": 60.0
+      "causa": "DESCARGA ATMOSFERICA",
+      "data_abertura": "2026-05-03T15:40:00-03:00",
+      "data_encerramento": "2026-05-03T16:25:00-03:00",
+      "duracao_min": 45.0
     }
   ],
   "chamados": [
     {
       "protocolo": "AT-DEMO-001",
-      "canal": "SITE",
-      "assunto": "FALTA DE ENERGIA",
-      "subassunto": null,
-      "data_abertura": "2026-09-10T10:05:00-03:00",
-      "data_fechamento": "2026-09-10T11:05:00-03:00",
-      "nota_satisfacao": null,
-      "historico": []
+      "canal": "APP",
+      "assunto": "CONTA ALTA",
+      "subassunto": "LEITURA ESTIMADA",
+      "data_abertura": "2026-07-02T10:05:00-03:00",
+      "data_fechamento": "2026-07-03T16:30:00-03:00",
+      "nota_satisfacao": 3.0,
+      "historico": [
+        {
+          "sequencia": 1,
+          "data": "2026-07-02T10:05:00-03:00",
+          "acao": "ABERTURA",
+          "canal": "APP"
+        },
+        {
+          "sequencia": 2,
+          "data": "2026-07-03T16:30:00-03:00",
+          "acao": "ENCERRAMENTO",
+          "canal": "BACKOFFICE"
+        }
+      ]
     }
-  ]
+  ],
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
 }

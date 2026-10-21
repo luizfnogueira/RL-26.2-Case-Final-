@@ -32,7 +32,7 @@ Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não es
 
 ### Limites dos stubs
 
-Os cenários analíticos estão preparados para as duas janelas anuais acima. Outros intervalos sintaticamente válidos retornam **422 `CENARIO_STUB_INDISPONIVEL`**, em vez de devolver números de outro período. A integração real deverá atender os intervalos disponíveis na Gold.
+Os cenários analíticos estão preparados para as duas janelas anuais acima. Outros intervalos sintaticamente válidos — inclusive um mês isolado (`YYYY-MM`) — retornam **422 `CENARIO_STUB_INDISPONIVEL`**, em vez de devolver números de outro período. Isso é limite do stub, não do formato: `YYYY-MM` continua válido no contrato (por exemplo, no filtro `periodo_atual` de GET /inspecoes, que não depende de cenário) e a integração real deverá atender os intervalos, mensais ou não, disponíveis na Gold.
 
 Filtros e paginação operam sobre exemplos locais. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH usam snapshot: alterações não persistem entre chamadas. Não existe SQL executável nem agente conectado.
 
@@ -336,7 +336,18 @@ Para UC360:
 {"contexto":"unidade","id_uc":"UC-DEMO-001","filtros":{"periodo_atual":"2025-07/2026-06"},"indicadores":[]}
 ```
 
-Retorna título/texto e os quatro números do diagnóstico da UC. A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
+
+Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos nomes e valores de `diagnostico_conta` em GET /unidades/{id}:
+
+| nome | rótulo | unidade | período de referência |
+| --- | --- | --- | --- |
+| ultimo_mes | Último mês | kWh | último mês (ex.: 2026-06) |
+| mesmo_mes_ano_anterior | Mesmo mês do ano anterior | kWh | mesmo mês, ano anterior (ex.: 2025-06) |
+| media_12_meses | Média de 12 meses | kWh | janela de 12 meses (ex.: 2025-07/2026-06) |
+| variacao_percentual | Variação sobre o ano anterior | % | último mês |
+
+`indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
 
 ## 11. GET /health
 
@@ -348,10 +359,47 @@ GET /health
 {"status":"ok"}
 ```
 
-## 12. Alinhamentos restantes e migração
+## 12. Migração V1 → V2
 
-Esta V2 altera o contrato: migrar `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens para inteiros, campos das ordens/resultados para o modelo do Gabriel; dashboard ganhou seis KPIs/séries/ponte; IA e insight têm respostas distintas. Gheyson precisa atualizar types/mocks em conjunto.
+Esta V2 altera o contrato: `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens inteiros, campos das ordens/resultados no modelo do Gabriel; dashboard com seis KPIs, série e ponte; IA e insight com respostas distintas.
 
-Confirmar com o par: convenção de intervalos, nomes JSON e identificação dos cenários; com Dados/GenAI: nomes reais da Gold, timestamp de carga, metodologia dos indicadores/diagnóstico, limites de períodos, auditoria e integração do agente. Fontes ausentes não devem virar valores fictícios em produção. Telefone permanece null até existir fonte.
+Contrato, schemas, routers e fixtures do backend estão na mesma versão (V2). `backend/tests/test_stubs.py` compara a resposta de cada rota com o fixture vinculado neste documento; se um mudar sem o outro, o teste falha. Gheyson gera `types/` e mocks a partir desses fixtures (F3).
 
-P1/B1 entregam contratos e stubs; não substituem B2/B3/B4/B5, O1b, V1a ou R1a. A leitura real e persistência seguem com os responsáveis do cronograma.
+## 13. Diferenças em relação à Arquitetura V1
+
+Decisões propostas na seção 2 do cronograma (daily de 19/10) e aplicadas nesta V2. Precisam constar na ata de aprovação, porque contrariam o texto original da Arquitetura V1.
+
+| # | Arquitetura V1 | Contrato V2 | Origem | Validar com |
+| --- | --- | --- | --- | --- |
+| 1 | POST /ia devolve só `{"resposta"}` | Resposta estendida: sql, tabelas, dados, status `ok`/`nao_sei`/`bloqueado` (Tela 7, “Como cheguei nisso”) | Cronograma, seção 2, item 1 | Equipe 3 (GenAI) |
+| 2 | 9 rotas | 10ª rota POST /ia/insight (bloco “Análise da IA” da Tela 2 e resumo da Tela 3) | Cronograma, seção 2, item 2 | Equipe 3 (GenAI) |
+| 3 | aberta → agendada → em execução → concluída | ABERTA → EM_CAMPO → CONCLUIDA; CANCELADA a partir de ABERTA/EM_CAMPO; “agendada” vira o campo `data_prevista` | Cronograma, seção 2, item 3 (fluxo do protótipo validado) | Gabriel (já implementado no service) |
+
+## 14. Regras provisórias e seus donos
+
+O stub precisa de números para o front trabalhar, mas as regras abaixo **não estão decididas por este contrato**. Pertencem aos donos das fatias, que podem trocá-las sem que isso conte como mudança de contrato, desde que mantenham os nomes e formatos dos campos. Se o formato mudar, atualize este documento e o fixture no mesmo PR.
+
+| Regra | Onde aparece | Valor no stub | Dono | Quando |
+| --- | --- | --- | --- | --- |
+| Veredito “conta alta” (limiar e comparação) | `diagnostico_conta` | Ilustrativo (último mês acima do ano anterior e da média) | Irvin Amilcar (V1a) | 22–23/10 |
+| Agregação regional de DEC/FEC (média ponderada por UCs, sem recalcular denominador por bairro) | `ranking_regional` | Ilustrativa | Arthur (D-R/R1a) | 21–23/10 |
+| Metas de DEC/FEC | `dec_medio.meta`, `fec_medio.meta` | 12,0 h e 7,5 interrupções (ilustrativas) | Arthur | 23/10 |
+| Decomposição preço/volume/bandeira-mix | `ponte_receita`, `drill_down` | Distribuição ilustrativa do consolidado | Dono da Gold de receita (Equipe 3, seção 2, item 6) | Amostra 23/10, final 26/10 |
+| Score e motivos da fila; corte de priorização (score ≥ 60) | `candidatos` | Ilustrativos | Equipe 3 (Gold da fila) e Gabriel (A1) | 26/10 |
+| Nomes reais de tabelas Gold, SQL e auditoria do agente | `resposta_ia` (`gold_receita_demo`) | Ilustrativos | Equipe 3 (GenAI) | Contrato 20/10, módulo até 29/10 |
+| Timestamp de carga da Gold | `metadados.gold_atualizada_em` | Fixo | Dados | B2 (21/10) |
+
+Fontes ausentes não devem virar valores fictícios em produção. Telefone permanece null até existir fonte.
+
+P1/B1 entregam contratos e stubs; não substituem B2/B3/B4/B5, O1b, V1a ou R1a. A leitura real e a persistência seguem com os responsáveis do cronograma.
+
+## 15. Aprovação
+
+Este documento fica como “proposta para revisão” até ser aprovado na daily. Para aprovar:
+
+- [ ] Par A (Thiago + Gheyson): formato de período, nomes JSON e formatos dos fixtures.
+- [ ] Equipe 3: itens 1 e 2 da seção 13 e as linhas dela na seção 14.
+- [ ] Irvin Amilcar e Arthur: suas linhas da seção 14 (podem manter o valor ilustrativo até V1a/R1a).
+- [ ] Gabriel: item 3 da seção 13 e os adaptadores de `schemas/inspecoes.py`.
+
+Depois da aprovação, troque o título para “V2 (aprovada em DD/MM)” e registre a data na ata da daily.

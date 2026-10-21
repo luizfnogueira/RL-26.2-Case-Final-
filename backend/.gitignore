@@ -7,3 +7,13 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.egg-info/
+venv/
+
+# Banco local gerado pelo seed (B2)
+*.db
+*.sqlite
+*.sqlite3
+
+# Cobertura de testes
+.coverage
+htmlcov/

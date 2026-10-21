@@ -1,11 +1,11 @@
 {
-  "pergunta": "Qual foi o consumo no período?",
+  "pergunta": "Qual foi a receita no período?",
   "contexto": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
+    "periodo_atual": "2025-07/2026-06",
+    "periodo_comparacao": "2022-07/2023-06",
+    "municipio": null,
     "bairro": null,
-    "classe": "Residencial",
+    "classe": null,
     "alimentador": null
   }
 }

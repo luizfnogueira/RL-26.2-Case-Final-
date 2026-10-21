@@ -1,10 +1,44 @@
 {
-  "id": "OS-DEMO-001",
-  "id_uc": "UC-DEMO-001",
-  "status": "EM_ANDAMENTO",
-  "motivo": "Verificar variação de consumo.",
-  "criado_em": "2026-10-20T10:00:00-03:00",
-  "atualizado_em": "2026-10-20T11:00:00-03:00",
-  "motivo_cancelamento": null,
-  "resultado": null
+  "id_ordem": 1,
+  "id_uc": "UC-DEMO-002",
+  "status": "EM_CAMPO",
+  "equipe_responsavel": "Equipe Norte 01",
+  "data_criacao": "2026-10-19T09:00:00-03:00",
+  "data_prevista": "2026-10-23",
+  "data_inicio_campo": "2026-10-21T09:30:00-03:00",
+  "data_conclusao": null,
+  "data_cancelamento": null,
+  "justificativa_cancelamento": null,
+  "motivo": "Score 91,5 na fila: queda de consumo sem GD.",
+  "kwh_estimado": 1840.0,
+  "observacoes": null,
+  "resultado": null,
+  "historico": [
+    {
+      "id_historico": 8,
+      "id_ordem": 1,
+      "status_anterior": null,
+      "status_novo": "ABERTA",
+      "data_mudanca": "2026-10-19T09:00:00-03:00",
+      "usuario": null,
+      "justificativa_ou_motivo": "Score 91,5 na fila: queda de consumo sem GD.",
+      "detalhes": {
+        "equipe": "Equipe Norte 01",
+        "data_prevista": "2026-10-23"
+      }
+    },
+    {
+      "id_historico": 9,
+      "id_ordem": 1,
+      "status_anterior": "ABERTA",
+      "status_novo": "EM_CAMPO",
+      "data_mudanca": "2026-10-21T09:30:00-03:00",
+      "usuario": null,
+      "justificativa_ou_motivo": "Ordem despachada para execução em campo.",
+      "detalhes": {
+        "equipe": "Equipe Norte 01",
+        "inicio_campo": "2026-10-21T09:30:00-03:00"
+      }
+    }
+  ]
 }

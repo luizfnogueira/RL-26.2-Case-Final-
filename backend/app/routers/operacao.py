@@ -4,15 +4,14 @@ from fastapi import APIRouter, Query
 
 from app.routers.common import STUB, respostas
 from app.schemas.operacao import FiltrosOperacao, Operacao
-from app.services.stubs import exemplo, paginar
+from app.services.stub_operacao import montar_operacao
 
 router = APIRouter(tags=['Operação'])
 
 
-@router.get('/operacao', response_model=Operacao, summary='DEC/FEC por alimentador',
-            description=STUB + ' Filtros/paginação sobre o exemplo; DEC/FEC ainda indisponíveis no P1.',
-            responses=respostas('operacao', erros=(422, 500, 503)))
+@router.get('/operacao', response_model=Operacao, summary='DEC/FEC por alimentador e região',
+            description=STUB + ' Rankings paginados de forma independente; a série não é paginada. '
+            'Filtro classe retorna 422.',
+            responses=respostas('operacao', erros=('CENARIO_STUB_INDISPONIVEL',)))
 async def operacao(filtros: Annotated[FiltrosOperacao, Query()]):
-    payload = paginar(exemplo('operacao'), filtros)
-    payload['periodo_referencia'] = filtros.periodo_atual
-    return payload
+    return montar_operacao(filtros)

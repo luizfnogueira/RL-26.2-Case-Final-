@@ -1,23 +1,1021 @@
 {
-  "periodo_referencia": "2026-09",
-  "items": [
+  "filtros": {
+    "municipio": null,
+    "bairro": null,
+    "classe": null,
+    "alimentador": null,
+    "periodo_atual": "2025-07/2026-06",
+    "ordenar_por": "dec"
+  },
+  "serie_historica": [
     {
       "alimentador": "ALM-DEMO-001",
-      "status_calculo": "indisponivel",
-      "motivo_indisponibilidade": "METODOLOGIA_PENDENTE",
-      "dec": {
-        "valor": null,
-        "unidade": "h/UC",
-        "periodo_referencia": "2026-09"
-      },
-      "fec": {
-        "valor": null,
-        "unidade": "interrupcoes/UC",
-        "periodo_referencia": "2026-09"
-      }
+      "pontos": [
+        {
+          "mes": "2025-07",
+          "dec": {
+            "valor": 0.85,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-07"
+          },
+          "fec": {
+            "valor": 0.35,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-07"
+          }
+        },
+        {
+          "mes": "2025-08",
+          "dec": {
+            "valor": 0.82,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-08"
+          },
+          "fec": {
+            "valor": 0.37,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-08"
+          }
+        },
+        {
+          "mes": "2025-09",
+          "dec": {
+            "valor": 0.78,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-09"
+          },
+          "fec": {
+            "valor": 0.43,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-09"
+          }
+        },
+        {
+          "mes": "2025-10",
+          "dec": {
+            "valor": 0.8,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-10"
+          },
+          "fec": {
+            "valor": 0.47,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-10"
+          }
+        },
+        {
+          "mes": "2025-11",
+          "dec": {
+            "valor": 0.82,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-11"
+          },
+          "fec": {
+            "valor": 0.5,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-11"
+          }
+        },
+        {
+          "mes": "2025-12",
+          "dec": {
+            "valor": 0.87,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-12"
+          },
+          "fec": {
+            "valor": 0.5,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-12"
+          }
+        },
+        {
+          "mes": "2026-01",
+          "dec": {
+            "valor": 0.9,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-01"
+          },
+          "fec": {
+            "valor": 0.49,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-01"
+          }
+        },
+        {
+          "mes": "2026-02",
+          "dec": {
+            "valor": 0.88,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-02"
+          },
+          "fec": {
+            "valor": 0.46,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-02"
+          }
+        },
+        {
+          "mes": "2026-03",
+          "dec": {
+            "valor": 0.84,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-03"
+          },
+          "fec": {
+            "valor": 0.45,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-03"
+          }
+        },
+        {
+          "mes": "2026-04",
+          "dec": {
+            "valor": 0.76,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-04"
+          },
+          "fec": {
+            "valor": 0.44,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-04"
+          }
+        },
+        {
+          "mes": "2026-05",
+          "dec": {
+            "valor": 0.66,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-05"
+          },
+          "fec": {
+            "valor": 0.46,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-05"
+          }
+        },
+        {
+          "mes": "2026-06",
+          "dec": {
+            "valor": 0.62,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-06"
+          },
+          "fec": {
+            "valor": 0.48,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-06"
+          }
+        }
+      ]
+    },
+    {
+      "alimentador": "ALM-DEMO-002",
+      "pontos": [
+        {
+          "mes": "2025-07",
+          "dec": {
+            "valor": 1.09,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-07"
+          },
+          "fec": {
+            "valor": 0.44,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-07"
+          }
+        },
+        {
+          "mes": "2025-08",
+          "dec": {
+            "valor": 1.04,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-08"
+          },
+          "fec": {
+            "valor": 0.47,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-08"
+          }
+        },
+        {
+          "mes": "2025-09",
+          "dec": {
+            "valor": 1.0,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-09"
+          },
+          "fec": {
+            "valor": 0.54,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-09"
+          }
+        },
+        {
+          "mes": "2025-10",
+          "dec": {
+            "valor": 1.02,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-10"
+          },
+          "fec": {
+            "valor": 0.6,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-10"
+          }
+        },
+        {
+          "mes": "2025-11",
+          "dec": {
+            "valor": 1.06,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-11"
+          },
+          "fec": {
+            "valor": 0.62,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-11"
+          }
+        },
+        {
+          "mes": "2025-12",
+          "dec": {
+            "valor": 1.11,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-12"
+          },
+          "fec": {
+            "valor": 0.63,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-12"
+          }
+        },
+        {
+          "mes": "2026-01",
+          "dec": {
+            "valor": 1.15,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-01"
+          },
+          "fec": {
+            "valor": 0.61,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-01"
+          }
+        },
+        {
+          "mes": "2026-02",
+          "dec": {
+            "valor": 1.13,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-02"
+          },
+          "fec": {
+            "valor": 0.58,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-02"
+          }
+        },
+        {
+          "mes": "2026-03",
+          "dec": {
+            "valor": 1.08,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-03"
+          },
+          "fec": {
+            "valor": 0.57,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-03"
+          }
+        },
+        {
+          "mes": "2026-04",
+          "dec": {
+            "valor": 0.97,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-04"
+          },
+          "fec": {
+            "valor": 0.56,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-04"
+          }
+        },
+        {
+          "mes": "2026-05",
+          "dec": {
+            "valor": 0.85,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-05"
+          },
+          "fec": {
+            "valor": 0.58,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-05"
+          }
+        },
+        {
+          "mes": "2026-06",
+          "dec": {
+            "valor": 0.8,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-06"
+          },
+          "fec": {
+            "valor": 0.6,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-06"
+          }
+        }
+      ]
+    },
+    {
+      "alimentador": "ALM-DEMO-003",
+      "pontos": [
+        {
+          "mes": "2025-07",
+          "dec": {
+            "valor": 1.51,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-07"
+          },
+          "fec": {
+            "valor": 0.51,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-07"
+          }
+        },
+        {
+          "mes": "2025-08",
+          "dec": {
+            "valor": 1.45,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-08"
+          },
+          "fec": {
+            "valor": 0.55,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-08"
+          }
+        },
+        {
+          "mes": "2025-09",
+          "dec": {
+            "valor": 1.4,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-09"
+          },
+          "fec": {
+            "valor": 0.63,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-09"
+          }
+        },
+        {
+          "mes": "2025-10",
+          "dec": {
+            "valor": 1.42,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-10"
+          },
+          "fec": {
+            "valor": 0.69,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-10"
+          }
+        },
+        {
+          "mes": "2025-11",
+          "dec": {
+            "valor": 1.47,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-11"
+          },
+          "fec": {
+            "valor": 0.72,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-11"
+          }
+        },
+        {
+          "mes": "2025-12",
+          "dec": {
+            "valor": 1.54,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-12"
+          },
+          "fec": {
+            "valor": 0.74,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-12"
+          }
+        },
+        {
+          "mes": "2026-01",
+          "dec": {
+            "valor": 1.6,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-01"
+          },
+          "fec": {
+            "valor": 0.71,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-01"
+          }
+        },
+        {
+          "mes": "2026-02",
+          "dec": {
+            "valor": 1.57,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-02"
+          },
+          "fec": {
+            "valor": 0.68,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-02"
+          }
+        },
+        {
+          "mes": "2026-03",
+          "dec": {
+            "valor": 1.5,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-03"
+          },
+          "fec": {
+            "valor": 0.66,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-03"
+          }
+        },
+        {
+          "mes": "2026-04",
+          "dec": {
+            "valor": 1.35,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-04"
+          },
+          "fec": {
+            "valor": 0.64,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-04"
+          }
+        },
+        {
+          "mes": "2026-05",
+          "dec": {
+            "valor": 1.18,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-05"
+          },
+          "fec": {
+            "valor": 0.67,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-05"
+          }
+        },
+        {
+          "mes": "2026-06",
+          "dec": {
+            "valor": 1.11,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-06"
+          },
+          "fec": {
+            "valor": 0.7,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-06"
+          }
+        }
+      ]
+    },
+    {
+      "alimentador": "ALM-DEMO-004",
+      "pontos": [
+        {
+          "mes": "2025-07",
+          "dec": {
+            "valor": 0.95,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-07"
+          },
+          "fec": {
+            "valor": 0.4,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-07"
+          }
+        },
+        {
+          "mes": "2025-08",
+          "dec": {
+            "valor": 0.92,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-08"
+          },
+          "fec": {
+            "valor": 0.42,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-08"
+          }
+        },
+        {
+          "mes": "2025-09",
+          "dec": {
+            "valor": 0.88,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-09"
+          },
+          "fec": {
+            "valor": 0.48,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-09"
+          }
+        },
+        {
+          "mes": "2025-10",
+          "dec": {
+            "valor": 0.9,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-10"
+          },
+          "fec": {
+            "valor": 0.53,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-10"
+          }
+        },
+        {
+          "mes": "2025-11",
+          "dec": {
+            "valor": 0.93,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-11"
+          },
+          "fec": {
+            "valor": 0.56,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-11"
+          }
+        },
+        {
+          "mes": "2025-12",
+          "dec": {
+            "valor": 0.97,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-12"
+          },
+          "fec": {
+            "valor": 0.57,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-12"
+          }
+        },
+        {
+          "mes": "2026-01",
+          "dec": {
+            "valor": 1.01,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-01"
+          },
+          "fec": {
+            "valor": 0.55,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-01"
+          }
+        },
+        {
+          "mes": "2026-02",
+          "dec": {
+            "valor": 0.99,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-02"
+          },
+          "fec": {
+            "valor": 0.52,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-02"
+          }
+        },
+        {
+          "mes": "2026-03",
+          "dec": {
+            "valor": 0.95,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-03"
+          },
+          "fec": {
+            "valor": 0.51,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-03"
+          }
+        },
+        {
+          "mes": "2026-04",
+          "dec": {
+            "valor": 0.85,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-04"
+          },
+          "fec": {
+            "valor": 0.5,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-04"
+          }
+        },
+        {
+          "mes": "2026-05",
+          "dec": {
+            "valor": 0.75,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-05"
+          },
+          "fec": {
+            "valor": 0.52,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-05"
+          }
+        },
+        {
+          "mes": "2026-06",
+          "dec": {
+            "valor": 0.7,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-06"
+          },
+          "fec": {
+            "valor": 0.54,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-06"
+          }
+        }
+      ]
+    },
+    {
+      "alimentador": "ALM-DEMO-005",
+      "pontos": [
+        {
+          "mes": "2025-07",
+          "dec": {
+            "valor": 0.79,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-07"
+          },
+          "fec": {
+            "valor": 0.31,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-07"
+          }
+        },
+        {
+          "mes": "2025-08",
+          "dec": {
+            "valor": 0.76,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-08"
+          },
+          "fec": {
+            "valor": 0.33,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-08"
+          }
+        },
+        {
+          "mes": "2025-09",
+          "dec": {
+            "valor": 0.73,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-09"
+          },
+          "fec": {
+            "valor": 0.37,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-09"
+          }
+        },
+        {
+          "mes": "2025-10",
+          "dec": {
+            "valor": 0.74,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-10"
+          },
+          "fec": {
+            "valor": 0.41,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-10"
+          }
+        },
+        {
+          "mes": "2025-11",
+          "dec": {
+            "valor": 0.76,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-11"
+          },
+          "fec": {
+            "valor": 0.43,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-11"
+          }
+        },
+        {
+          "mes": "2025-12",
+          "dec": {
+            "valor": 0.8,
+            "unidade": "h/UC",
+            "periodo_referencia": "2025-12"
+          },
+          "fec": {
+            "valor": 0.44,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2025-12"
+          }
+        },
+        {
+          "mes": "2026-01",
+          "dec": {
+            "valor": 0.83,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-01"
+          },
+          "fec": {
+            "valor": 0.42,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-01"
+          }
+        },
+        {
+          "mes": "2026-02",
+          "dec": {
+            "valor": 0.82,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-02"
+          },
+          "fec": {
+            "valor": 0.4,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-02"
+          }
+        },
+        {
+          "mes": "2026-03",
+          "dec": {
+            "valor": 0.78,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-03"
+          },
+          "fec": {
+            "valor": 0.39,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-03"
+          }
+        },
+        {
+          "mes": "2026-04",
+          "dec": {
+            "valor": 0.7,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-04"
+          },
+          "fec": {
+            "valor": 0.38,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-04"
+          }
+        },
+        {
+          "mes": "2026-05",
+          "dec": {
+            "valor": 0.61,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-05"
+          },
+          "fec": {
+            "valor": 0.4,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-05"
+          }
+        },
+        {
+          "mes": "2026-06",
+          "dec": {
+            "valor": 0.58,
+            "unidade": "h/UC",
+            "periodo_referencia": "2026-06"
+          },
+          "fec": {
+            "valor": 0.42,
+            "unidade": "interrupcoes/UC",
+            "periodo_referencia": "2026-06"
+          }
+        }
+      ]
     }
   ],
-  "page": 1,
-  "page_size": 20,
-  "total": 1
+  "ranking_alimentadores": {
+    "items": [
+      {
+        "posicao": 1,
+        "alimentador": "ALM-DEMO-003",
+        "municipio": "Recife",
+        "bairros_atendidos": [
+          "Boa Viagem"
+        ],
+        "ucs_atendidas": 81984,
+        "dec": {
+          "valor": 17.1,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 7.9,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 64.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      {
+        "posicao": 2,
+        "alimentador": "ALM-DEMO-002",
+        "municipio": "Recife",
+        "bairros_atendidos": [
+          "Casa Amarela"
+        ],
+        "ucs_atendidas": 50106,
+        "dec": {
+          "valor": 12.3,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 6.8,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 51.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      {
+        "posicao": 3,
+        "alimentador": "ALM-DEMO-004",
+        "municipio": "Jaboatão dos Guararapes",
+        "bairros_atendidos": [
+          "Candeias",
+          "Piedade"
+        ],
+        "ucs_atendidas": 91797,
+        "dec": {
+          "valor": 10.8,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 6.1,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 44.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      {
+        "posicao": 4,
+        "alimentador": "ALM-DEMO-001",
+        "municipio": "Recife",
+        "bairros_atendidos": [
+          "Boa Vista"
+        ],
+        "ucs_atendidas": 56827,
+        "dec": {
+          "valor": 9.6,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 5.4,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 38.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      {
+        "posicao": 5,
+        "alimentador": "ALM-DEMO-005",
+        "municipio": "Olinda",
+        "bairros_atendidos": [
+          "Casa Caiada",
+          "Rio Doce"
+        ],
+        "ucs_atendidas": 131636,
+        "dec": {
+          "valor": 8.9,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 4.7,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 33.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 5
+  },
+  "ranking_regional": {
+    "items": [
+      {
+        "posicao": 1,
+        "municipio": "Recife",
+        "bairro": null,
+        "dec": {
+          "valor": 13.57,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 6.86,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 153.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      {
+        "posicao": 2,
+        "municipio": "Jaboatão dos Guararapes",
+        "bairro": null,
+        "dec": {
+          "valor": 10.8,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 6.1,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 44.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      {
+        "posicao": 3,
+        "municipio": "Olinda",
+        "bairro": null,
+        "dec": {
+          "valor": 8.9,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "fec": {
+          "valor": 4.7,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "interrupcoes": {
+          "valor": 33.0,
+          "unidade": "interrupcoes",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 3,
+    "nivel_regional": "municipio"
+  },
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
 }

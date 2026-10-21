@@ -1,10 +1,31 @@
-from typing import Annotated, Generic, Literal, TypeVar
+from typing import Annotated, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 Mes = Annotated[str, StringConstraints(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')]
 Texto = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-Disponibilidade = Literal['disponivel', 'indisponivel']
+
+
+def limites(periodo: str) -> tuple[str, str]:
+    inicio, _, fim = periodo.partition('/')
+    return inicio, fim or inicio
+
+
+def duracao(periodo: str) -> int:
+    inicio, fim = (int(m[:4]) * 12 + int(m[5:]) for m in limites(periodo))
+    return fim - inicio + 1
+
+
+def _validar_periodo(periodo: str) -> str:
+    inicio, fim = limites(periodo)
+    if inicio > fim:
+        raise ValueError('O início do período deve ser anterior ou igual ao fim')
+    return periodo
+
+
+# YYYY-MM ou YYYY-MM/YYYY-MM, com início e fim inclusivos.
+Periodo = Annotated[str, StringConstraints(
+    pattern=r'^\d{4}-(0[1-9]|1[0-2])(/\d{4}-(0[1-9]|1[0-2]))?$'), AfterValidator(_validar_periodo)]
 
 
 class Schema(BaseModel):
@@ -19,7 +40,18 @@ class Erro(Schema):
 class Indicador(Schema):
     valor: float | None
     unidade: str
-    periodo_referencia: Mes
+    periodo_referencia: Periodo
+
+
+class IndicadorNomeado(Indicador):
+    nome: str
+    rotulo: str
+
+
+class Metadados(Schema):
+    dados_ficticios: bool
+    gold_atualizada_em: AwareDatetime | None
+    observacoes: list[str] = Field(default_factory=list)
 
 
 class FiltrosRegiao(Schema):
@@ -36,18 +68,18 @@ class FiltrosRegiao(Schema):
 
 
 class Contexto(FiltrosRegiao):
-    periodo_atual: Mes
-    periodo_comparacao: Mes | None = None
+    periodo_atual: Periodo
+    periodo_comparacao: Periodo | None = None
 
     @model_validator(mode='after')
     def validar_periodos(self):
+        if self.periodo_comparacao is None:
+            return self
         if self.periodo_atual == self.periodo_comparacao:
             raise ValueError('Os períodos devem ser diferentes')
+        if duracao(self.periodo_atual) != duracao(self.periodo_comparacao):
+            raise ValueError('Os períodos devem ter a mesma duração')
         return self
-
-
-class FiltrosDashboard(Contexto):
-    periodo_comparacao: Mes
 
 
 class Paginacao(Schema):

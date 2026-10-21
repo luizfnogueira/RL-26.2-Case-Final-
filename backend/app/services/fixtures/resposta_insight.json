@@ -1,38 +1,56 @@
 {
-  "resposta": "No cenário simulado, receita faturada e consumo cresceram 20%. A decomposição entre preço e volume ainda não está disponível.",
-  "contexto": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
-    "bairro": null,
-    "classe": "Residencial",
-    "alimentador": null
-  },
-  "indicadores_utilizados": [
+  "titulo": "Por que a receita mudou?",
+  "texto": "No consolidado, a receita passou de R$ 263,6 milhões para R$ 284,7 milhões. O reajuste de 10,5% gerou um efeito-preço de R$ 27,7 milhões, enquanto o volume faturado variou −3,9% e respondeu por um efeito-volume de −R$ 10,4 milhões. O crescimento da receita veio do preço, não de mais consumo.",
+  "numeros_utilizados": [
     {
-      "nome": "receita_faturada",
-      "valor": 120000.0,
+      "valor": 284700000.0,
       "unidade": "BRL",
-      "periodo_referencia": "2026-09"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "receita_atual",
+      "rotulo": "Receita atual"
     },
     {
-      "nome": "receita_faturada",
-      "valor": 100000.0,
+      "valor": 263600000.0,
       "unidade": "BRL",
-      "periodo_referencia": "2026-08"
+      "periodo_referencia": "2022-07/2023-06",
+      "nome": "receita_comparacao",
+      "rotulo": "Receita base"
     },
     {
-      "nome": "consumo",
-      "valor": 150000.0,
-      "unidade": "kWh",
-      "periodo_referencia": "2026-09"
+      "valor": -3.8986,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "variacao_volume",
+      "rotulo": "Volume"
     },
     {
-      "nome": "consumo",
-      "valor": 125000.0,
-      "unidade": "kWh",
-      "periodo_referencia": "2026-08"
+      "valor": 10.5,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "reajuste",
+      "rotulo": "Reajuste"
+    },
+    {
+      "valor": 27700000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "efeito_preco",
+      "rotulo": "Efeito-preço"
+    },
+    {
+      "valor": -10400000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "efeito_volume",
+      "rotulo": "Efeito-volume"
     }
   ],
-  "gerado_em": "2026-10-20T10:00:00-03:00"
+  "gerado_em": "2026-10-21T06:20:00-03:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
 }

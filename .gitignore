@@ -1,0 +1,13 @@
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+.idea/
+
+# Python (data-engineering e scripts fora do backend)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/

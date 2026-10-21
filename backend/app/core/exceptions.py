@@ -67,3 +67,8 @@ class ResultadoIncompletoException(AppException):
     codigo = "RESULTADO_INCOMPLETO"
     mensagem = "Resultado de campo incompleto ou inconsistente."
 
+
+class CenarioStubIndisponivelException(AppException):
+    status_code = 422
+    codigo = "CENARIO_STUB_INDISPONIVEL"
+    mensagem = "Consulta válida, mas fora dos cenários simulados pelo stub."

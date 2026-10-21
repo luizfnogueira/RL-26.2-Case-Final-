@@ -1,15 +1,16 @@
+"""Adaptadores de transporte da API V2 sobre o modelo de ordens do Gabriel (schemas/inspecao.py)."""
 from datetime import date
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import AwareDatetime, Field, StringConstraints, model_validator
 
 from app.schemas.common import (
-    Contexto, Disponibilidade, FiltrosRegiao, Indicador, Mes, Pagina,
-    Paginacao, Schema, Texto,
+    Contexto, FiltrosRegiao, Indicador, Metadados, Pagina, Paginacao, Periodo, Schema, Texto,
 )
+from app.schemas.inspecao import ResultadoInspecao
 
-StatusOrdem = Literal['ABERTA', 'EM_ANDAMENTO', 'CONCLUIDA', 'CANCELADA']
-Motivo = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+StatusOrdem = Literal['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
+TextoLongo = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
 class FiltrosCandidatos(Contexto, Paginacao):
@@ -24,72 +25,110 @@ class Candidato(Schema):
     alimentador: str
     posicao: int = Field(ge=1)
     motivos: list[str]
-    energia_estimada_recuperar: Indicador
+    energia_estimada: Indicador
+    score: float = Field(ge=0, le=100)
+    ordem_ativa: bool
+    id_ordem_ativa: int | None
+
+
+class ResumoCandidatos(Schema):
+    ucs_analisadas: Indicador
+    ucs_priorizadas: Indicador
+    potencial_recuperacao: Indicador
+    ordens_ativas: Indicador
 
 
 class Candidatos(Pagina[Candidato]):
-    periodo_referencia: Mes
-    status_analise: Disponibilidade
-    motivo_indisponibilidade: str | None
+    periodo_referencia: Periodo
+    resumo: ResumoCandidatos
+    metadados: Metadados
 
 
 class FiltrosInspecoes(FiltrosRegiao, Paginacao):
     id_uc: Texto | None = None
     status: StatusOrdem | None = None
-    periodo_atual: Mes | None = None
+    periodo_atual: Periodo | None = None
 
 
 class Resultado(Schema):
-    data: date
-    inspetor: Texto
-    classificacao: Literal['IRREGULARIDADE_CONFIRMADA', 'SEM_IRREGULARIDADE', 'INCONCLUSIVA']
+    irregularidade_detectada: bool
     tipo_irregularidade: Texto | None = None
-    kwh_recuperado: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-    observacoes: str | None = Field(default=None, max_length=2000)
+    kwh_recuperado: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    observacoes: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+    data_inspecao: AwareDatetime | None = None
+    inspetor: Texto | None = None
 
     @model_validator(mode='after')
     def validar_resultado(self):
-        if self.classificacao == 'IRREGULARIDADE_CONFIRMADA':
-            if not self.tipo_irregularidade:
-                raise ValueError('Informe o tipo de irregularidade')
-        elif self.tipo_irregularidade is not None:
-            raise ValueError('Tipo de irregularidade exige confirmação')
-        if self.classificacao == 'SEM_IRREGULARIDADE' and self.kwh_recuperado != 0:
-            raise ValueError('Sem irregularidade, kwh_recuperado deve ser zero')
-        if self.classificacao == 'INCONCLUSIVA' and self.kwh_recuperado is not None:
-            raise ValueError('Resultado inconclusivo exige kwh_recuperado nulo')
+        # Reaproveita as regras de consistência do modelo do Gabriel; erro vira 422.
+        ResultadoInspecao(**self.model_dump())
         return self
+
+
+class Historico(Schema):
+    id_historico: int
+    id_ordem: int
+    status_anterior: StatusOrdem | None
+    status_novo: StatusOrdem
+    data_mudanca: AwareDatetime
+    usuario: str | None
+    justificativa_ou_motivo: str | None
+    detalhes: dict[str, Any] | None
+
+
+class Ordem(Schema):
+    id_ordem: int = Field(ge=1)
+    id_uc: str
+    status: StatusOrdem
+    equipe_responsavel: str
+    data_criacao: AwareDatetime
+    data_prevista: date | None
+    data_inicio_campo: AwareDatetime | None
+    data_conclusao: AwareDatetime | None
+    data_cancelamento: AwareDatetime | None
+    justificativa_cancelamento: str | None
+    motivo: str | None
+    kwh_estimado: float | None
+    observacoes: str | None
+    resultado: Resultado | None
+    historico: list[Historico]
+
+
+class ContagemStatus(Schema):
+    ABERTA: int
+    EM_CAMPO: int
+    CONCLUIDA: int
+    CANCELADA: int
+
+
+class Ordens(Pagina[Ordem]):
+    contagem_status: ContagemStatus
+    metadados: Metadados
 
 
 class CriarInspecao(Schema):
     id_uc: Texto
-    motivo: Motivo
+    equipe_responsavel: Texto
+    data_prevista: date | None = None
+    motivo: TextoLongo | None = None
+    kwh_estimado: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    observacoes: TextoLongo | None = None
 
 
 class AtualizarInspecao(Schema):
     status: StatusOrdem
-    motivo_cancelamento: Motivo | None = None
+    equipe_responsavel: Texto | None = None
+    observacoes: TextoLongo | None = None
     resultado: Resultado | None = None
+    justificativa: TextoLongo | None = None
 
     @model_validator(mode='after')
-    def validar_status(self):
-        if self.status == 'CONCLUIDA':
-            if self.resultado is None or self.motivo_cancelamento is not None:
-                raise ValueError('Conclusão exige resultado e não aceita motivo de cancelamento')
-        elif self.status == 'CANCELADA':
-            if not self.motivo_cancelamento or self.resultado is not None:
-                raise ValueError('Cancelamento exige motivo e não aceita resultado')
-        elif self.resultado is not None or self.motivo_cancelamento is not None:
-            raise ValueError('Status não aceita resultado ou cancelamento')
+    def validar_campos(self):
+        # Ausência de resultado/justificativa é regra de negócio (400); aqui só combinações (422).
+        if self.status != 'EM_CAMPO' and (self.equipe_responsavel is not None or self.observacoes is not None):
+            raise ValueError('equipe_responsavel e observacoes só são aceitos ao iniciar campo')
+        if self.status != 'CONCLUIDA' and self.resultado is not None:
+            raise ValueError('resultado só é aceito na conclusão')
+        if self.status != 'CANCELADA' and self.justificativa is not None:
+            raise ValueError('justificativa só é aceita no cancelamento')
         return self
-
-
-class Ordem(Schema):
-    id: str
-    id_uc: str
-    status: StatusOrdem
-    motivo: str
-    criado_em: AwareDatetime
-    atualizado_em: AwareDatetime
-    motivo_cancelamento: str | None
-    resultado: Resultado | None

@@ -1,17 +1,206 @@
 {
   "items": [
     {
-      "id": "OS-DEMO-001",
-      "id_uc": "UC-DEMO-001",
+      "id_ordem": 1,
+      "id_uc": "UC-DEMO-002",
       "status": "ABERTA",
-      "motivo": "Verificar variação de consumo.",
-      "criado_em": "2026-10-20T10:00:00-03:00",
-      "atualizado_em": "2026-10-20T10:00:00-03:00",
-      "motivo_cancelamento": null,
-      "resultado": null
+      "equipe_responsavel": "Equipe Norte 01",
+      "data_criacao": "2026-10-19T09:00:00-03:00",
+      "data_prevista": "2026-10-23",
+      "data_inicio_campo": null,
+      "data_conclusao": null,
+      "data_cancelamento": null,
+      "justificativa_cancelamento": null,
+      "motivo": "Score 91,5 na fila: queda de consumo sem GD.",
+      "kwh_estimado": 1840.0,
+      "observacoes": null,
+      "resultado": null,
+      "historico": [
+        {
+          "id_historico": 8,
+          "id_ordem": 1,
+          "status_anterior": null,
+          "status_novo": "ABERTA",
+          "data_mudanca": "2026-10-19T09:00:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Score 91,5 na fila: queda de consumo sem GD.",
+          "detalhes": {
+            "equipe": "Equipe Norte 01",
+            "data_prevista": "2026-10-23"
+          }
+        }
+      ]
+    },
+    {
+      "id_ordem": 2,
+      "id_uc": "UC-DEMO-005",
+      "status": "EM_CAMPO",
+      "equipe_responsavel": "Equipe Sul 02",
+      "data_criacao": "2026-10-14T10:30:00-03:00",
+      "data_prevista": "2026-10-16",
+      "data_inicio_campo": "2026-10-16T08:10:00-03:00",
+      "data_conclusao": null,
+      "data_cancelamento": null,
+      "justificativa_cancelamento": null,
+      "motivo": "Consumo zerado em 2 meses.",
+      "kwh_estimado": 610.0,
+      "observacoes": null,
+      "resultado": null,
+      "historico": [
+        {
+          "id_historico": 6,
+          "id_ordem": 2,
+          "status_anterior": null,
+          "status_novo": "ABERTA",
+          "data_mudanca": "2026-10-14T10:30:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Consumo zerado em 2 meses.",
+          "detalhes": {
+            "equipe": "Equipe Sul 02",
+            "data_prevista": "2026-10-16"
+          }
+        },
+        {
+          "id_historico": 7,
+          "id_ordem": 2,
+          "status_anterior": "ABERTA",
+          "status_novo": "EM_CAMPO",
+          "data_mudanca": "2026-10-16T08:10:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Ordem despachada para execução em campo.",
+          "detalhes": {
+            "equipe": "Equipe Sul 02",
+            "inicio_campo": "2026-10-16T08:10:00-03:00"
+          }
+        }
+      ]
+    },
+    {
+      "id_ordem": 3,
+      "id_uc": "UC-DEMO-003",
+      "status": "CONCLUIDA",
+      "equipe_responsavel": "Equipe Norte 01",
+      "data_criacao": "2026-09-22T14:00:00-03:00",
+      "data_prevista": "2026-09-25",
+      "data_inicio_campo": "2026-09-25T08:00:00-03:00",
+      "data_conclusao": "2026-09-25T11:40:00-03:00",
+      "data_cancelamento": null,
+      "justificativa_cancelamento": null,
+      "motivo": "Consumo abaixo da média do bairro.",
+      "kwh_estimado": 280.0,
+      "observacoes": null,
+      "resultado": {
+        "irregularidade_detectada": true,
+        "tipo_irregularidade": "BY-PASS",
+        "kwh_recuperado": 310.0,
+        "observacoes": "Ligação direta antes do medidor; regularizada em campo.",
+        "data_inspecao": "2026-09-25T11:40:00-03:00",
+        "inspetor": "Inspetor de exemplo 01"
+      },
+      "historico": [
+        {
+          "id_historico": 3,
+          "id_ordem": 3,
+          "status_anterior": null,
+          "status_novo": "ABERTA",
+          "data_mudanca": "2026-09-22T14:00:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Consumo abaixo da média do bairro.",
+          "detalhes": {
+            "equipe": "Equipe Norte 01",
+            "data_prevista": "2026-09-25"
+          }
+        },
+        {
+          "id_historico": 4,
+          "id_ordem": 3,
+          "status_anterior": "ABERTA",
+          "status_novo": "EM_CAMPO",
+          "data_mudanca": "2026-09-25T08:00:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Ordem despachada para execução em campo.",
+          "detalhes": {
+            "equipe": "Equipe Norte 01",
+            "inicio_campo": "2026-09-25T08:00:00-03:00"
+          }
+        },
+        {
+          "id_historico": 5,
+          "id_ordem": 3,
+          "status_anterior": "EM_CAMPO",
+          "status_novo": "CONCLUIDA",
+          "data_mudanca": "2026-09-25T11:45:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Inspeção concluída: IRREGULARIDADE CONFIRMADA.",
+          "detalhes": {
+            "irregularidade_detectada": true,
+            "tipo_irregularidade": "BY-PASS",
+            "kwh_recuperado": 310.0,
+            "observacoes": "Ligação direta antes do medidor; regularizada em campo.",
+            "data_inspecao": "2026-09-25T11:40:00-03:00",
+            "inspetor": "Inspetor de exemplo 01"
+          }
+        }
+      ]
+    },
+    {
+      "id_ordem": 4,
+      "id_uc": "UC-DEMO-004",
+      "status": "CANCELADA",
+      "equipe_responsavel": "Equipe Leste 03",
+      "data_criacao": "2026-09-10T16:20:00-03:00",
+      "data_prevista": "2026-09-15",
+      "data_inicio_campo": null,
+      "data_conclusao": null,
+      "data_cancelamento": "2026-09-12T09:00:00-03:00",
+      "justificativa_cancelamento": "Ordem criada em duplicidade.",
+      "motivo": "Medidor sem manutenção há mais de 5 anos.",
+      "kwh_estimado": 2400.0,
+      "observacoes": null,
+      "resultado": null,
+      "historico": [
+        {
+          "id_historico": 1,
+          "id_ordem": 4,
+          "status_anterior": null,
+          "status_novo": "ABERTA",
+          "data_mudanca": "2026-09-10T16:20:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Medidor sem manutenção há mais de 5 anos.",
+          "detalhes": {
+            "equipe": "Equipe Leste 03",
+            "data_prevista": "2026-09-15"
+          }
+        },
+        {
+          "id_historico": 2,
+          "id_ordem": 4,
+          "status_anterior": "ABERTA",
+          "status_novo": "CANCELADA",
+          "data_mudanca": "2026-09-12T09:00:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Cancelamento: Ordem criada em duplicidade.",
+          "detalhes": {
+            "justificativa": "Ordem criada em duplicidade."
+          }
+        }
+      ]
     }
   ],
   "page": 1,
   "page_size": 20,
-  "total": 1
+  "total": 4,
+  "contagem_status": {
+    "ABERTA": 1,
+    "EM_CAMPO": 1,
+    "CONCLUIDA": 1,
+    "CANCELADA": 1
+  },
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
 }

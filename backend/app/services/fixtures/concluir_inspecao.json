@@ -1,11 +1,11 @@
 {
   "status": "CONCLUIDA",
   "resultado": {
-    "data": "2026-10-20",
-    "inspetor": "INSP-DEMO-001",
-    "classificacao": "IRREGULARIDADE_CONFIRMADA",
+    "irregularidade_detectada": true,
     "tipo_irregularidade": "BY-PASS",
     "kwh_recuperado": 120.0,
-    "observacoes": "Registro fictício para testar o formulário."
+    "observacoes": "Resultado fictício",
+    "data_inspecao": "2026-10-21T06:15:00-03:00",
+    "inspetor": null
   }
 }

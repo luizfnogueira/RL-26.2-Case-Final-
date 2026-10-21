@@ -1,23 +1,35 @@
 from app.schemas.common import Erro
-from app.services.stubs import exemplo
+from app.services.stubs import PERIODO_ATUAL, PERIODO_COMPARACAO, exemplo
 
 STUB = (
-    'Stub do P1: dados fictícios, sem banco ou IA. '
-    'Os indicadores e datas são fixos nos exemplos de agosto/setembro de 2026. '
-    'Parâmetros são validados, mas não há cálculo real. '
-    'POST/PATCH não persistem: chamadas posteriores de GET não mudam.'
+    'Stub do P1 (contrato V2): dados fictícios, sem banco ou IA. '
+    f'Cenários simulados: periodo_atual={PERIODO_ATUAL} e periodo_comparacao={PERIODO_COMPARACAO}; '
+    'outros intervalos válidos retornam 422 CENARIO_STUB_INDISPONIVEL. '
+    'POST/PATCH usam snapshot: chamadas posteriores de GET não mudam.'
 )
 
+ERROS = {
+    'TRANSICAO_INVALIDA': 400,
+    'JUSTIFICATIVA_OBRIGATORIA': 400,
+    'RESULTADO_INCOMPLETO': 400,
+    'UC_INEXISTENTE': 404,
+    'ORDEM_NAO_ENCONTRADA': 404,
+    'ORDEM_ATIVA_EXISTENTE': 409,
+    'DADOS_INVALIDOS': 422,
+    'CENARIO_STUB_INDISPONIVEL': 422,
+    'ERRO_INTERNO': 500,
+}
 
-def respostas(nome: str, status: int = 200, erros: tuple[int, ...] = (422, 500)) -> dict:
-    codigos = {404: 'RECURSO_NAO_ENCONTRADO', 409: 'CONFLITO',
-               422: 'DADOS_INVALIDOS', 500: 'ERRO_INTERNO', 503: 'DADOS_INDISPONIVEIS'}
+
+def respostas(nome: str, status: int = 200, erros: tuple[str, ...] = ()) -> dict:
     respostas = {
-        status: {'description': 'Exemplo simulado do contrato P1',
+        status: {'description': 'Exemplo simulado do contrato V2',
                  'content': {'application/json': {'example': exemplo(nome)}}}
     }
-    for erro in erros:
-        respostas[erro] = {'model': Erro, 'description': codigos[erro],
-                          'content': {'application/json': {'example': {
-                              'codigo': codigos[erro], 'mensagem': 'Não foi possível concluir a requisição.'}}}}
+    for codigo in (*erros, 'DADOS_INVALIDOS', 'ERRO_INTERNO'):
+        http = ERROS[codigo]
+        exemplos = respostas.setdefault(http, {'model': Erro, 'description': 'Erro {codigo, mensagem}',
+                                               'content': {'application/json': {'examples': {}}}})
+        exemplos['content']['application/json']['examples'][codigo] = {
+            'value': {'codigo': codigo, 'mensagem': 'Não foi possível concluir a requisição.'}}
     return respostas

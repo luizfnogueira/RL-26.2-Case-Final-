@@ -2,7 +2,70 @@
   "items": [
     {
       "id_uc": "UC-DEMO-001",
-      "nome_titular": "Titular de exemplo",
+      "nome_titular": "Titular de exemplo 001",
+      "municipio": "Recife",
+      "bairro": "Boa Vista",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-001",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-002",
+      "nome_titular": "Comércio de exemplo 002",
+      "municipio": "Recife",
+      "bairro": "Boa Viagem",
+      "classe": "Comercial",
+      "alimentador": "ALM-DEMO-003",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-003",
+      "nome_titular": "Titular de exemplo 003",
+      "municipio": "Jaboatão dos Guararapes",
+      "bairro": "Piedade",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-004",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-004",
+      "nome_titular": "Indústria de exemplo 004",
+      "municipio": "Olinda",
+      "bairro": "Rio Doce",
+      "classe": "Industrial",
+      "alimentador": "ALM-DEMO-005",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-005",
+      "nome_titular": "Titular de exemplo 005",
+      "municipio": "Recife",
+      "bairro": "Casa Amarela",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-002",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-006",
+      "nome_titular": "Comércio de exemplo 006",
+      "municipio": "Jaboatão dos Guararapes",
+      "bairro": "Candeias",
+      "classe": "Comercial",
+      "alimentador": "ALM-DEMO-004",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-007",
+      "nome_titular": "Titular de exemplo 007",
+      "municipio": "Olinda",
+      "bairro": "Casa Caiada",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-005",
+      "status": "ATIVA"
+    },
+    {
+      "id_uc": "UC-DEMO-008",
+      "nome_titular": "Titular de exemplo 008",
       "municipio": "Recife",
       "bairro": "Boa Vista",
       "classe": "Residencial",
@@ -12,5 +75,12 @@
   ],
   "page": 1,
   "page_size": 20,
-  "total": 1
+  "total": 8,
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
 }

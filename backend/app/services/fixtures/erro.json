@@ -1,4 +1,4 @@
 {
-  "codigo": "UNIDADE_NAO_ENCONTRADA",
-  "mensagem": "A unidade solicitada não foi encontrada."
+  "codigo": "TRANSICAO_INVALIDA",
+  "mensagem": "A ordem não permite a transição solicitada."
 }
