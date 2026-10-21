@@ -60,3 +60,40 @@ pytest
 ```
 
 Para incluir o teste de recarga no banco, defina `TEST_DATABASE_URL` com um banco descartável (ex.: `postgresql+psycopg://vgrid:vgrid@localhost:5432/vgrid360_teste`).
+
+
+## Frontend
+
+React + TypeScript (Vite) + Tailwind CSS, com a identidade visual FILO (tokens em `frontend/src/index.css`, espelhando as variáveis do Figma).
+
+### Pré-requisitos
+
+- Node.js 22+
+
+### Instalação e execução
+
+```bash
+cd frontend
+npm install
+cp .env.example .env             # Windows: copy .env.example .env
+npm run dev
+```
+
+O portal abre em http://localhost:5173.
+
+### Variáveis de ambiente (`frontend/.env`)
+
+| Variável         | Padrão                  | Uso                                                              |
+| ---------------- | ----------------------- | ---------------------------------------------------------------- |
+| `VITE_API_URL`   | `http://localhost:8000` | URL base da API FastAPI                                          |
+| `VITE_USE_MOCKS` | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend  |
+
+### Scripts
+
+`npm run dev` · `npm run build` · `npm run typecheck` · `npm run lint` · `npm run format` · `npm run format:check`
+
+### Estrutura (`frontend/src`)
+
+`layouts/` (menu, cabeçalho, rodapé, botão da IA) · `pages/` (uma por tela) · `components/` (por assunto) · `hooks/` · `services/` (cliente HTTP e `env.ts`) · `types/` · `data/` (mocks) · `utils/`.
+
+Rotas: `/painel`, `/receita`, `/unidades` e `/unidades/:id`, `/perdas/fila`, `/perdas/ordens`, `/operacao`, `/assistente`.

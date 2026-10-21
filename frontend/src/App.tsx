@@ -1,7 +1,33 @@
-import HomePage from './pages/HomePage'
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
+import AppLayout from '@/layouts/AppLayout'
+import AssistentePage from '@/pages/AssistentePage'
+import FilaPage from '@/pages/FilaPage'
+import NotFoundPage from '@/pages/NotFoundPage'
+import OperacaoPage from '@/pages/OperacaoPage'
+import OrdensPage from '@/pages/OrdensPage'
+import PainelPage from '@/pages/PainelPage'
+import ReceitaPage from '@/pages/ReceitaPage'
+import UnidadePage from '@/pages/UnidadePage'
 
-function App() {
-  return <HomePage />
+const router = createBrowserRouter([
+  {
+    element: <AppLayout />,
+    children: [
+      { index: true, element: <Navigate to="/painel" replace /> },
+      { path: 'painel', element: <PainelPage /> },
+      { path: 'receita', element: <ReceitaPage /> },
+      { path: 'unidades', element: <UnidadePage /> },
+      { path: 'unidades/:id', element: <UnidadePage /> },
+      { path: 'perdas', element: <Navigate to="/perdas/fila" replace /> },
+      { path: 'perdas/fila', element: <FilaPage /> },
+      { path: 'perdas/ordens', element: <OrdensPage /> },
+      { path: 'operacao', element: <OperacaoPage /> },
+      { path: 'assistente', element: <AssistentePage /> },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+])
+
+export default function App() {
+  return <RouterProvider router={router} />
 }
-
-export default App
