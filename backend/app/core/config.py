@@ -15,3 +15,8 @@ CORS_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://vgrid:vgrid@localhost:5432/vgrid360",
+)

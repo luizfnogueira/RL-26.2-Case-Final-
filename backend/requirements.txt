@@ -1,3 +1,5 @@
 fastapi[standard]==0.148.0
 SQLAlchemy==2.0.55
 python-dotenv==1.2.4
+psycopg[binary]==3.3.6
+pytest==9.1.1
