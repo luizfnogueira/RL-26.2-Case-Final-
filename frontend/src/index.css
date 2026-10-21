@@ -1,298 +1,117 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+/*
+ * Tokens da identidade visual FILO.
+ * Espelham as variáveis e os estilos do arquivo Figma
+ * "V-Energy Grid 360 — Protótipo de alta (identidade FILO)".
+ *
+ * Correspondência com o Figma:
+ *   text/primario → ink · text/secundario → ink-2 · text/terciario → ink-3
+ *   surface/*     → surface-* · border/* → borda · brand/sky-* → azul-*
+ *   brand/lime-*  → lima-* · status/* → perigo, alerta, sucesso
+ */
+@theme {
+  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Fundo da página (degradê vertical) */
+  --color-fundo-topo: #f3f4fa;
+  --color-fundo-base: #a9e2f2;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Superfícies e bordas */
+  --color-surface-card: #ffffff;
+  --color-surface-alt: #f4f4f4;
+  --color-surface-sutil: #f5f5f5;
+  --color-surface-escuro: #36465f;
+  --color-surface-tinta: #141b34;
+  --color-surface-esqueleto: #eceef2;
+  --color-borda: #d9d9d9;
+  --color-borda-leve: #f1f1f1;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  /* Texto */
+  --color-ink: #404040;
+  --color-ink-2: #7b7d80;
+  --color-ink-3: #898c8f;
+  --color-ink-inverso: #ffffff;
+
+  /* Marca */
+  --color-marca: #6a838b;
+  --color-teal: #4696ad;
+  --color-teal-escuro: #2e7a92;
+  --color-teal-profundo: #1b607a;
+  --color-azul-50: #eaf6fb;
+  --color-azul-100: #c9eaf6;
+  --color-azul-300: #a9e2f2;
+  --color-azul-400: #8fd3e8;
+  --color-lima: #d7fe65;
+  --color-lima-escuro: #b4d64e;
+  --color-lima-suave: #fbfff0;
+
+  /* Estados */
+  --color-perigo: #d75757;
+  --color-perigo-escuro: #b94343;
+  --color-perigo-suave: #fbeaea;
+  --color-alerta: #b9a065;
+  --color-alerta-escuro: #8a6f2a;
+  --color-alerta-suave: #f7f0dc;
+  --color-sucesso-texto: #4f7a12;
+  --color-sucesso-suave: #effbc8;
+
+  /* Raios */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-card: 24px;
+
+  /* Sombras */
+  --shadow-card: 0 4px 5px rgb(0 0 0 / 0.05);
+  --shadow-flutuante: 0 4px 20px rgb(0 0 0 / 0.12);
+  --shadow-modal: 0 8px 32px rgb(0 0 0 / 0.18);
+
+  /* Escala tipográfica (estilos de texto do Figma) */
+  --text-display: 30px;
+  --text-display--line-height: 38px;
+  --text-numero: 24px;
+  --text-numero--line-height: 30px;
+  --text-titulo-lg: 20px;
+  --text-titulo-lg--line-height: 26px;
+  --text-titulo: 16px;
+  --text-titulo--line-height: 20px;
+  --text-corpo-lg: 16px;
+  --text-corpo-lg--line-height: 20px;
+  --text-corpo: 14px;
+  --text-corpo--line-height: 18px;
+  --text-legenda: 12px;
+  --text-legenda--line-height: 16px;
+  --text-micro: 10px;
+  --text-micro--line-height: 12px;
+}
+
+@utility bg-filo {
+  background-image: linear-gradient(to bottom, var(--color-fundo-topo), var(--color-fundo-base));
+  background-attachment: fixed;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
   }
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-fundo-base);
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
   }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
-
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
+  :focus-visible {
+    outline: 2px solid var(--color-teal-escuro);
     outline-offset: 2px;
   }
-}
 
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
-}
-
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
-
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
-
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
+  ::selection {
+    background-color: var(--color-lima);
+    color: var(--color-ink);
   }
 }
