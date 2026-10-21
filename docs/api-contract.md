@@ -1,362 +1,145 @@
-# Contrato da API — V-Energy — V1
+# Contrato da API — V-Energy — V2 (proposta para revisão)
 
-**Status: proposta para revisão de Thiago e Gheyson. Não aprovado.**
+Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. Backend real/Gold/agente não estão implementados nesta entrega.
 
-Dez rotas funcionais (nove da arquitetura + `/ia/insight`) e `/health`. **Exemplos fictícios para mocks/stubs.** Decisões pendentes estão no final.
+## 1. Regras comuns
 
-## 1. Convenções
+- JSON em `snake_case`. IDs de UC são strings; `id_ordem` e o `{id}` de PATCH são inteiros positivos, alinhados ao modelo do Gabriel.
+- Datas: `YYYY-MM-DD`; instantes: ISO 8601 com fuso. Valores são números JSON; dinheiro em BRL, energia em kWh, DEC em h/UC, FEC em interrupcoes/UC.
+- Indicadores: `{valor, unidade, periodo_referencia}`. `null` significa ausente; não converter ausência em zero.
+- `metadados.dados_ficticios=true` identifica o mock. `gold_atualizada_em` é timestamp da última carga **de dados**, distinto de `gerado_em` da IA. Neste stub ambos são fictícios; o front formata “hoje, 06:15” a partir do timestamp, sem texto fixo.
+- `page=1`, `page_size=20` por padrão; limites 1 e 100. Resposta paginada: `{items, page, page_size, total}`. `total` após filtros, antes da paginação; página além do fim retorna `items: []`.
+- Filtros geográficos combinam por AND; `bairro` exige `municipio`. Campos extras de escrita: 422.
 
-### 1.1 Formatos
+### Períodos e filtros
 
-- JSON em `snake_case`; IDs como strings.
-- Datas: `YYYY-MM-DD`; instantes: ISO 8601 com fuso.
-- Números sem formatação; valores monetários com arredondamento para duas casas.
-- `null`: informação ausente em campo anulável; `0`: zero conhecido; `[]`: lista vazia.
-- Indicadores incluem `valor`, `unidade` e `periodo_referencia`.
-- Campos extras em corpos de escrita: `422`. PATCH preserva campos não enviados.
+`periodo_atual` e `periodo_comparacao`: string `YYYY-MM/YYYY-MM`, com início/fim **inclusivos**. Um mês também pode ser expresso como `YYYY-MM`. Validar meses, início ≤ fim e comparações de mesma duração, diferentes entre si.
 
-### 1.2 Filtros e períodos
+Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2023-06`. O formato de transporte é uma decisão desta proposta, não um nome de coluna da Gold.
 
-Períodos mensais `YYYY-MM` nesta proposta; intervalos maiores dependem de revisão.
-
-| Parâmetro | Tipo | Regra |
-| --- | --- | --- |
-| `periodo_atual` | string `YYYY-MM` | Obrigatório no dashboard, operação, candidatos e contexto de IA. Opcional em UC360 e listagem de ordens. |
-| `periodo_comparacao` | string `YYYY-MM` | Obrigatório no dashboard; opcional em candidatos e contexto de IA. Deve ser diferente do período atual. |
-| `municipio` | string | Opcional; valor normalizado a combinar com Dados. |
-| `bairro` | string | Opcional; nesta proposta exige `municipio`, para evitar ambiguidade. |
-| `classe` | string | Opcional; valores normalizados a combinar com Dados. |
-| `alimentador` | string | Opcional; identificador do alimentador. |
-| `page` | inteiro | Padrão `1`; mínimo `1`. |
-| `page_size` | inteiro | Padrão `20`; entre `1` e `100`. |
-
-Filtros combinados usam **AND**. Sem correspondência: listas vazias ou indicadores indisponíveis.
-
-`total`: quantidade após filtros, antes da paginação. Página fora do resultado: `items: []`, mantendo `total`.
-
-### 1.3 Matriz de filtros
-
-| Rota | Parâmetros aceitos |
+| Rota | Query ou corpo |
 | --- | --- |
-| `GET /dashboard` | `periodo_atual`, `periodo_comparacao`, `municipio`, `bairro`, `classe`, `alimentador` |
-| `GET /unidades` | `busca`, `municipio`, `bairro`, `classe`, `alimentador`, `page`, `page_size` |
-| `GET /unidades/{id}` | `periodo_atual` opcional |
-| `GET /inspecoes/candidatos` | `periodo_atual`, `periodo_comparacao`, `municipio`, `bairro`, `classe`, `alimentador`, `page`, `page_size` |
-| `GET /inspecoes` | `id_uc`, `status`, `periodo_atual`, `municipio`, `bairro`, `classe`, `alimentador`, `page`, `page_size` |
-| `GET /operacao` | `periodo_atual`, `alimentador`, `page`, `page_size` |
+| GET /dashboard | Ambos os períodos obrigatórios; município, bairro, classe, alimentador; `nivel=municipio|bairro|classe`, page, page_size |
+| GET /unidades | busca (ID ou titular, 1–100 caracteres); município, bairro, classe, alimentador; page, page_size |
+| GET /unidades/{id} | periodo_atual opcional; no mock o padrão é 2025-07/2026-06 |
+| GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
+| GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
+| GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec; nivel_regional=municipio|bairro; page, page_size |
+| POST /ia | pergunta; contexto opcional com períodos/filtros |
+| POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
 
-`/operacao` aceita recorte por alimentador, sem filtros por bairro/classe.
+Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não está disponível no mock operacional e retorna erro explícito se enviada. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
+
+### Limites dos stubs
+
+Os cenários analíticos estão preparados para as duas janelas anuais acima. Outros intervalos sintaticamente válidos retornam **422 `CENARIO_STUB_INDISPONIVEL`**, em vez de devolver números de outro período. A integração real deverá atender os intervalos disponíveis na Gold.
+
+Filtros e paginação operam sobre exemplos locais. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH usam snapshot: alterações não persistem entre chamadas. Não existe SQL executável nem agente conectado.
 
 ## 2. Erros
 
-Formato único:
-
 ```json
-{
-  "codigo": "UNIDADE_NAO_ENCONTRADA",
-  "mensagem": "A unidade solicitada não foi encontrada."
-}
+{"codigo": "TRANSICAO_INVALIDA", "mensagem": "A ordem não permite a transição solicitada."}
 ```
 
-| HTTP | Código proposto | Uso |
+| HTTP | Código | Situação |
 | --- | --- | --- |
-| `404` | `UNIDADE_NAO_ENCONTRADA` | ID de unidade inexistente. |
-| `404` | `ORDEM_NAO_ENCONTRADA` | ID de ordem inexistente. |
-| `404` | `RECURSO_NAO_ENCONTRADO` | Rota/recurso inexistente. |
-| `405` | `METODO_NAO_PERMITIDO` | Método incompatível com a rota. |
-| `409` | `ORDEM_ATIVA_EXISTENTE` | Outra ordem aberta/em andamento para a mesma UC. |
-| `409` | `TRANSICAO_STATUS_INVALIDA` | Alteração incompatível com o status atual. |
-| `422` | `DADOS_INVALIDOS` | Formato, campo ou combinação de campos inválidos. |
-| `503` | `DADOS_INDISPONIVEIS` | Fonte necessária à operação indisponível. |
-| `503` | `IA_INDISPONIVEL` | Agente indisponível. |
-| `500` | `ERRO_INTERNO` | Falha inesperada; detalhe técnico somente no log. |
+| 400 | TRANSICAO_INVALIDA | Estado atual não permite a transição |
+| 400 | JUSTIFICATIVA_OBRIGATORIA | Cancelamento sem justificativa |
+| 400 | RESULTADO_INCOMPLETO | Conclusão sem resultado |
+| 404 | UC_INEXISTENTE | UC não disponível no cadastro/cenário |
+| 404 | ORDEM_NAO_ENCONTRADA | ID de ordem inexistente |
+| 409 | ORDEM_ATIVA_EXISTENTE | UC já tem ordem ABERTA ou EM_CAMPO |
+| 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
+| 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
+| 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
 
-Rotas/services informam o erro; o handler padroniza a resposta.
+`AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`; falhas 503 de fonte/agente serão usadas na integração real. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
 
-## 3. GET /dashboard
-
-**Finalidade:** indicadores de receita e consumo, comparação mensal, decomposição preço-volume e recorte por região/classe.
-
-Requisição sem corpo:
+## 3. GET /dashboard — Telas 1 e 2
 
 ```http
-GET /dashboard?periodo_atual=2026-09&periodo_comparacao=2026-08&municipio=Recife&classe=Residencial
+GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 ```
 
-Resposta `200`:
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/dashboard.json)**
 
-```json
-{
-  "filtros": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
-    "bairro": null,
-    "classe": "Residencial",
-    "alimentador": null
-  },
-  "indicadores": {
-    "receita_faturada": {
-      "atual": {"valor": 120000.0, "unidade": "BRL", "periodo_referencia": "2026-09"},
-      "comparacao": {"valor": 100000.0, "unidade": "BRL", "periodo_referencia": "2026-08"},
-      "variacao_percentual": {"valor": 20.0, "unidade": "%", "periodo_referencia": "2026-09"}
-    },
-    "consumo": {
-      "atual": {"valor": 150000.0, "unidade": "kWh", "periodo_referencia": "2026-09"},
-      "comparacao": {"valor": 125000.0, "unidade": "kWh", "periodo_referencia": "2026-08"},
-      "variacao_percentual": {"valor": 20.0, "unidade": "%", "periodo_referencia": "2026-09"}
-    }
-  },
-  "analise_preco_volume": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "status": "indisponivel",
-    "motivo_indisponibilidade": "METODOLOGIA_PENDENTE",
-    "efeito_preco": {"valor": null, "unidade": "BRL", "periodo_referencia": "2026-09"},
-    "efeito_volume": {"valor": null, "unidade": "BRL", "periodo_referencia": "2026-09"}
-  }
-}
-```
-
-Regras:
-
-- Receita proposta: soma de `valor_total` das faturas elegíveis da competência; consumo: total mensal tratado. Critérios e metodologia ainda precisam de aprovação.
-- Variação com denominador zero/ausente ou indicador sem registros: `valor: null`. Falha da fonte: `503`.
-- Preço-volume: `disponivel` com valores e motivo `null`; sem metodologia, `indisponivel` e valores `null`.
-
-## 4. GET /unidades
-
-**Finalidade:** buscar e paginar o cadastro.
-
-`busca`: ID da UC ou titular, de 1 a 100 caracteres. Ordenação: `id_uc` crescente.
+- `indicadores`: exatamente seis KPIs — receita_faturada, energia_faturada, ucs_ativas, inadimplencia, dec_medio, fec_medio. Cada um tem atual, comparação, diferença e variação percentual; campos não aplicáveis retornam null.
+- Inadimplência inclui percentual da receita em cada período e variação em pontos percentuais. DEC/FEC incluem metas ilustrativas, não limites regulatórios certificados.
+- `serie_historica`: 48 pontos mensais, jul/2022–jun/2026, cada um com receita e energia. A janela da série é independente das duas janelas de comparação.
+- `ponte_receita`: receita_comparacao + efeito_preco + efeito_volume + bandeira_mix = receita_atual. Exemplo: 263,6 + 27,7 − 10,4 + 3,8 = 284,7 milhões. Inclui reajuste_percentual.
+- `drill_down`: nível, breadcrumb e lista paginada; receita, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
+- Nível bairro exige município; nível classe exige município e bairro. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
 
 ```http
-GET /unidades?municipio=Recife&classe=Residencial&page=1&page_size=20
+GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=bairro&municipio=Recife
+GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
 ```
 
-Resposta `200`:
+Na integração, a API lê os efeitos pré-calculados na Gold. O cálculo de distribuição do mock não é a implementação B3b.
 
-```json
-{
-  "items": [
-    {
-      "id_uc": "UC-DEMO-001",
-      "nome_titular": "Titular de exemplo",
-      "municipio": "Recife",
-      "bairro": "Boa Vista",
-      "classe": "Residencial",
-      "alimentador": "ALM-DEMO-001",
-      "status": "ATIVA"
-    }
-  ],
-  "page": 1,
-  "page_size": 20,
-  "total": 1
-}
-```
-
-Sem correspondências: `200`, `items: []`, `total: 0`.
-
-## 5. GET /unidades/{id}
-
-**Finalidade:** visão 360 da unidade, com cadastro e registros relacionados.
-
-`id`: ID da UC. Sem `periodo_atual`, usar a última competência disponível. Consumo: até 12 meses encerrando na referência. Faturas: competência selecionada; interrupções/chamados: mês de abertura. Medidores: histórico disponível; geração: cadastro com data de conexão.
+## 4. GET /unidades — busca da Tela 3
 
 ```http
-GET /unidades/UC-DEMO-001?periodo_atual=2026-09
+GET /unidades?busca=UC-DEMO&page=1&page_size=20
 ```
 
-Resposta `200`:
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/unidades.json)**
 
-```json
-{
-  "periodo_referencia": "2026-09",
-  "cadastro": {
-    "id_uc": "UC-DEMO-001",
-    "nome_titular": "Titular de exemplo",
-    "logradouro": "Rua de Exemplo",
-    "numero": "100",
-    "bairro": "Boa Vista",
-    "municipio": "Recife",
-    "uf": "PE",
-    "cep": "00000000",
-    "classe": "Residencial",
-    "subgrupo_tarifario": "B1",
-    "alimentador": "ALM-DEMO-001",
-    "data_ligacao": "2022-07-01",
-    "status": "ATIVA",
-    "latitude": null,
-    "longitude": null
-  },
-  "consumo": [
-    {"valor": 250.0, "unidade": "kWh", "periodo_referencia": "2026-08"},
-    {"valor": 300.0, "unidade": "kWh", "periodo_referencia": "2026-09"}
-  ],
-  "faturas": [
-    {
-      "id_fatura": "FT-DEMO-001",
-      "mes_referencia": "2026-09",
-      "valor_energia": 180.0,
-      "tributos": 60.0,
-      "valor_total": 240.0,
-      "moeda": "BRL",
-      "bandeira_tarifaria": "Verde",
-      "data_emissao": "2026-09-27",
-      "data_vencimento": "2026-10-08",
-      "data_pagamento": null,
-      "status": "ABERTA"
-    }
-  ],
-  "medidores": [
-    {
-      "id_medidor": "MD-DEMO-001",
-      "modelo": "MODELO-DEMO",
-      "tipo": "ELETRONICO",
-      "data_instalacao": "2022-07-01",
-      "data_retirada": null,
-      "data_ultima_manutencao": null,
-      "status": "ATIVO"
-    }
-  ],
-  "geracao_distribuida": [
-    {
-      "potencia_kwp": 5.0,
-      "data_conexao": "2025-02-01",
-      "modalidade": "GERACAO NA PROPRIA UC",
-      "energia_injetada_kwh_media_mensal": 200.0
-    }
-  ],
-  "interrupcoes": [
-    {
-      "id_ocorrencia": "OC-DEMO-001",
-      "alimentador": "ALM-DEMO-001",
-      "tipo": "FALTA DE ENERGIA",
-      "causa": "NAO IDENTIFICADA",
-      "data_abertura": "2026-09-10T10:00:00-03:00",
-      "data_encerramento": "2026-09-10T11:00:00-03:00",
-      "duracao_min": 60.0
-    }
-  ],
-  "chamados": [
-    {
-      "protocolo": "AT-DEMO-001",
-      "canal": "SITE",
-      "assunto": "FALTA DE ENERGIA",
-      "subassunto": null,
-      "data_abertura": "2026-09-10T10:05:00-03:00",
-      "data_fechamento": "2026-09-10T11:05:00-03:00",
-      "nota_satisfacao": null,
-      "historico": []
-    }
-  ]
-}
-```
+Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular; ordenação por ID. Sem correspondência: lista vazia.
 
-Sem registros: `[]`. UC inexistente: `404`. Sem competência disponível: `periodo_referencia: null` e listas temporais vazias.
-
-`chamados[].historico[]`: `sequencia` (inteiro), `data` (ISO 8601), `acao` e `canal` (strings).
-
-`energia_injetada_kwh_media_mensal` é média cadastral sem período explícito; não representa geração medida no mês nem uma série histórica.
-
-Status/tipos das fontes permanecem strings até normalização; exemplos não definem enums.
-
-## 6. GET /inspecoes/candidatos
-
-**Finalidade:** fila analítica de unidades a inspecionar, separada das ordens já criadas.
+## 5. GET /unidades/{id} — Tela 3
 
 ```http
-GET /inspecoes/candidatos?periodo_atual=2026-09&periodo_comparacao=2026-08&municipio=Recife&page=1&page_size=20
+GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 ```
 
-Resposta `200` — exemplo simulado de análise disponível:
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/unidade.json)**
 
-```json
-{
-  "periodo_referencia": "2026-09",
-  "status_analise": "disponivel",
-  "motivo_indisponibilidade": null,
-  "items": [
-    {
-      "id_uc": "UC-DEMO-001",
-      "municipio": "Recife",
-      "bairro": "Boa Vista",
-      "classe": "Residencial",
-      "alimentador": "ALM-DEMO-001",
-      "posicao": 1,
-      "motivos": ["Variação de consumo identificada pela análise de exemplo."],
-      "energia_estimada_recuperar": {
-        "valor": 120.0,
-        "unidade": "kWh",
-        "periodo_referencia": "2026-09"
-      }
-    }
-  ],
-  "page": 1,
-  "page_size": 20,
-  "total": 1
-}
-```
+- Cadastro, CPF/CNPJ mascarado e telefone anulável (não há telefone na fonte bruta inspecionada).
+- `consumo`: 12 pares de mês atual/mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura`.
+- `diagnostico_conta`: conta_alta (bool/null), veredito, último mês, mesmo mês do ano anterior, média de 12 meses, variação percentual, leitura_estimada e alerta.
+- Faturas abertas e pagas, medidor com última leitura, GD, interrupções recentes e chamados com nota/histórico. Exemplo tem 1 fatura aberta e 1 paga; a UI conta o que recebeu.
+- Média mensal injetada de GD não é geração medida no período. Diagnóstico é um caso fictício; limiar/regra real pertence à V1a e deve ser acordado pelo responsável.
 
-`posicao`: posição após filtros, antes da paginação. Ordenar por posição e ID da UC.
+No mock, somente UC-DEMO-001 tem a visão detalhada. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
 
-Sem metodologia: `status_analise: "indisponivel"`, motivo `METODOLOGIA_PENDENTE`, `items: []`, `total: 0`. Análise disponível sem candidatos: lista vazia e status `disponivel`.
-
-Estimativa ausente: `valor: null`. Energia historicamente recuperada não é estimativa futura.
-
-## 7. Ordens de inspeção
-
-Ordens do portal são distintas das inspeções históricas do Excel.
-
-### 7.1 Status e regras propostas
-
-Status: `ABERTA`, `EM_ANDAMENTO`, `CONCLUIDA`, `CANCELADA`.
-
-Transições permitidas:
-
-- `ABERTA` → `EM_ANDAMENTO` ou `CANCELADA`.
-- `EM_ANDAMENTO` → `CONCLUIDA` ou `CANCELADA`.
-- `CONCLUIDA` e `CANCELADA` são finais nesta V1.
-
-Máximo de uma ordem ativa (`ABERTA` ou `EM_ANDAMENTO`) por UC, validado no backend/persistência.
-
-Resultados propostos: `IRREGULARIDADE_CONFIRMADA`, `SEM_IRREGULARIDADE`, `INCONCLUSIVA`.
-
-Status indica andamento; resultado indica a constatação da inspeção.
-
-### 7.2 GET /inspecoes
-
-`periodo_atual`: mês de criação. Filtros geográficos: UC vinculada. Ordenar por `criado_em` decrescente e `id` crescente.
+## 6. GET /inspecoes/candidatos — Tela 4
 
 ```http
-GET /inspecoes?status=ABERTA&page=1&page_size=20
+GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=20
 ```
 
-Resposta `200`:
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/candidatos.json)**
 
-```json
-{
-  "items": [
-    {
-      "id": "OS-DEMO-001",
-      "id_uc": "UC-DEMO-001",
-      "status": "ABERTA",
-      "motivo": "Verificar variação de consumo.",
-      "criado_em": "2026-10-20T10:00:00-03:00",
-      "atualizado_em": "2026-10-20T10:00:00-03:00",
-      "motivo_cancelamento": null,
-      "resultado": null
-    }
-  ],
-  "page": 1,
-  "page_size": 20,
-  "total": 1
-}
+`resumo`: UCs analisadas, priorizadas, potencial de recuperação e ordens ativas, com unidade/período, antes da paginação. Cada candidato: ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), ordem_ativa e id_ordem_ativa.
+
+Ordenar por score decrescente, ID como desempate; posição global após filtros. Desabilitar seleção de UC com ordem ativa no front; POST também valida duplicidade. Estimativa futura não é o kWh já recuperado do histórico.
+
+## 7. Ordens — Telas 4 e 5
+
+Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadores de transporte em `schemas/inspecoes.py`. Não modifica o service/repository dele.
+
+- Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
+- `data_prevista` é campo, não status. Uma ordem ativa por UC.
+- Resposta usa id_ordem inteiro, id_uc, equipe_responsavel, datas, motivo, kwh_estimado, observacoes, resultado e historico[].
+- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado, observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
+- Com irregularidade: tipo obrigatório e kWh não negativo. Sem irregularidade: tipo null e kWh zero. Não há `classificacao` ou `INCONCLUSIVA` neste contrato, para corresponder ao modelo existente.
+- `historico[]`: id_historico, id_ordem, status_anterior, status_novo, data_mudanca, usuario, justificativa_ou_motivo e detalhes.
+
+### GET /inspecoes
+
+```http
+GET /inspecoes?page=1&page_size=20
 ```
 
-### 7.3 POST /inspecoes
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/inspecoes.json)**
 
-Requisição:
+`contagem_status` conta os resultados após filtros de UC/região/período, antes do filtro status e da paginação; sustenta as abas da Tela 5. Ordenação: criação decrescente e ID crescente.
+
+### POST /inspecoes
+
+Obrigatórios: id_uc e equipe_responsavel. data_prevista opcional no modelo do Gabriel; a modal pode exigir antes do envio. Demais campos opcionais. Servidor gera ID, datas, status e histórico.
 
 ```http
 POST /inspecoes
@@ -366,135 +149,79 @@ Content-Type: application/json
 ```json
 {
   "id_uc": "UC-DEMO-001",
-  "motivo": "Verificar variação de consumo."
-}
-```
-
-Obrigatórios: `id_uc` não vazio e `motivo` com 1–1000 caracteres após remover espaços nas extremidades. Servidor gera ID, datas e status inicial. UC inexistente: `404`; ordem ativa: `409`.
-
-Resposta `201`:
-
-```json
-{
-  "id": "OS-DEMO-001",
-  "id_uc": "UC-DEMO-001",
-  "status": "ABERTA",
+  "equipe_responsavel": "Equipe Norte 02",
+  "data_prevista": "2026-10-22",
   "motivo": "Verificar variação de consumo.",
-  "criado_em": "2026-10-20T10:00:00-03:00",
-  "atualizado_em": "2026-10-20T10:00:00-03:00",
-  "motivo_cancelamento": null,
-  "resultado": null
+  "kwh_estimado": 120.0,
+  "observacoes": null
 }
 ```
 
-### 7.4 PATCH /inspecoes/{id}
 
-Não permite trocar `id_uc`, ID da ordem ou data de criação. `status` é obrigatório. Para iniciar:
+**201 — [JSON completo da resposta](../backend/app/services/fixtures/ordem_criada.json)**
+
+### PATCH /inspecoes/{id}
 
 ```http
-PATCH /inspecoes/OS-DEMO-001
+PATCH /inspecoes/1
 Content-Type: application/json
 ```
 
 ```json
 {
-  "status": "EM_ANDAMENTO"
+  "status": "EM_CAMPO"
 }
 ```
 
-Resposta `200`:
 
-```json
-{
-  "id": "OS-DEMO-001",
-  "id_uc": "UC-DEMO-001",
-  "status": "EM_ANDAMENTO",
-  "motivo": "Verificar variação de consumo.",
-  "criado_em": "2026-10-20T10:00:00-03:00",
-  "atualizado_em": "2026-10-20T11:00:00-03:00",
-  "motivo_cancelamento": null,
-  "resultado": null
-}
-```
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/ordem_atualizada.json)**
 
-Para concluir uma ordem em andamento:
+Conclusão (no snapshot, usar ordem **2**, já EM_CAMPO):
 
 ```json
 {
   "status": "CONCLUIDA",
   "resultado": {
-    "data": "2026-10-20",
-    "inspetor": "INSP-DEMO-001",
-    "classificacao": "IRREGULARIDADE_CONFIRMADA",
+    "irregularidade_detectada": true,
     "tipo_irregularidade": "BY-PASS",
     "kwh_recuperado": 120.0,
-    "observacoes": "Registro fictício para testar o formulário."
+    "observacoes": "Resultado fictício",
+    "data_inspecao": "2026-10-21T06:15:00-03:00",
+    "inspetor": null
   }
 }
 ```
 
-Resposta `200`: objeto completo da ordem, com `status: "CONCLUIDA"`, `resultado` igual ao resultado validado e `atualizado_em` atualizado.
 
-Para cancelar:
+Cancelamento (ordem 1 ou 2):
 
 ```json
 {
   "status": "CANCELADA",
-  "motivo_cancelamento": "Ordem criada em duplicidade."
+  "justificativa": "Ordem criada em duplicidade."
 }
 ```
 
-Resposta `200`: objeto completo da ordem com status e motivo de cancelamento atualizados, `resultado: null`.
 
-Regras propostas de validação:
+Resposta completa da ordem com histórico acrescentado. Campos não enviados permanecem; não permite trocar UC, ID ou data de criação. A equipe pode mudar ao iniciar campo. Combinações de campos inválidas: 422; transição inválida: 400.
 
-- Conclusão exige `resultado`, com `data`, `inspetor` e `classificacao`.
-- `tipo_irregularidade` obrigatório quando confirmada; nos demais casos, `null`.
-- `kwh_recuperado` é número não negativo ou `null` se ainda não apurado. Não confundir recuperação com consumo do mês. Sem irregularidade, deve ser `0`; inconclusiva, `null`.
-- `observacoes` é opcional/anulável, até 2000 caracteres.
-- Cancelamento exige motivo não vazio, até 1000 caracteres, e não aceita resultado.
-- `EM_ANDAMENTO` não aceita resultado nem motivo de cancelamento.
-- Combinação de campos inválida: `422`; transição incompatível com o estado armazenado: `409`.
+Snapshot de teste: 1 ABERTA/UC-DEMO-002; 2 EM_CAMPO/UC-DEMO-005; 3 CONCLUIDA; 4 CANCELADA. Criar UC-DEMO-001 funciona; criar 002/005 retorna 409. Um PATCH não altera esse snapshot para chamadas seguintes.
 
-## 8. GET /operacao
-
-**Finalidade:** DEC/FEC mensais por alimentador.
+## 8. GET /operacao — Tela 6
 
 ```http
-GET /operacao?periodo_atual=2026-09&alimentador=ALM-DEMO-001&page=1&page_size=20
+GET /operacao?periodo_atual=2025-07/2026-06&ordenar_por=dec&page=1&page_size=20
 ```
 
-Resposta `200`:
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/operacao.json)**
 
-```json
-{
-  "periodo_referencia": "2026-09",
-  "items": [
-    {
-      "alimentador": "ALM-DEMO-001",
-      "status_calculo": "indisponivel",
-      "motivo_indisponibilidade": "METODOLOGIA_PENDENTE",
-      "dec": {"valor": null, "unidade": "h/UC", "periodo_referencia": "2026-09"},
-      "fec": {"valor": null, "unidade": "interrupcoes/UC", "periodo_referencia": "2026-09"}
-    }
-  ],
-  "page": 1,
-  "page_size": 20,
-  "total": 1
-}
-```
+- `serie_historica`: DEC e FEC mensais por alimentador.
+- `ranking_alimentadores`: lista paginada com DEC, FEC, número de interrupções, UCs atendidas, município e bairros atendidos.
+- `ranking_regional`: lista paginada com DEC, FEC e interrupções; `nivel_regional=municipio` (padrão, bairro null) ou `bairro` (município e bairro preenchidos).
+- Rankings ordenados pelo indicador escolhido, decrescente. Mesmo page/page_size aplicado independentemente a cada ranking; totais próprios. A série não é truncada pela paginação.
+- Clicar em um alimentador reconsulta com `alimentador`, filtrando série e rankings. O mock tem 12 pontos por alimentador; os totais de DEC/FEC correspondem à soma mensal fictícia.
 
-Ordenar por alimentador. Cálculo disponível: `status_calculo: "disponivel"`, motivo `null`, valores numéricos.
-
-Metodologia pendente: ver seção final. Não usar média simples de duração como DEC ou contagem de linhas como FEC.
-
-## 9. POST /ia
-
-**Finalidade:** pergunta do usuário com resposta textual, usando o contexto dos filtros.
-
-**Extensão de resposta proposta; conferir requisito de IA antes de aprovar.**
-
-`pergunta`: obrigatória, 1–2000 caracteres. `contexto`: opcional; se enviado, exige `periodo_atual` e aceita filtros mensais/geográficos, sem paginação. Sem contexto, o agente pode pedir o período.
+## 9. POST /ia — Tela 7 e painel flutuante
 
 ```http
 POST /ia
@@ -503,46 +230,34 @@ Content-Type: application/json
 
 ```json
 {
-  "pergunta": "Qual foi o consumo no período?",
+  "pergunta": "Qual foi a receita no período?",
   "contexto": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
+    "periodo_atual": "2025-07/2026-06",
+    "periodo_comparacao": "2022-07/2023-06",
+    "municipio": null,
     "bairro": null,
-    "classe": "Residencial",
+    "classe": null,
     "alimentador": null
   }
 }
 ```
 
-Resposta `200` — exemplo fictício:
 
-```json
-{
-  "resposta": "No cenário simulado, o consumo foi de 150.000 kWh em setembro de 2026, 20% acima de agosto.",
-  "contexto": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
-    "bairro": null,
-    "classe": "Residencial",
-    "alimentador": null
-  },
-  "indicadores_utilizados": [
-    {"nome": "consumo", "valor": 150000.0, "unidade": "kWh", "periodo_referencia": "2026-09"},
-    {"nome": "consumo", "valor": 125000.0, "unidade": "kWh", "periodo_referencia": "2026-08"}
-  ],
-  "gerado_em": "2026-10-20T10:00:00-03:00"
-}
-```
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_ia.json)**
 
-Resposta: contexto aplicado ou `null`; indicadores usados ou `[]`. O agente não altera ordens nem expõe raciocínio interno.
+Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
 
-## 10. POST /ia/insight
+Cenários demonstrativos:
 
-**Finalidade:** análise automática complementar no dashboard. Não substitui os indicadores e gráficos de `/dashboard`.
+| Pergunta | Status / resposta completa |
+| --- | --- |
+| Qual foi a receita no período? + contexto do exemplo | ok — exemplo acima |
+| Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
+| DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 
-`contexto` obrigatório, com os mesmos filtros do dashboard, incluindo os dois períodos.
+Outras perguntas retornam nao_sei no stub. Não há agente, parser SQL de segurança ou execução de comandos. A demonstração de bloqueio não substitui as proteções da integração real. Nome `gold_receita_demo` e SQL são ilustrativos; validar os nomes reais com Equipe 3.
+
+## 10. POST /ia/insight — Telas 2 e 3
 
 ```http
 POST /ia/insight
@@ -551,73 +266,92 @@ Content-Type: application/json
 
 ```json
 {
-  "contexto": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
+  "contexto": "receita",
+  "filtros": {
+    "periodo_atual": "2025-07/2026-06",
+    "periodo_comparacao": "2022-07/2023-06",
+    "municipio": null,
     "bairro": null,
-    "classe": "Residencial",
-    "alimentador": null
-  }
-}
-```
-
-Resposta `200` — exemplo fictício:
-
-```json
-{
-  "resposta": "No cenário simulado, receita faturada e consumo cresceram 20%. A decomposição entre preço e volume ainda não está disponível.",
-  "contexto": {
-    "periodo_atual": "2026-09",
-    "periodo_comparacao": "2026-08",
-    "municipio": "Recife",
-    "bairro": null,
-    "classe": "Residencial",
+    "classe": null,
     "alimentador": null
   },
-  "indicadores_utilizados": [
-    {"nome": "receita_faturada", "valor": 120000.0, "unidade": "BRL", "periodo_referencia": "2026-09"},
-    {"nome": "receita_faturada", "valor": 100000.0, "unidade": "BRL", "periodo_referencia": "2026-08"},
-    {"nome": "consumo", "valor": 150000.0, "unidade": "kWh", "periodo_referencia": "2026-09"},
-    {"nome": "consumo", "valor": 125000.0, "unidade": "kWh", "periodo_referencia": "2026-08"}
-  ],
-  "gerado_em": "2026-10-20T10:00:00-03:00"
+  "id_uc": null,
+  "indicadores": [
+    {
+      "nome": "receita_atual",
+      "rotulo": "Receita atual",
+      "valor": 284700000,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "receita_comparacao",
+      "rotulo": "Receita base",
+      "valor": 263600000,
+      "unidade": "BRL",
+      "periodo_referencia": "2022-07/2023-06"
+    },
+    {
+      "nome": "variacao_volume",
+      "rotulo": "Volume",
+      "valor": -3.8986,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "reajuste",
+      "rotulo": "Reajuste",
+      "valor": 10.5,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "efeito_preco",
+      "rotulo": "Efeito-preço",
+      "valor": 27700000,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "efeito_volume",
+      "rotulo": "Efeito-volume",
+      "valor": -10400000,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    }
+  ]
 }
 ```
 
-Backend consulta os indicadores do recorte informado. Front refaz a consulta ao mudar filtros e descarta respostas antigas. Falha no insight não bloqueia o dashboard; fonte indisponível: `503`.
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight.json)**
+
+Resposta separada do chat: `titulo`, `texto`, `numeros_utilizados[]` (nome, rótulo, valor, unidade, período), gerado_em e metadados com atualização da Gold.
+
+Receita usa **seis números**: receita atual, receita base, variação do volume, reajuste, efeito-preço e efeito-volume. Os números enviados são opcionais no stub; se presentes, precisam corresponder aos seis do cenário. Na integração, validar contra a Gold, não confiar em valores arbitrários do navegador.
+
+Para UC360:
+
+```json
+{"contexto":"unidade","id_uc":"UC-DEMO-001","filtros":{"periodo_atual":"2025-07/2026-06"},"indicadores":[]}
+```
+
+Retorna título/texto e os quatro números do diagnóstico da UC. A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
 
 ## 11. GET /health
-
-Rota de infraestrutura já implementada, fora das dez rotas funcionais:
 
 ```http
 GET /health
 ```
 
-Resposta `200`:
-
 ```json
-{
-  "status": "ok"
-}
+{"status":"ok"}
 ```
 
-Verifica a API, não banco/pipeline/agente.
+## 12. Alinhamentos restantes e migração
 
-## 12. Stubs e pendências
+Esta V2 altera o contrato: migrar `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens para inteiros, campos das ordens/resultados para o modelo do Gabriel; dashboard ganhou seis KPIs/séries/ponte; IA e insight têm respostas distintas. Gheyson precisa atualizar types/mocks em conjunto.
 
-Após aprovação, Thiago implementa `schemas/` e `routers/`; Gheyson espelha os formatos em `types/` e mocks. Stubs validam entradas e devolvem exemplos fixos, sem banco ou IA. Documentar no `/docs` os cenários suportados e a ausência de persistência em POST/PATCH. Na integração real, preservar os formatos aprovados.
+Confirmar com o par: convenção de intervalos, nomes JSON e identificação dos cenários; com Dados/GenAI: nomes reais da Gold, timestamp de carga, metodologia dos indicadores/diagnóstico, limites de períodos, auditoria e integração do agente. Fontes ausentes não devem virar valores fictícios em produção. Telefone permanece null até existir fonte.
 
-Os campos foram referenciados no cadastro de UCs, faturas, leituras 2022–2026, medidores, geração distribuída, ocorrências, atendimentos e inspeções enviados. Dados entrega a fonte tratada; Dev faz o mapeamento nos repositories.
-
-| Confirmar antes da aprovação | Responsáveis |
-| --- | --- |
-| Períodos mensais, formatos JSON e regras das ordens (status/transições/uma ativa por UC). | Thiago, Gheyson e grupo |
-| Receita: faturas elegíveis, duplicidades, base financeira e cálculo preço-volume. | Dados e Dev |
-| Candidatos: critérios de suspeita, prioridade e horizonte da energia estimada. | Responsáveis pela análise |
-| DEC/FEC: população por alimentador, eventos elegíveis, duplicados, sem encerramento e que atravessam meses. | Dados |
-| IA: conferir seção 2, itens 1–3, ainda não fornecida; validar extensão de resposta e insight, incluindo auditoria. | Responsável pela IA e par |
-| Fonte tratada: chaves, vocabulários, competências, interpretação de datas sem fuso e tecnologia da geração (não identificada explicitamente no bruto). | Dados e Dev |
-
-**Aprovação pendente.** Registrar responsáveis e data após a revisão.
+P1/B1 entregam contratos e stubs; não substituem B2/B3/B4/B5, O1b, V1a ou R1a. A leitura real e persistência seguem com os responsáveis do cronograma.
