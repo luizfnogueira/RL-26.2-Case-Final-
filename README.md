@@ -6,43 +6,36 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
 
 ### Pré-requisitos
 
-- Python 3.12+
 - Docker com Docker Compose
   - Fedora: `sudo dnf install docker-cli docker-compose moby-engine && sudo systemctl enable --now docker && sudo usermod -aG docker $USER` (saia e entre de novo na sessão)
   - Ubuntu/Debian: `sudo apt install docker.io docker-compose-v2 && sudo usermod -aG docker $USER` (saia e entre de novo na sessão)
   - Windows e macOS: Docker Desktop em docs.docker.com/get-docker
 
-### Instalação
+### Instalação e execução
 
 ```bash
 cd backend
-cp .env.example .env             # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
-docker compose up -d --wait      # sobe o PostgreSQL 16 e espera ficar pronto
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m app.db.seed            # carrega os dados fictícios da Gold
+cp .env.example .env                              # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
+docker compose up -d --build --wait               # sobe o PostgreSQL e a API e espera ficarem prontos
+docker compose exec api python -m app.db.seed     # carrega os dados fictícios da Gold
 ```
 
-Se já houver um PostgreSQL usando a porta 5432 na máquina, pare-o ou troque `POSTGRES_PORT` no `.env`.
+Documentação da API em http://localhost:8000/docs. O código em `app/` é montado no container: ao salvar, a API recarrega sozinha.
 
-### Rodar
+Se as portas 5432 ou 8000 já estiverem em uso, troque `POSTGRES_PORT` ou `API_PORT` no `.env`.
 
-```bash
-uvicorn app.main:app --reload
-```
+Comandos úteis:
 
-Documentação da API em http://localhost:8000/docs.
-
-Para parar o banco: `docker compose stop` (os dados ficam no volume `postgres_dados`). Para apagar tudo e recomeçar: `docker compose down -v`.
+- logs da API: `docker compose logs -f api`
+- parar: `docker compose stop` (os dados ficam no volume)
+- apagar tudo e recomeçar: `docker compose down -v`
+- após mudar o `requirements.txt`: `docker compose up -d --build --wait`
 
 ### Testes
 
 ```bash
-pytest
+docker compose exec api pytest
 ```
-
-Para incluir o teste de recarga no banco, defina `TEST_DATABASE_URL` com um banco descartável (ex.: `postgresql+psycopg://vgrid:<senha>@localhost:5432/vgrid360_teste`).
 
 
 ## Frontend

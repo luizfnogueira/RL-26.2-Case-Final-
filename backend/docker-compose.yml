@@ -19,5 +19,28 @@ services:
       retries: 10
     restart: unless-stopped
 
+  api:
+    build: .
+    container_name: vgrid360-api
+    env_file: .env
+    environment:
+      # Dentro da rede do compose o banco é acessado pelo nome do serviço, não por localhost.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Código montado no container: alterações recarregam a API sem rebuild.
+      - ./app:/app/app
+      - ./tests:/app/tests
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   postgres_dados:
