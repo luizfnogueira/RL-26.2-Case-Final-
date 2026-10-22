@@ -14,7 +14,7 @@ from decimal import Decimal
 from sqlalchemy import Engine, insert, text
 
 from app.db.base import GOLD_SCHEMA, PORTAL_SCHEMA, GoldBase, PortalBase
-from app.models import gold
+from app.models import gold, portal  # noqa: F401
 
 FUSO = timezone(timedelta(hours=-3))  # Recife, sem horário de verão
 PRIMEIRO_MES = date(2022, 7, 1)
