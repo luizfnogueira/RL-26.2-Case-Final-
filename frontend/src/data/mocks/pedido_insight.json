@@ -1,0 +1,56 @@
+{
+  "contexto": "receita",
+  "filtros": {
+    "periodo_atual": "2025-07/2026-06",
+    "periodo_comparacao": "2022-07/2023-06",
+    "municipio": null,
+    "bairro": null,
+    "classe": null,
+    "alimentador": null
+  },
+  "id_uc": null,
+  "indicadores": [
+    {
+      "nome": "receita_atual",
+      "rotulo": "Receita atual",
+      "valor": 284700000,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "receita_comparacao",
+      "rotulo": "Receita base",
+      "valor": 263600000,
+      "unidade": "BRL",
+      "periodo_referencia": "2022-07/2023-06"
+    },
+    {
+      "nome": "variacao_volume",
+      "rotulo": "Volume",
+      "valor": -3.8986,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "reajuste",
+      "rotulo": "Reajuste",
+      "valor": 10.5,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "efeito_preco",
+      "rotulo": "Efeito-preço",
+      "valor": 27700000,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    {
+      "nome": "efeito_volume",
+      "rotulo": "Efeito-volume",
+      "valor": -10400000,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    }
+  ]
+}

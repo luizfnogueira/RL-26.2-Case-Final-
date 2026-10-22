@@ -1,0 +1,11 @@
+{
+  "status": "CONCLUIDA",
+  "resultado": {
+    "irregularidade_detectada": true,
+    "tipo_irregularidade": "BY-PASS",
+    "kwh_recuperado": 120.0,
+    "observacoes": "Resultado fictício",
+    "data_inspecao": "2026-10-21T06:15:00-03:00",
+    "inspetor": null
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "resposta": "No cenário fictício, a receita faturada foi de R$ 284,7 milhões entre jul/2025 e jun/2026, contra R$ 263,6 milhões entre jul/2022 e jun/2023 (+8,0%).",
+  "sql": "SELECT CASE WHEN mes BETWEEN '2025-07' AND '2026-06' THEN '2025-07/2026-06' ELSE '2022-07/2023-06' END AS periodo,\n       SUM(receita_faturada) AS receita_faturada_brl\nFROM gold_receita_demo\nWHERE mes BETWEEN '2025-07' AND '2026-06'\n   OR mes BETWEEN '2022-07' AND '2023-06'\nGROUP BY 1\nORDER BY 1 DESC;",
+  "tabelas": [
+    "gold_receita_demo"
+  ],
+  "dados": {
+    "colunas": [
+      "periodo",
+      "receita_faturada_brl"
+    ],
+    "linhas": [
+      [
+        "2025-07/2026-06",
+        284700000.0
+      ],
+      [
+        "2022-07/2023-06",
+        263600000.0
+      ]
+    ]
+  },
+  "status": "ok",
+  "gerado_em": "2026-10-21T09:12:00-03:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Resposta pré-definida do stub; não há agente conectado nem SQL executado."
+    ]
+  }
+}

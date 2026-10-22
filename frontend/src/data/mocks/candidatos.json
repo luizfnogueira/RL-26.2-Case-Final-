@@ -1,0 +1,192 @@
+{
+  "items": [
+    {
+      "id_uc": "UC-DEMO-002",
+      "municipio": "Recife",
+      "bairro": "Boa Viagem",
+      "classe": "Comercial",
+      "alimentador": "ALM-DEMO-003",
+      "posicao": 1,
+      "motivos": [
+        "Queda de 42% no consumo sem geração distribuída",
+        "Histórico de religação"
+      ],
+      "energia_estimada": {
+        "valor": 1840.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 91.5,
+      "ordem_ativa": true,
+      "id_ordem_ativa": 1
+    },
+    {
+      "id_uc": "UC-DEMO-001",
+      "municipio": "Recife",
+      "bairro": "Boa Vista",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-001",
+      "posicao": 2,
+      "motivos": [
+        "Consumo 38% acima do mesmo mês do ano anterior",
+        "Leitura estimada no último mês"
+      ],
+      "energia_estimada": {
+        "valor": 520.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 87.2,
+      "ordem_ativa": false,
+      "id_ordem_ativa": null
+    },
+    {
+      "id_uc": "UC-DEMO-005",
+      "municipio": "Recife",
+      "bairro": "Casa Amarela",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-002",
+      "posicao": 3,
+      "motivos": [
+        "Consumo zerado em 2 meses",
+        "Medidor com leitura retroativa"
+      ],
+      "energia_estimada": {
+        "valor": 610.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 78.4,
+      "ordem_ativa": true,
+      "id_ordem_ativa": 2
+    },
+    {
+      "id_uc": "UC-DEMO-006",
+      "municipio": "Jaboatão dos Guararapes",
+      "bairro": "Candeias",
+      "classe": "Comercial",
+      "alimentador": "ALM-DEMO-004",
+      "posicao": 4,
+      "motivos": [
+        "Queda de consumo após troca de titularidade"
+      ],
+      "energia_estimada": {
+        "valor": 1320.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 66.0,
+      "ordem_ativa": false,
+      "id_ordem_ativa": null
+    },
+    {
+      "id_uc": "UC-DEMO-003",
+      "municipio": "Jaboatão dos Guararapes",
+      "bairro": "Piedade",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-004",
+      "posicao": 5,
+      "motivos": [
+        "Consumo abaixo da média do bairro"
+      ],
+      "energia_estimada": {
+        "valor": 280.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 58.3,
+      "ordem_ativa": false,
+      "id_ordem_ativa": null
+    },
+    {
+      "id_uc": "UC-DEMO-007",
+      "municipio": "Olinda",
+      "bairro": "Casa Caiada",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-005",
+      "posicao": 6,
+      "motivos": [
+        "Variação atípica entre meses consecutivos"
+      ],
+      "energia_estimada": {
+        "valor": 190.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 47.9,
+      "ordem_ativa": false,
+      "id_ordem_ativa": null
+    },
+    {
+      "id_uc": "UC-DEMO-004",
+      "municipio": "Olinda",
+      "bairro": "Rio Doce",
+      "classe": "Industrial",
+      "alimentador": "ALM-DEMO-005",
+      "posicao": 7,
+      "motivos": [
+        "Medidor sem manutenção há mais de 5 anos"
+      ],
+      "energia_estimada": {
+        "valor": 2400.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 41.2,
+      "ordem_ativa": false,
+      "id_ordem_ativa": null
+    },
+    {
+      "id_uc": "UC-DEMO-008",
+      "municipio": "Recife",
+      "bairro": "Boa Vista",
+      "classe": "Residencial",
+      "alimentador": "ALM-DEMO-001",
+      "posicao": 8,
+      "motivos": [
+        "Consumo abaixo da média da classe"
+      ],
+      "energia_estimada": {
+        "valor": 150.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "score": 35.6,
+      "ordem_ativa": false,
+      "id_ordem_ativa": null
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 8,
+  "periodo_referencia": "2025-07/2026-06",
+  "resumo": {
+    "ucs_analisadas": {
+      "valor": 8.0,
+      "unidade": "UCs",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "ucs_priorizadas": {
+      "valor": 4.0,
+      "unidade": "UCs",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "potencial_recuperacao": {
+      "valor": 4290.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "ordens_ativas": {
+      "valor": 2.0,
+      "unidade": "ordens",
+      "periodo_referencia": "2025-07/2026-06"
+    }
+  },
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
+}
