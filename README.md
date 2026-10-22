@@ -7,43 +7,24 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
 ### Pré-requisitos
 
 - Python 3.12+
-- PostgreSQL 16+
-  - Fedora: `sudo dnf install postgresql-server postgresql && sudo postgresql-setup --initdb && sudo systemctl enable --now postgresql`
-  - Ubuntu/Debian: `sudo apt install postgresql`
-  - Windows: instalador em postgresql.org
-  - macOS: `brew install postgresql@16 && brew services start postgresql@16`
+- Docker com Docker Compose
+  - Fedora: `sudo dnf install docker-cli docker-compose moby-engine && sudo systemctl enable --now docker && sudo usermod -aG docker $USER` (saia e entre de novo na sessão)
+  - Ubuntu/Debian: `sudo apt install docker.io docker-compose-v2 && sudo usermod -aG docker $USER` (saia e entre de novo na sessão)
+  - Windows e macOS: Docker Desktop em docs.docker.com/get-docker
 
 ### Instalação
 
-1. Crie o usuário e o banco (Linux: `sudo -u postgres psql`; Windows/macOS: `psql` ou pgAdmin):
+```bash
+cd backend
+cp .env.example .env             # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
+docker compose up -d             # sobe o PostgreSQL 16
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m app.db.seed            # carrega os dados fictícios da Gold
+```
 
-   ```sql
-   CREATE ROLE vgrid LOGIN PASSWORD 'vgrid';
-   CREATE DATABASE vgrid360 OWNER vgrid;
-   ```
-
-   No Fedora, libere o login por senha (senão o seed falha com `autenticação do tipo Ident falhou`):
-
-   ```bash
-   sudo sed -i -E 's/^(host\s+all\s+all\s+(127\.0\.0\.1\/32|::1\/128)\s+)ident/\1scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
-   sudo systemctl restart postgresql
-   ```
-
-2. Instale o backend:
-
-   ```bash
-   cd backend
-   python -m venv .venv
-   source .venv/bin/activate        # Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
-   cp .env.example .env             # ajuste DATABASE_URL se mudar usuário, senha ou porta
-   ```
-
-3. Carregue os dados fictícios da Gold:
-
-   ```bash
-   python -m app.db.seed
-   ```
+Se já houver um PostgreSQL usando a porta 5432 na máquina, pare-o ou troque `POSTGRES_PORT` no `.env`.
 
 ### Rodar
 
@@ -53,13 +34,15 @@ uvicorn app.main:app --reload
 
 Documentação da API em http://localhost:8000/docs.
 
+Para parar o banco: `docker compose stop` (os dados ficam no volume `postgres_dados`). Para apagar tudo e recomeçar: `docker compose down -v`.
+
 ### Testes
 
 ```bash
 pytest
 ```
 
-Para incluir o teste de recarga no banco, defina `TEST_DATABASE_URL` com um banco descartável (ex.: `postgresql+psycopg://vgrid:vgrid@localhost:5432/vgrid360_teste`).
+Para incluir o teste de recarga no banco, defina `TEST_DATABASE_URL` com um banco descartável (ex.: `postgresql+psycopg://vgrid:<senha>@localhost:5432/vgrid360_teste`).
 
 
 ## Frontend
