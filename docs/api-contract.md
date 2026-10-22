@@ -1,6 +1,6 @@
 # Contrato da API — V-Energy — V2 (proposta para revisão)
 
-Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. Backend real/Gold/agente não estão implementados nesta entrega.
+Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
 
 ## 1. Regras comuns
 
@@ -34,7 +34,7 @@ Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não es
 
 Os cenários analíticos estão preparados para as duas janelas anuais acima. Outros intervalos sintaticamente válidos — inclusive um mês isolado (`YYYY-MM`) — retornam **422 `CENARIO_STUB_INDISPONIVEL`**, em vez de devolver números de outro período. Isso é limite do stub, não do formato: `YYYY-MM` continua válido no contrato (por exemplo, no filtro `periodo_atual` de GET /inspecoes, que não depende de cenário) e a integração real deverá atender os intervalos, mensais ou não, disponíveis na Gold.
 
-Filtros e paginação operam sobre exemplos locais. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH usam snapshot: alterações não persistem entre chamadas. Não existe SQL executável nem agente conectado.
+Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeção, que são lidas do schema `portal`. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH das demais rotas usam snapshot: alterações não persistem entre chamadas. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
 
 ## 2. Erros
 
@@ -118,7 +118,7 @@ Ordenar por score decrescente, ID como desempate; posição global após filtros
 
 ## 7. Ordens — Telas 4 e 5
 
-Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadores de transporte em `schemas/inspecoes.py`. Não modifica o service/repository dele.
+Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadores de transporte em `schemas/inspecoes.py`. As regras de ciclo não mudam; a persistência usa as tabelas `portal.ordens_inspecao` e `portal.ordens_historico`.
 
 - Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
 - `data_prevista` é campo, não status. Uma ordem ativa por UC.
@@ -205,7 +205,7 @@ Cancelamento (ordem 1 ou 2):
 
 Resposta completa da ordem com histórico acrescentado. Campos não enviados permanecem; não permite trocar UC, ID ou data de criação. A equipe pode mudar ao iniciar campo. Combinações de campos inválidas: 422; transição inválida: 400.
 
-Snapshot de teste: 1 ABERTA/UC-DEMO-002; 2 EM_CAMPO/UC-DEMO-005; 3 CONCLUIDA; 4 CANCELADA. Criar UC-DEMO-001 funciona; criar 002/005 retorna 409. Um PATCH não altera esse snapshot para chamadas seguintes.
+Persistência: `GET`, `POST` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
 
 ## 8. GET /operacao — Tela 6
 

@@ -37,6 +37,17 @@ Comandos úteis:
 docker compose exec api pytest
 ```
 
+Os testes de integração com o PostgreSQL (recarga da Gold e persistência/concorrência das ordens de
+inspeção) só rodam quando `TEST_DATABASE_URL` aponta para um banco descartável, pois recriam a Gold:
+
+```bash
+docker compose exec postgres createdb -U USUARIO vgrid360_teste
+docker compose exec -e TEST_DATABASE_URL=postgresql+psycopg://USUARIO:SENHA@postgres:5432/vgrid360_teste api pytest
+```
+
+Troque `USUARIO` e `SENHA` pelos valores do `.env`. Sem essa variável, esses testes são ignorados e o
+restante da suíte roda normalmente.
+
 
 ## Frontend
 
