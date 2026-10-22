@@ -17,7 +17,7 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
 ```bash
 cd backend
 cp .env.example .env             # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
-docker compose up -d             # sobe o PostgreSQL 16
+docker compose up -d --wait      # sobe o PostgreSQL 16 e espera ficar pronto
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
