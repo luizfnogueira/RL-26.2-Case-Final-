@@ -1,0 +1,18 @@
+{
+  "resposta": "Não posso executar essa solicitação. O assistente é somente leitura e não altera nem apaga dados.",
+  "sql": null,
+  "tabelas": [],
+  "dados": {
+    "colunas": [],
+    "linhas": []
+  },
+  "status": "bloqueado",
+  "gerado_em": "2026-10-21T09:12:00-03:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Resposta pré-definida do stub; não há agente conectado nem SQL executado."
+    ]
+  }
+}

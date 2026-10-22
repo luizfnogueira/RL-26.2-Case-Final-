@@ -74,13 +74,31 @@ O portal abre em http://localhost:5173.
 | ---------------- | ----------------------- | ---------------------------------------------------------------- |
 | `VITE_API_URL`   | `http://localhost:8000` | URL base da API FastAPI                                          |
 | `VITE_USE_MOCKS` | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend  |
+| `VITE_MOCK_DELAY_MS` | `350`                   | Atraso artificial dos mocks (ms), para ver os estados de carregamento |
 
 ### Scripts
 
-`npm run dev` · `npm run build` · `npm run typecheck` · `npm run lint` · `npm run format` · `npm run format:check`
+`npm run dev` · `npm run build` · `npm run typecheck` · `npm run lint` · `npm run format` · `npm run format:check` · `npm test` · `npm run mocks:sync`
 
 ### Estrutura (`frontend/src`)
 
 `layouts/` (menu, cabeçalho, rodapé, botão da IA) · `pages/` (uma por tela) · `components/` (por assunto) · `hooks/` · `services/` (cliente HTTP e `env.ts`) · `types/` · `data/` (mocks) · `utils/`.
 
 Rotas: `/painel`, `/receita`, `/unidades` e `/unidades/:id`, `/perdas/fila`, `/perdas/ordens`, `/operacao`, `/assistente`.
+
+### Camada de dados
+
+O front fala com a API só por `src/services`. Cada função devolve tipos de `src/types`, que espelham o contrato V2 (`docs/api-contract.md`).
+
+- **Mocks** (`VITE_USE_MOCKS=true`): `services/mock` atende as mesmas rotas e erros do stub do backend, com dados fictícios. As ordens de inspeção ficam em memória durante a sessão (criar, iniciar, concluir e cancelar funcionam; recarregar a página volta ao snapshot).
+- **API real** (`VITE_USE_MOCKS=false`): `fetch` em `VITE_API_URL`. Todo erro chega como `ApiError` com `{status, codigo, mensagem}`.
+- **Hooks**: `useConsulta` (leituras, com loading, erro e descarte de respostas antigas) e `useAcao` (POST e PATCH).
+- **Fixtures**: `src/data/mocks` é cópia de `backend/app/services/fixtures`. Atualize com `npm run mocks:sync`; `npm run typecheck` falha se um fixture deixar de bater com os tipos.
+- **Testes**: `npm test` cobre mocks, cliente HTTP, hooks e utilitários.
+
+```ts
+const { dados, erro, carregando, recarregar } = useConsulta(
+  (sinal) => buscarDashboard({ periodo_atual, periodo_comparacao }, sinal),
+  [periodo_atual, periodo_comparacao],
+)
+```

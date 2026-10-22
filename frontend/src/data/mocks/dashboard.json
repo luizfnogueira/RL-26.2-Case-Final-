@@ -1,0 +1,1006 @@
+{
+  "filtros": {
+    "municipio": null,
+    "bairro": null,
+    "classe": null,
+    "alimentador": null,
+    "periodo_atual": "2025-07/2026-06",
+    "periodo_comparacao": "2022-07/2023-06"
+  },
+  "indicadores": {
+    "receita_faturada": {
+      "rotulo": "Receita faturada",
+      "atual": {
+        "valor": 284700000.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "comparacao": {
+        "valor": 263600000.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "diferenca": {
+        "valor": 21100000.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "variacao_percentual": {
+        "valor": 8.0046,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      }
+    },
+    "energia_faturada": {
+      "rotulo": "Volume faturado",
+      "atual": {
+        "valor": 394400000.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "comparacao": {
+        "valor": 410400000.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "diferenca": {
+        "valor": -16000000.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "variacao_percentual": {
+        "valor": -3.8986,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      }
+    },
+    "ucs_ativas": {
+      "rotulo": "UCs ativas",
+      "atual": {
+        "valor": 412350.0,
+        "unidade": "UCs",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "comparacao": {
+        "valor": 398920.0,
+        "unidade": "UCs",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "diferenca": {
+        "valor": 13430.0,
+        "unidade": "UCs",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "variacao_percentual": {
+        "valor": 3.3666,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      }
+    },
+    "inadimplencia": {
+      "rotulo": "Inadimplência",
+      "atual": {
+        "valor": 12811500.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "comparacao": {
+        "valor": 10016800.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "diferenca": {
+        "valor": 2794700.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "variacao_percentual": {
+        "valor": 27.9001,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "percentual_receita_atual": {
+        "valor": 4.5,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "percentual_receita_comparacao": {
+        "valor": 3.8,
+        "unidade": "%",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "variacao_pontos_percentuais": {
+        "valor": 0.7,
+        "unidade": "p.p.",
+        "periodo_referencia": "2025-07/2026-06"
+      }
+    },
+    "dec_medio": {
+      "rotulo": "DEC médio",
+      "atual": {
+        "valor": 11.46,
+        "unidade": "h/UC",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "comparacao": {
+        "valor": 13.27,
+        "unidade": "h/UC",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "diferenca": {
+        "valor": -1.81,
+        "unidade": "h/UC",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "variacao_percentual": {
+        "valor": -13.6398,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "meta": {
+        "valor": 12.0,
+        "unidade": "h/UC",
+        "periodo_referencia": "2025-07/2026-06"
+      }
+    },
+    "fec_medio": {
+      "rotulo": "FEC médio",
+      "atual": {
+        "valor": 6.0,
+        "unidade": "interrupcoes/UC",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "comparacao": {
+        "valor": 6.95,
+        "unidade": "interrupcoes/UC",
+        "periodo_referencia": "2022-07/2023-06"
+      },
+      "diferenca": {
+        "valor": -0.95,
+        "unidade": "interrupcoes/UC",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "variacao_percentual": {
+        "valor": -13.6691,
+        "unidade": "%",
+        "periodo_referencia": "2025-07/2026-06"
+      },
+      "meta": {
+        "valor": 7.5,
+        "unidade": "interrupcoes/UC",
+        "periodo_referencia": "2025-07/2026-06"
+      }
+    }
+  },
+  "serie_historica": [
+    {
+      "mes": "2022-07",
+      "receita": {
+        "valor": 22800163.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-07"
+      },
+      "energia": {
+        "valor": 36641314.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-07"
+      }
+    },
+    {
+      "mes": "2022-08",
+      "receita": {
+        "valor": 22027539.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-08"
+      },
+      "energia": {
+        "valor": 35188106.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-08"
+      }
+    },
+    {
+      "mes": "2022-09",
+      "receita": {
+        "valor": 21248031.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-09"
+      },
+      "energia": {
+        "valor": 33740428.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-09"
+      }
+    },
+    {
+      "mes": "2022-10",
+      "receita": {
+        "valor": 21767703.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-10"
+      },
+      "energia": {
+        "valor": 34359874.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-10"
+      }
+    },
+    {
+      "mes": "2022-11",
+      "receita": {
+        "valor": 22509354.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-11"
+      },
+      "energia": {
+        "valor": 35319461.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-11"
+      }
+    },
+    {
+      "mes": "2022-12",
+      "receita": {
+        "valor": 23694962.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2022-12"
+      },
+      "energia": {
+        "valor": 36959333.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2022-12"
+      }
+    },
+    {
+      "mes": "2023-01",
+      "receita": {
+        "valor": 24668916.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-01"
+      },
+      "energia": {
+        "valor": 38250766.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-01"
+      }
+    },
+    {
+      "mes": "2023-02",
+      "receita": {
+        "valor": 24323042.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-02"
+      },
+      "energia": {
+        "valor": 37491669.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-02"
+      }
+    },
+    {
+      "mes": "2023-03",
+      "receita": {
+        "valor": 23307790.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-03"
+      },
+      "energia": {
+        "valor": 35714911.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-03"
+      }
+    },
+    {
+      "mes": "2023-04",
+      "receita": {
+        "valor": 21169736.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-04"
+      },
+      "energia": {
+        "valor": 32247813.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-04"
+      }
+    },
+    {
+      "mes": "2023-05",
+      "receita": {
+        "valor": 18567076.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-05"
+      },
+      "energia": {
+        "valor": 28117023.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-05"
+      }
+    },
+    {
+      "mes": "2023-06",
+      "receita": {
+        "valor": 17515688.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-06"
+      },
+      "energia": {
+        "valor": 26369302.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-06"
+      }
+    },
+    {
+      "mes": "2023-07",
+      "receita": {
+        "valor": 23371032.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-07"
+      },
+      "energia": {
+        "valor": 36168120.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-07"
+      }
+    },
+    {
+      "mes": "2023-08",
+      "receita": {
+        "valor": 22579063.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-08"
+      },
+      "energia": {
+        "valor": 34733678.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-08"
+      }
+    },
+    {
+      "mes": "2023-09",
+      "receita": {
+        "valor": 21780038.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-09"
+      },
+      "energia": {
+        "valor": 33304696.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-09"
+      }
+    },
+    {
+      "mes": "2023-10",
+      "receita": {
+        "valor": 22312721.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-10"
+      },
+      "energia": {
+        "valor": 33916142.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-10"
+      }
+    },
+    {
+      "mes": "2023-11",
+      "receita": {
+        "valor": 23072941.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-11"
+      },
+      "energia": {
+        "valor": 34863338.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-11"
+      }
+    },
+    {
+      "mes": "2023-12",
+      "receita": {
+        "valor": 24288235.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2023-12"
+      },
+      "energia": {
+        "valor": 36482032.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2023-12"
+      }
+    },
+    {
+      "mes": "2024-01",
+      "receita": {
+        "valor": 25286575.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-01"
+      },
+      "energia": {
+        "valor": 37756787.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-01"
+      }
+    },
+    {
+      "mes": "2024-02",
+      "receita": {
+        "valor": 24932041.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-02"
+      },
+      "energia": {
+        "valor": 37007493.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-02"
+      }
+    },
+    {
+      "mes": "2024-03",
+      "receita": {
+        "valor": 23891369.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-03"
+      },
+      "energia": {
+        "valor": 35253680.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-03"
+      }
+    },
+    {
+      "mes": "2024-04",
+      "receita": {
+        "valor": 21699783.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-04"
+      },
+      "energia": {
+        "valor": 31831357.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-04"
+      }
+    },
+    {
+      "mes": "2024-05",
+      "receita": {
+        "valor": 19031958.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-05"
+      },
+      "energia": {
+        "valor": 27753914.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-05"
+      }
+    },
+    {
+      "mes": "2024-06",
+      "receita": {
+        "valor": 17954244.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-06"
+      },
+      "energia": {
+        "valor": 26028763.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-06"
+      }
+    },
+    {
+      "mes": "2024-07",
+      "receita": {
+        "valor": 24037046.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-07"
+      },
+      "energia": {
+        "valor": 35694925.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-07"
+      }
+    },
+    {
+      "mes": "2024-08",
+      "receita": {
+        "valor": 23222508.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-08"
+      },
+      "energia": {
+        "valor": 34279251.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-08"
+      }
+    },
+    {
+      "mes": "2024-09",
+      "receita": {
+        "valor": 22400713.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-09"
+      },
+      "energia": {
+        "valor": 32868965.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-09"
+      }
+    },
+    {
+      "mes": "2024-10",
+      "receita": {
+        "valor": 22948576.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-10"
+      },
+      "energia": {
+        "valor": 33472411.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-10"
+      }
+    },
+    {
+      "mes": "2024-11",
+      "receita": {
+        "valor": 23730460.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-11"
+      },
+      "energia": {
+        "valor": 34407214.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-11"
+      }
+    },
+    {
+      "mes": "2024-12",
+      "receita": {
+        "valor": 24980387.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2024-12"
+      },
+      "energia": {
+        "valor": 36004730.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-12"
+      }
+    },
+    {
+      "mes": "2025-01",
+      "receita": {
+        "valor": 26007177.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-01"
+      },
+      "energia": {
+        "valor": 37262808.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-01"
+      }
+    },
+    {
+      "mes": "2025-02",
+      "receita": {
+        "valor": 25642539.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-02"
+      },
+      "energia": {
+        "valor": 36523317.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-02"
+      }
+    },
+    {
+      "mes": "2025-03",
+      "receita": {
+        "valor": 24572210.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-03"
+      },
+      "energia": {
+        "valor": 34792450.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-03"
+      }
+    },
+    {
+      "mes": "2025-04",
+      "receita": {
+        "valor": 22318171.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-04"
+      },
+      "energia": {
+        "valor": 31414902.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-04"
+      }
+    },
+    {
+      "mes": "2025-05",
+      "receita": {
+        "valor": 19574319.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-05"
+      },
+      "energia": {
+        "valor": 27390804.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-05"
+      }
+    },
+    {
+      "mes": "2025-06",
+      "receita": {
+        "valor": 18465894.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-06"
+      },
+      "energia": {
+        "valor": 25688223.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-06"
+      }
+    },
+    {
+      "mes": "2025-07",
+      "receita": {
+        "valor": 24625214.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-07"
+      },
+      "energia": {
+        "valor": 35212803.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07"
+      }
+    },
+    {
+      "mes": "2025-08",
+      "receita": {
+        "valor": 23790745.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-08"
+      },
+      "energia": {
+        "valor": 33816250.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-08"
+      }
+    },
+    {
+      "mes": "2025-09",
+      "receita": {
+        "valor": 22948841.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-09"
+      },
+      "energia": {
+        "valor": 32425012.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-09"
+      }
+    },
+    {
+      "mes": "2025-10",
+      "receita": {
+        "valor": 23510110.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-10"
+      },
+      "energia": {
+        "valor": 33020307.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-10"
+      }
+    },
+    {
+      "mes": "2025-11",
+      "receita": {
+        "valor": 24311126.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-11"
+      },
+      "energia": {
+        "valor": 33942484.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-11"
+      }
+    },
+    {
+      "mes": "2025-12",
+      "receita": {
+        "valor": 25591638.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2025-12"
+      },
+      "energia": {
+        "valor": 35518423.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-12"
+      }
+    },
+    {
+      "mes": "2026-01",
+      "receita": {
+        "valor": 26643552.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-01"
+      },
+      "energia": {
+        "valor": 36759508.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-01"
+      }
+    },
+    {
+      "mes": "2026-02",
+      "receita": {
+        "valor": 26269993.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-02"
+      },
+      "energia": {
+        "valor": 36030006.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-02"
+      }
+    },
+    {
+      "mes": "2026-03",
+      "receita": {
+        "valor": 25173474.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-03"
+      },
+      "energia": {
+        "valor": 34322517.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-03"
+      }
+    },
+    {
+      "mes": "2026-04",
+      "receita": {
+        "valor": 22864279.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-04"
+      },
+      "energia": {
+        "valor": 30990588.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-04"
+      }
+    },
+    {
+      "mes": "2026-05",
+      "receita": {
+        "valor": 20053288.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-05"
+      },
+      "energia": {
+        "valor": 27020843.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-05"
+      }
+    },
+    {
+      "mes": "2026-06",
+      "receita": {
+        "valor": 18917740.0,
+        "unidade": "BRL",
+        "periodo_referencia": "2026-06"
+      },
+      "energia": {
+        "valor": 25341259.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-06"
+      }
+    }
+  ],
+  "ponte_receita": {
+    "receita_comparacao": {
+      "valor": 263600000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2022-07/2023-06"
+    },
+    "efeito_preco": {
+      "valor": 27700000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "efeito_volume": {
+      "valor": -10400000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "bandeira_mix": {
+      "valor": 3800000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "receita_atual": {
+      "valor": 284700000.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06"
+    },
+    "reajuste_percentual": {
+      "valor": 10.5,
+      "unidade": "%",
+      "periodo_referencia": "2025-07/2026-06"
+    }
+  },
+  "drill_down": {
+    "items": [
+      {
+        "nivel": "municipio",
+        "nome": "Recife",
+        "receita_atual": {
+          "valor": 128509122.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "receita_comparacao": {
+          "valor": 121256000.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "energia_atual": {
+          "valor": 178028351.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "energia_comparacao": {
+          "valor": 188784000.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "variacao_energia_percentual": {
+          "valor": -5.6973,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "queda_kwh": {
+          "valor": 10755649.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "efeito_preco": {
+          "valor": 12503346.26,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "efeito_volume": {
+          "valor": -6991171.85,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "filtros": {
+          "municipio": "Recife",
+          "bairro": null,
+          "classe": null
+        }
+      },
+      {
+        "nivel": "municipio",
+        "nome": "Jaboatão dos Guararapes",
+        "receita_atual": {
+          "valor": 62231341.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "receita_comparacao": {
+          "valor": 57992000.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "energia_atual": {
+          "valor": 86210580.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "energia_comparacao": {
+          "valor": 90288000.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "variacao_energia_percentual": {
+          "valor": -4.516,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "queda_kwh": {
+          "valor": 4077420.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "efeito_preco": {
+          "valor": 6054823.13,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "efeito_volume": {
+          "valor": -2650323.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "filtros": {
+          "municipio": "Jaboatão dos Guararapes",
+          "bairro": null,
+          "classe": null
+        }
+      },
+      {
+        "nivel": "municipio",
+        "nome": "Olinda",
+        "receita_atual": {
+          "valor": 93959537.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "receita_comparacao": {
+          "valor": 84352000.0,
+          "unidade": "BRL",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "energia_atual": {
+          "valor": 130161069.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "energia_comparacao": {
+          "valor": 131328000.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "variacao_energia_percentual": {
+          "valor": -0.8886,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "queda_kwh": {
+          "valor": 1166931.0,
+          "unidade": "kWh",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "efeito_preco": {
+          "valor": 9141830.61,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "efeito_volume": {
+          "valor": -758505.15,
+          "unidade": "BRL",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "filtros": {
+          "municipio": "Olinda",
+          "bairro": null,
+          "classe": null
+        }
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 3,
+    "nivel": "municipio",
+    "breadcrumb": [
+      {
+        "nivel": "consolidado",
+        "rotulo": "Todos os municípios",
+        "filtros": {
+          "municipio": null,
+          "bairro": null,
+          "classe": null
+        }
+      }
+    ]
+  },
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
+}
