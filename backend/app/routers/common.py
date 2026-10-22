@@ -5,7 +5,7 @@ STUB = (
     'Stub do P1 (contrato V2): dados fictícios, sem banco ou IA. '
     f'Cenários simulados: periodo_atual={PERIODO_ATUAL} e periodo_comparacao={PERIODO_COMPARACAO}; '
     'outros intervalos válidos retornam 422 CENARIO_STUB_INDISPONIVEL. '
-    'POST/PATCH usam snapshot: chamadas posteriores de GET não mudam.'
+    'Escritas em rotas de exemplo não persistem; GET/POST/PATCH /inspecoes usam o schema portal.'
 )
 
 ERROS = {

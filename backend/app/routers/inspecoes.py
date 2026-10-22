@@ -1,22 +1,50 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Path, Query
+from fastapi import APIRouter, Body, Depends, Path, Query
+from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
     JustificativaObrigatoriaException, ResultadoIncompletoException, TransicaoInvalidaException,
 )
+from app.db.session import get_db
+from app.repositories.inspecao_repository import SqlAlchemyOrdemInspecaoRepository
 from app.routers.common import STUB, respostas
-from app.schemas.inspecao import OrdemInspecaoAvancarCampo, OrdemInspecaoCreate, ResultadoInspecao
+from app.schemas.inspecao import (
+    OrdemInspecaoAvancarCampo,
+    OrdemInspecaoCreate,
+    OrdemInspecaoResponse,
+    ResultadoInspecao,
+    StatusOrdem,
+)
 from app.schemas.inspecoes import (
     AtualizarInspecao, Candidatos, CriarInspecao, FiltrosCandidatos, FiltrosInspecoes, Ordem, Ordens,
 )
-from app.services.stub_inspecoes import listar_candidatos, listar_ordens, para_transporte, servico_ordens
+from app.services.inspecao_service import OrdemInspecaoService
+from app.services.stub_inspecoes import listar_candidatos
 from app.services.stubs import exemplo
 
 router = APIRouter(prefix='/inspecoes', tags=['Inspeções'])
 
-SNAPSHOT = (' Snapshot: 1 ABERTA/UC-DEMO-002, 2 EM_CAMPO/UC-DEMO-005, 3 CONCLUIDA, 4 CANCELADA. '
-            'Regras do service do Gabriel; nada persiste entre chamadas.')
+PERSISTENCIA = (' Ordens e histórico são persistidos no schema portal; a recarga da Gold não os apaga. '
+                'Há no máximo uma ordem ativa (ABERTA/EM_CAMPO) por UC, garantida por índice único parcial.')
+
+
+def get_service(db: Annotated[Session, Depends(get_db)]) -> OrdemInspecaoService:
+    return OrdemInspecaoService(repository=SqlAlchemyOrdemInspecaoRepository(db))
+
+
+def para_transporte(ordem: OrdemInspecaoResponse) -> dict:
+    return ordem.model_dump(mode='json')
+
+
+def metadados() -> dict:
+    return {
+        'dados_ficticios': True,
+        'gold_atualizada_em': None,
+        'observacoes': [
+            'Dados fictícios do seed; as ordens de inspeção são persistidas no schema portal.'
+        ],
+    }
 
 
 @router.get('/candidatos', response_model=Candidatos, summary='Fila priorizada de candidatos',
@@ -27,33 +55,60 @@ async def candidatos(filtros: Annotated[FiltrosCandidatos, Query()]):
 
 
 @router.get('', response_model=Ordens, summary='Listar ordens de inspeção',
-            description=STUB + SNAPSHOT + ' contagem_status ignora o filtro status e a paginação.',
+            description=PERSISTENCIA + ' contagem_status ignora o filtro status e a paginação.',
             responses=respostas('inspecoes'))
-async def listar_inspecoes(filtros: Annotated[FiltrosInspecoes, Query()]):
-    return listar_ordens(filtros)
+async def listar_inspecoes(
+    filtros: Annotated[FiltrosInspecoes, Query()],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+):
+    ordens, total, contagem = servico.consultar_ordens(
+        status=StatusOrdem(filtros.status) if filtros.status is not None else None,
+        id_uc=filtros.id_uc,
+        periodo_atual=filtros.periodo_atual,
+        municipio=filtros.municipio,
+        bairro=filtros.bairro,
+        classe=filtros.classe,
+        alimentador=filtros.alimentador,
+        page=filtros.page,
+        page_size=filtros.page_size,
+    )
+    return {
+        'items': [para_transporte(ordem) for ordem in ordens],
+        'page': filtros.page,
+        'page_size': filtros.page_size,
+        'total': total,
+        'contagem_status': contagem,
+        'metadados': metadados(),
+    }
 
 
 @router.post('', response_model=Ordem, status_code=201, summary='Criar ordem de inspeção',
-             description=STUB + SNAPSHOT + ' Criar UC-DEMO-001 funciona; UC-DEMO-002/005 retornam 409.',
+             description=PERSISTENCIA + ' UC inexistente retorna 404; UC já com ordem ativa retorna 409.',
              responses=respostas('ordem_criada', status=201, erros=('UC_INEXISTENTE', 'ORDEM_ATIVA_EXISTENTE')))
-async def criar_inspecao(dados: Annotated[CriarInspecao, Body(openapi_examples={
-    'criar': {'value': exemplo('criar_inspecao')},
-})]):
-    ordem = servico_ordens().criar_ordem(OrdemInspecaoCreate(**dados.model_dump()))
+async def criar_inspecao(
+    dados: Annotated[CriarInspecao, Body(openapi_examples={
+        'criar': {'value': exemplo('criar_inspecao')},
+    })],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+):
+    ordem = servico.criar_ordem(OrdemInspecaoCreate(**dados.model_dump()))
     return para_transporte(ordem)
 
 
 @router.patch('/{id}', response_model=Ordem, summary='Avançar, concluir ou cancelar ordem',
-              description=STUB + SNAPSHOT + ' Concluir exige ordem EM_CAMPO (use a 2).',
+              description=PERSISTENCIA + ' Concluir exige ordem EM_CAMPO e resultado válido.',
               responses=respostas('ordem_atualizada', erros=(
                   'TRANSICAO_INVALIDA', 'JUSTIFICATIVA_OBRIGATORIA', 'RESULTADO_INCOMPLETO',
                   'ORDEM_NAO_ENCONTRADA')))
-async def atualizar_inspecao(id: Annotated[int, Path(gt=0)], dados: Annotated[AtualizarInspecao, Body(openapi_examples={
-    'iniciar': {'value': exemplo('iniciar_inspecao')},
-    'concluir': {'value': exemplo('concluir_inspecao')},
-    'cancelar': {'value': exemplo('cancelar_inspecao')},
-})]):
-    servico = servico_ordens()
+async def atualizar_inspecao(
+    id: Annotated[int, Path(gt=0)],
+    dados: Annotated[AtualizarInspecao, Body(openapi_examples={
+        'iniciar': {'value': exemplo('iniciar_inspecao')},
+        'concluir': {'value': exemplo('concluir_inspecao')},
+        'cancelar': {'value': exemplo('cancelar_inspecao')},
+    })],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+):
     if dados.status == 'EM_CAMPO':
         ordem = servico.avancar_para_campo(id, OrdemInspecaoAvancarCampo(
             equipe_responsavel=dados.equipe_responsavel, observacoes=dados.observacoes))

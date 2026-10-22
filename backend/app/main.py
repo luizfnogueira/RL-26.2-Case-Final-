@@ -11,7 +11,11 @@ from app.routers import dashboard, ia, inspecoes, operacao, unidades
 app = FastAPI(
     title="V-Energy Grid 360 API",
     version="0.2.0",
-    description="API de teste do front (contrato V2, docs/api-contract.md). Rotas usam exemplos fictícios do P1, sem banco ou IA. POST/PATCH não persistem alterações.",
+    description=(
+        "API do case V-Energy — contrato V2 (docs/api-contract.md). As ordens de inspeção "
+        "(GET/POST/PATCH /inspecoes) persistem no schema portal; as demais rotas ainda usam "
+        "exemplos fictícios do P1."
+    ),
 )
 register_error_handlers(app)
 
