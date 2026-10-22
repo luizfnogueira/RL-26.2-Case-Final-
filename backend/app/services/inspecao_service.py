@@ -286,6 +286,31 @@ class OrdemInspecaoService:
     ) -> list[OrdemInspecaoResponse]:
         return self.repository.listar(status=status, id_uc=id_uc)
 
+    def consultar_ordens(
+        self,
+        *,
+        status: Optional[StatusOrdem] = None,
+        id_uc: Optional[str] = None,
+        periodo_atual: Optional[str] = None,
+        municipio: Optional[str] = None,
+        bairro: Optional[str] = None,
+        classe: Optional[str] = None,
+        alimentador: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[OrdemInspecaoResponse], int, dict[str, int]]:
+        return self.repository.consultar(
+            status=status,
+            id_uc=id_uc,
+            periodo_atual=periodo_atual,
+            municipio=municipio,
+            bairro=bairro,
+            classe=classe,
+            alimentador=alimentador,
+            page=page,
+            page_size=page_size,
+        )
+
     def obter_ordem_ativa(self, id_uc: str) -> Optional[OrdemInspecaoResponse]:
         return self.repository.obter_ativa_por_uc(id_uc)
 
