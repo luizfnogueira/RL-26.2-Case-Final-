@@ -70,9 +70,9 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 - Definições da Gold (`agg_kpis_mensal`; com filtro, as mesmas regras sobre `fato_uc_mes`):
   - `receita_faturada` = Σ `valor_total` (com tributos).
   - `energia_faturada` = Σ `consumo_kwh` das leituras válidas (sem `flag_consumo_negativo`).
-  - `ucs_ativas` = UCs faturadas no **último mês** de cada janela: o retrato da base de clientes, como as distribuidoras reportam. Contar quem teve fatura em qualquer mês dos 12 inflaria o número com UCs desligadas no meio do período.
+  - `ucs_ativas` = UCs **ligadas até o fim do último mês** de cada janela (`data_ligacao`; sem data, conta sempre), a mesma regra do Cc da `gold.fato_alimentador_mes`: o retrato da base de clientes, como as distribuidoras reportam.
   - `inadimplencia` = Σ `valor_total` das faturas `EM ABERTO` no período (`valor_em_aberto` da Gold); inclui o percentual da receita em cada período e a variação em pontos percentuais. Rótulo na tela: **“Valor em aberto”**. No mercado, inadimplência é o valor **vencido** e não pago; nesta base o histórico termina em jun/2026 e toda fatura em aberto já venceu, então os dois números coincidem.
-  - `dec_medio` / `fec_medio` = soma dos meses da janela; agregado de alimentadores pondera pelas UCs (Σ horas ÷ Σ UCs). Só interrupções acima de 3 minutos (PRODIST Módulo 8). Metas ilustrativas, não limites regulatórios certificados.
+  - `dec_medio` / `fec_medio` = soma dos DEC/FEC mensais da janela; cada mês divide pelas UCs atendidas naquele mês (Cc mensal). Seguem as regras da `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais (PRODIST Módulo 8), sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva (sem contar em dobro o tempo sobreposto). Com filtro de bairro, classe ou alimentador, retornam null: a continuidade só é agregada por alimentador e município.
 - `serie_historica`: 48 pontos mensais, jul/2022–jun/2026, cada um com receita e energia. A janela da série é independente das duas janelas de comparação.
 - `ponte_receita`: decompõe a **receita de energia** (sem tributos), como `gold.agg_preco_volume`: receita_energia_comparacao + efeito_preco + efeito_volume = receita_energia_atual, sem resíduo. Exemplo do stub: 205,9 + 24,7 − 8,2 = 222,4 milhões. efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação, por recorte e depois somado; efeito_preco = variação da receita de energia − efeito_volume. reajuste_percentual = variação da tarifa média de energia. Não há parcela de bandeira/mix.
 - `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
@@ -370,7 +370,7 @@ GET /health
 
 Esta V2 altera o contrato: `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens inteiros, campos das ordens/resultados no modelo do Gabriel; dashboard com seis KPIs, série e ponte; IA e insight com respostas distintas.
 
-Alinhamento com a Gold (23/10), que muda formatos para o front: `ponte_receita` passa a ter `receita_energia_comparacao`, `efeito_preco`, `efeito_volume`, `receita_energia_atual` e `reajuste_percentual` (sai `bandeira_mix`); as linhas do `drill_down` trocam `receita_atual`/`receita_comparacao` por `receita_energia_atual`/`receita_energia_comparacao`; chamados perdem `historico` e ganham `tempo_atendimento_h`; o insight da receita usa `receita_energia_atual`/`receita_energia_comparacao`. Gheyson precisa atualizar `types/` e mocks.
+Alinhamento com a Gold (23/10), que muda formatos para o front: `ponte_receita` passa a ter `receita_energia_comparacao`, `efeito_preco`, `efeito_volume`, `receita_energia_atual` e `reajuste_percentual` (sai `bandeira_mix`); as linhas do `drill_down` trocam `receita_atual`/`receita_comparacao` por `receita_energia_atual`/`receita_energia_comparacao`; chamados perdem `historico` e ganham `tempo_atendimento_h`; o insight da receita usa `receita_energia_atual`/`receita_energia_comparacao`.
 
 Contrato, schemas, routers e fixtures do backend estão na mesma versão (V2). `backend/tests/test_stubs.py` compara a resposta de cada rota com o fixture vinculado neste documento; se um mudar sem o outro, o teste falha. Gheyson gera `types/` e mocks a partir desses fixtures (F3).
 
@@ -391,7 +391,6 @@ O stub precisa de números para o front trabalhar, mas as regras abaixo **não e
 | Regra | Onde aparece | Valor no stub | Dono | Quando |
 | --- | --- | --- | --- | --- |
 | Agregação regional de DEC/FEC por bairro (alimentadores que atendem o bairro, ponderados por UCs) | `ranking_regional` | Ilustrativa | Arthur (R1a) | 23/10 |
-| Metas de DEC/FEC | `dec_medio.meta`, `fec_medio.meta` | 12,0 h e 7,5 interrupções (ilustrativas) | Arthur | 23/10 |
 | Nomes reais de tabelas Gold, SQL e auditoria do agente | `resposta_ia` (`gold_receita_demo`) | Ilustrativos | Equipe 3 (GenAI) | Contrato 20/10, módulo até 29/10 |
 | Timestamp de carga da Gold | `metadados.gold_atualizada_em` | Fixo | Dados | B2 (21/10) |
 

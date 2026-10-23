@@ -34,17 +34,13 @@ class KpiInadimplencia(Kpi):
     variacao_pontos_percentuais: Indicador
 
 
-class KpiContinuidade(Kpi):
-    meta: Indicador
-
-
 class IndicadoresDashboard(Schema):
     receita_faturada: Kpi
     energia_faturada: Kpi
     ucs_ativas: Kpi
     inadimplencia: KpiInadimplencia
-    dec_medio: KpiContinuidade
-    fec_medio: KpiContinuidade
+    dec_medio: Kpi
+    fec_medio: Kpi
 
 
 class PontoSerie(Schema):

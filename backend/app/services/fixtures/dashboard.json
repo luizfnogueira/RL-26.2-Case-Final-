@@ -136,11 +136,6 @@
         "valor": -13.6398,
         "unidade": "%",
         "periodo_referencia": "2025-07/2026-06"
-      },
-      "meta": {
-        "valor": 12.0,
-        "unidade": "h/UC",
-        "periodo_referencia": "2025-07/2026-06"
       }
     },
     "fec_medio": {
@@ -163,11 +158,6 @@
       "variacao_percentual": {
         "valor": -13.6691,
         "unidade": "%",
-        "periodo_referencia": "2025-07/2026-06"
-      },
-      "meta": {
-        "valor": 7.5,
-        "unidade": "interrupcoes/UC",
         "periodo_referencia": "2025-07/2026-06"
       }
     }

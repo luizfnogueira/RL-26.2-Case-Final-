@@ -76,7 +76,7 @@ class TestDashboard:
         assert sum(l['efeito_volume']['valor'] for l in drill['items']) == pytest.approx(
             ponte['efeito_volume']['valor'], abs=0.05)
         assert dados['indicadores']['dec_medio']['atual']['valor'] is None
-        assert dados['indicadores']['dec_medio']['meta']['valor'] is not None
+        assert 'meta' not in dados['indicadores']['dec_medio']
 
     def test_drill_ordenado_e_com_breadcrumb(self):
         drill = get('/dashboard', **PERIODOS, nivel='classe', municipio='Recife', bairro='Boa Vista')['drill_down']

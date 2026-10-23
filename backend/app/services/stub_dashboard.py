@@ -55,6 +55,7 @@ def _indicadores(soma: dict, base: dict, filtrado: bool) -> dict:
     continuidade = {}
     for nome in ('dec_medio', 'fec_medio'):
         kpi = base[nome]
+        kpi.pop('meta', None)   # sem meta: o contrato não tem mais esse campo
         if filtrado:
             for campo in ('atual', 'comparacao', 'diferenca', 'variacao_percentual'):
                 kpi[campo]['valor'] = None
