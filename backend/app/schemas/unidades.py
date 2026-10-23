@@ -5,7 +5,8 @@ from pydantic import AwareDatetime, StringConstraints
 
 from app.schemas.common import FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema
 
-TipoLeitura = Literal['REAL', 'ESTIMADA']
+# Domínio de tipo_leitura na Silver/Gold (silver_medicao)
+TipoLeitura = Literal['REAL', 'ESTIMADA', 'MEDIA', 'AUTENTICADA', 'NAO REALIZADA']
 
 
 class FiltrosUnidades(FiltrosRegiao, Paginacao):
@@ -36,9 +37,9 @@ class Cadastro(Unidade):
     logradouro: str
     numero: str
     uf: str
-    cep: str
+    cep: str | None
     subgrupo_tarifario: str
-    data_ligacao: date
+    data_ligacao: date | None
     latitude: float | None
     longitude: float | None
 
@@ -67,7 +68,6 @@ class Fatura(Schema):
     valor_energia: float
     tributos: float
     valor_total: float
-    moeda: str
     bandeira_tarifaria: str
     data_emissao: date
     data_vencimento: date
@@ -86,9 +86,6 @@ class Medidor(Schema):
     modelo: str
     tipo: str
     data_instalacao: date
-    data_retirada: date | None
-    data_ultima_manutencao: date | None
-    status: str
     ultima_leitura: Leitura | None
 
 

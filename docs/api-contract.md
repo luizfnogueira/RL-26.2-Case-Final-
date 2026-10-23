@@ -26,7 +26,7 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /unidades/{id} | periodo_atual opcional; no mock o padrão é 2025-07/2026-06 |
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
-| GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec; nivel_regional=municipio|bairro; page, page_size |
+| GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta; contexto opcional com períodos/filtros |
 | POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
 
@@ -69,7 +69,7 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 - `indicadores`: exatamente seis KPIs — receita_faturada, energia_faturada, ucs_ativas, inadimplencia, dec_medio, fec_medio. Cada um tem atual, comparação, diferença e variação percentual; campos não aplicáveis retornam null.
 - Definições da Gold (`agg_kpis_mensal`; com filtro, as mesmas regras sobre `fato_uc_mes`):
   - `receita_faturada` = Σ `valor_total` (com tributos).
-  - `energia_faturada` = Σ `consumo_kwh` das leituras válidas (sem `flag_consumo_negativo`).
+  - `energia_faturada` = Σ `consumo_kwh_valido` do `fato_uc_mes` (consumo sem as leituras negativas não recuperadas).
   - `ucs_ativas` = UCs **ligadas até o fim do último mês** de cada janela (`data_ligacao`; sem data, conta sempre), a mesma regra do Cc da `gold.fato_alimentador_mes`: o retrato da base de clientes, como as distribuidoras reportam.
   - `inadimplencia` = Σ `valor_total` das faturas `EM ABERTO` no período (`valor_em_aberto` da Gold); inclui o percentual da receita em cada período e a variação em pontos percentuais. Rótulo na tela: **“Valor em aberto”**. No mercado, inadimplência é o valor **vencido** e não pago; nesta base o histórico termina em jun/2026 e toda fatura em aberto já venceu, então os dois números coincidem.
   - `dec_medio` / `fec_medio` = soma dos DEC/FEC mensais da janela; cada mês divide pelas UCs atendidas naquele mês (Cc mensal). Seguem as regras da `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais (PRODIST Módulo 8), sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva (sem contar em dobro o tempo sobreposto). Com filtro de bairro, classe ou alimentador, retornam null: a continuidade só é agregada por alimentador e município.
@@ -103,10 +103,11 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/unidade.json)**
 
-- Cadastro, CPF/CNPJ mascarado e telefone anulável (não há telefone na fonte bruta inspecionada).
-- `consumo`: 12 pares de mês atual/mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura`.
+- Fontes na Gold: cadastro, medidor ativo e GD da `dim_uc`; faturas, última leitura e `tipo_leitura` do `fato_uc_mes`; consumo comparativo da `uc_consumo_comparativo`; interrupções da `uc_interrupcoes`; chamados da `uc_atendimentos`.
+- Cadastro, CPF/CNPJ mascarado e telefone anulável (não há telefone na fonte bruta inspecionada). `cep` e `data_ligacao` também são anuláveis.
+- `consumo`: 12 pares de mês atual/mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura` (`REAL`, `ESTIMADA`, `MEDIA`, `AUTENTICADA` ou `NAO REALIZADA`). O ano anterior é null quando a UC não tem leitura naquele mês.
 - `diagnostico_conta`: conta_alta (bool/null), veredito, último mês, mesmo mês do ano anterior, média de 12 meses, variação percentual, leitura_estimada e alerta. `conta_alta` vem de `gold.uc_consumo_comparativo.flag_conta_alta`: consumo do último mês **mais de 20% acima** do mesmo mês do ano anterior; null quando não há ano anterior ou algum dos consumos é ≤ 0. A média de 12 meses e o alerta de leitura estimada são calculados pela API a partir do `fato_uc_mes`.
-- Faturas abertas e pagas, medidor com última leitura, GD, interrupções recentes e chamados com nota e `tempo_atendimento_h`. Chamados **não trazem histórico**: a Gold não o publica (a ação dos eventos na fonte é aleatória). Exemplo tem 1 fatura aberta e 1 paga; a UI conta o que recebeu.
+- Faturas abertas e pagas (valores em BRL), medidor ativo (id, modelo, tipo, data de instalação e última leitura), GD, interrupções recentes e chamados com nota e `tempo_atendimento_h`. Exemplo tem 1 fatura aberta e 1 paga; a UI conta o que recebeu.
 - Média mensal injetada de GD não é geração medida no período. O exemplo é um caso fictício que segue a regra da Gold.
 
 No mock, somente UC-DEMO-001 tem a visão detalhada. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
@@ -119,7 +120,7 @@ GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=20
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/candidatos.json)**
 
-`resumo`: UCs analisadas, priorizadas, potencial de recuperação e ordens ativas, com unidade/período, antes da paginação. Cada candidato: ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), ordem_ativa e id_ordem_ativa.
+`resumo`, antes da paginação e com os mesmos filtros: UCs analisadas (UCs do cadastro, o universo da `tb_fila_perdas_auditoria`), UCs priorizadas (UCs na `tb_fila_perdas`, todas elegíveis), potencial de recuperação (Σ `kwh_estimado` das priorizadas) e ordens ativas (do schema `portal`). Cada candidato: ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa.
 
 Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após filtros (na Gold, `posicao_fila`). Só UCs com `status_triagem = ELEGIVEL` entram. `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada; a tela deve deixar isso claro. Desabilitar seleção de UC com ordem ativa no front; POST também valida duplicidade. Estimativa futura não é o kWh já recuperado do histórico.
 
@@ -222,10 +223,13 @@ GET /operacao?periodo_atual=2025-07/2026-06&ordenar_por=dec&page=1&page_size=20
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/operacao.json)**
 
-- `serie_historica`: DEC e FEC mensais por alimentador.
-- `ranking_alimentadores`: lista paginada com DEC, FEC, número de interrupções, UCs atendidas, município e bairros atendidos.
-- `ranking_regional`: lista paginada com DEC, FEC e interrupções; `nivel_regional=municipio` (padrão, bairro null) ou `bairro` (município e bairro preenchidos).
-- Rankings ordenados pelo indicador escolhido, decrescente. Mesmo page/page_size aplicado independentemente a cada ranking; totais próprios. A série não é truncada pela paginação.
+- DEC e FEC seguem a `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais, sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva; o denominador são as UCs atendidas pelo alimentador no mês. No período, DEC/FEC são a soma dos meses.
+- `dec_sem_dia_critico` / `fec_sem_dia_critico`: os mesmos indicadores sem os dias críticos (`flag_dia_critico`, como o expurgo do PRODIST; na base, julho de 2025).
+- `horas_interrupcao`: o CHI (consumidor-hora interrompido), total de horas sem energia somadas nas UCs. Mostra onde mais gente sofreu, já que o DEC favorece alimentadores pequenos.
+- `serie_historica`: DEC e FEC mensais por alimentador, com e sem dia crítico.
+- `ranking_alimentadores`: lista paginada com DEC e FEC (com e sem dia crítico), número de interrupções, horas de interrupção, UCs atendidas, município e bairros atendidos.
+- `ranking_regional`: lista paginada com DEC e FEC (com e sem dia crítico), interrupções e horas de interrupção; `nivel_regional=municipio` (padrão, bairro null) ou `bairro` (município e bairro preenchidos).
+- Rankings ordenados pelo indicador escolhido (`ordenar_por=dec|fec|chi`), decrescente. Mesmo page/page_size aplicado independentemente a cada ranking; totais próprios. A série não é truncada pela paginação.
 - Clicar em um alimentador reconsulta com `alimentador`, filtrando série e rankings. O mock tem 12 pontos por alimentador; os totais de DEC/FEC correspondem à soma mensal fictícia.
 
 ## 9. POST /ia — Tela 7 e painel flutuante
@@ -394,8 +398,6 @@ O stub precisa de números para o front trabalhar, mas as regras abaixo **não e
 | Nomes reais de tabelas Gold, SQL e auditoria do agente | `resposta_ia` (`gold_receita_demo`) | Ilustrativos | Equipe 3 (GenAI) | Contrato 20/10, módulo até 29/10 |
 | Timestamp de carga da Gold | `metadados.gold_atualizada_em` | Fixo | Dados | B2 (21/10) |
 
-A conta alta, a decomposição preço/volume e o score da fila deixaram de ser provisórios: são definidos pela Gold (seção 16). O corte de priorização do resumo da fila (score ≥ 60) segue ilustrativo no stub.
-
 Fontes ausentes não devem virar valores fictícios em produção. Telefone permanece null até existir fonte.
 
 P1/B1 entregam contratos e stubs; não substituem B2/B3/B4/B5, O1b, V1a ou R1a. A leitura real e a persistência seguem com os responsáveis do cronograma.
@@ -419,10 +421,11 @@ A Gold não muda para atender o portal. Onde este contrato divergia dela, a API 
 | --- | --- | --- |
 | Inadimplência | `valor_em_aberto`: faturas `EM ABERTO`, sem olhar o vencimento | Mesmo número, inclusive nos KPIs com filtro, com o rótulo “Valor em aberto”. O conceito de mercado (vencido e não pago) coincide nesta base, porque toda fatura em aberto já venceu |
 | KPIs com filtro | `agg_kpis_mensal` é só global | Sem filtro, lê `agg_kpis_mensal`; com filtro, agrega `fato_uc_mes` + `dim_uc` com as mesmas regras, e DEC/FEC por `agg_dec_fec_mensal` |
-| UCs ativas | `ucs_atendidas` é o total do cadastro, igual nos dois períodos | API deriva do `fato_uc_mes`: UCs faturadas no último mês de cada janela (retrato da base de clientes, prática do setor) |
-| Energia por recorte | `agg_receita_mensal` não exclui `flag_consumo_negativo`; `agg_kpis_mensal` exclui | KPI de energia sempre pela regra do `agg_kpis_mensal` (soma o `fato_uc_mes` sem os negativos); `agg_receita_mensal` só para receita e drill-down |
+| UCs ativas | `fato_alimentador_mes.ucs_atendidas`: UCs ligadas até o fim de cada mês | Mesma regra: UCs ligadas até o fim do último mês da janela; com filtro de bairro ou classe, contadas na `dim_uc` pela `data_ligacao` |
+| Energia | `consumo_kwh_valido` no `fato_uc_mes`, somado igual em `agg_kpis_mensal` e `agg_receita_mensal` | KPI de energia e série somam `consumo_kwh_valido` |
 | Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2 | Seção 3: sem `bandeira_mix`; outras janelas recebem 422 |
 | Conta alta | `flag_conta_alta`: consumo > 20% acima do mesmo mês do ano anterior | Seção 5: veredito pela flag; média de 12 meses e alerta de leitura estimada calculados pela API |
 | Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
-| Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao` e converte `motivos_json` em `motivos[]` |
+| Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json`; `confianca_evidencia` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao`, converte `motivos_json` em `motivos[]` e repassa `confianca_evidencia` |
+| Medidor | `dim_uc` traz só o medidor ativo: id, tipo, modelo e data de instalação | Seção 5: medidor com esses campos e a última leitura do `fato_uc_mes` |
 

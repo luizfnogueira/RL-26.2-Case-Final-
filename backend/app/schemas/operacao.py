@@ -3,11 +3,13 @@ from typing import Literal
 from app.schemas.common import FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema
 
 NivelRegional = Literal['municipio', 'bairro']
+# chi = horas de interrupção (consumidor-hora interrompido), ranking de onde mais gente ficou sem energia
+OrdenarPor = Literal['dec', 'fec', 'chi']
 
 
 class FiltrosOperacao(FiltrosRegiao, Paginacao):
     periodo_atual: Periodo
-    ordenar_por: Literal['dec', 'fec'] = 'dec'
+    ordenar_por: OrdenarPor = 'dec'
     nivel_regional: NivelRegional = 'municipio'
 
 
@@ -15,6 +17,8 @@ class PontoOperacao(Schema):
     mes: Mes
     dec: Indicador
     fec: Indicador
+    dec_sem_dia_critico: Indicador
+    fec_sem_dia_critico: Indicador
 
 
 class SerieAlimentador(Schema):
@@ -30,7 +34,10 @@ class RankingAlimentador(Schema):
     ucs_atendidas: int
     dec: Indicador
     fec: Indicador
+    dec_sem_dia_critico: Indicador
+    fec_sem_dia_critico: Indicador
     interrupcoes: Indicador
+    horas_interrupcao: Indicador
 
 
 class RankingRegional(Schema):
@@ -39,7 +46,10 @@ class RankingRegional(Schema):
     bairro: str | None
     dec: Indicador
     fec: Indicador
+    dec_sem_dia_critico: Indicador
+    fec_sem_dia_critico: Indicador
     interrupcoes: Indicador
+    horas_interrupcao: Indicador
 
 
 class RankingAlimentadores(Pagina[RankingAlimentador]):
@@ -52,7 +62,7 @@ class RankingRegionalPagina(Pagina[RankingRegional]):
 
 class FiltrosOperacaoAplicados(FiltrosRegiao):
     periodo_atual: Periodo
-    ordenar_por: Literal['dec', 'fec']
+    ordenar_por: OrdenarPor
 
 
 class Operacao(Schema):

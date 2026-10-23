@@ -27,6 +27,7 @@ class Candidato(Schema):
     motivos: list[str]
     energia_estimada: Indicador
     score: float = Field(ge=0, le=100)
+    confianca_evidencia: Literal['ALTA', 'MEDIA', 'BAIXA', 'INDETERMINADA']
     ordem_ativa: bool
     id_ordem_ativa: int | None
 

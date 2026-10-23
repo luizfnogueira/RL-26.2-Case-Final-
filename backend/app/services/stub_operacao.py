@@ -3,11 +3,14 @@ from app.core.exceptions import CenarioStubIndisponivelException
 from app.schemas.operacao import FiltrosOperacao
 from app.services.stubs import PERIODO_ATUAL, exemplo, indicador, paginar, verificar_cenario
 
-UNIDADES = {'dec': 'h/UC', 'fec': 'interrupcoes/UC', 'interrupcoes': 'interrupcoes'}
+UNIDADES = {'dec': 'h/UC', 'fec': 'interrupcoes/UC', 'dec_sem_dia_critico': 'h/UC',
+            'fec_sem_dia_critico': 'interrupcoes/UC', 'interrupcoes': 'interrupcoes', 'horas_interrupcao': 'h'}
+CAMPO_ORDENACAO = {'dec': 'dec', 'fec': 'fec', 'chi': 'horas_interrupcao'}
 
 
 def _ranking(items: list[dict], ordenar_por: str, nome) -> list[dict]:
-    items.sort(key=lambda item: (-item[ordenar_por]['valor'], nome(item)))
+    campo = CAMPO_ORDENACAO[ordenar_por]
+    items.sort(key=lambda item: (-item[campo]['valor'], nome(item)))
     for posicao, item in enumerate(items, start=1):
         item['posicao'] = posicao
     return items
@@ -27,11 +30,12 @@ def _regional(alimentadores: list[dict], filtros: FiltrosOperacao) -> list[dict]
     for (municipio, bairro), grupo in grupos.items():
         ucs = sum(a['ucs_atendidas'] for a in grupo)
         linha = {'posicao': 0, 'municipio': municipio, 'bairro': bairro}
-        for nome in ('dec', 'fec'):
+        for nome in ('dec', 'fec', 'dec_sem_dia_critico', 'fec_sem_dia_critico'):
             media = sum(a[nome]['valor'] * a['ucs_atendidas'] for a in grupo) / ucs
             linha[nome] = indicador(round(media, 2), UNIDADES[nome], PERIODO_ATUAL)
-        linha['interrupcoes'] = indicador(
-            sum(a['interrupcoes']['valor'] for a in grupo), UNIDADES['interrupcoes'], PERIODO_ATUAL)
+        for nome in ('interrupcoes', 'horas_interrupcao'):
+            total = round(sum(a[nome]['valor'] for a in grupo), 2)
+            linha[nome] = indicador(total, UNIDADES[nome], PERIODO_ATUAL)
         linhas.append(linha)
     return linhas
 

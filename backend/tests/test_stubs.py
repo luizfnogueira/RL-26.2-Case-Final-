@@ -160,6 +160,15 @@ class TestOperacao:
         dados = get('/operacao', periodo_atual=PA, alimentador='ALM-DEMO-001')
         assert [s['alimentador'] for s in dados['serie_historica']] == ['ALM-DEMO-001']
 
+    def test_sem_dia_critico_e_ranking_por_chi(self):
+        dados = get('/operacao', periodo_atual=PA, ordenar_por='chi')
+        alimentadores = dados['ranking_alimentadores']['items']
+        horas = [a['horas_interrupcao']['valor'] for a in alimentadores]
+        assert horas == sorted(horas, reverse=True)
+        for a in alimentadores:
+            assert a['dec_sem_dia_critico']['valor'] <= a['dec']['valor']
+            assert a['fec_sem_dia_critico']['valor'] <= a['fec']['valor']
+
     def test_classe_retorna_erro(self):
         erro(client.get('/operacao', params={'periodo_atual': PA, 'classe': 'Residencial'}), 422,
              'CENARIO_STUB_INDISPONIVEL')
