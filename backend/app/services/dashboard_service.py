@@ -1,7 +1,9 @@
 from decimal import Decimal
 
+from app.core.exceptions import CenarioStubIndisponivelException
 from app.repositories import dashboard_repository
-from app.services.stubs import indicador
+from app.services import stub_dashboard
+from app.services.stubs import PERIODO_ATUAL, PERIODO_COMPARACAO, indicador
 from app.schemas.common import limites
 from app.schemas.dashboard import FiltrosDashboard
 
@@ -76,7 +78,8 @@ def montar_indicadores(db: Session, filtros: FiltrosDashboard) -> dict:
             db, inicio_comparacao, fim_comparacao, filtros.municipio)
       
         dec_atual, fec_atual, dec_comparacao, fec_comparacao = (
-            round(valor, 4) for valor in (dec_atual, fec_atual, dec_comparacao, fec_comparacao))
+            None if valor is None else round(valor, 4)
+            for valor in (dec_atual, fec_atual, dec_comparacao, fec_comparacao))
 
     return {
         "receita_faturada": kpi(
@@ -160,3 +163,30 @@ def montar_serie(db: Session, filtros: FiltrosDashboard) -> list[dict]:
         }
         for mes, valor_receita in receita
     ]
+
+
+def _simulado(filtros: FiltrosDashboard) -> dict:
+    """Ponte e drill-down do stub; fora dos recortes e períodos do mock, usa o consolidado simulado."""
+    try:
+        return stub_dashboard.montar_dashboard(filtros)
+    except CenarioStubIndisponivelException:
+        consolidado = FiltrosDashboard(periodo_atual=PERIODO_ATUAL, periodo_comparacao=PERIODO_COMPARACAO,
+                                       page=filtros.page, page_size=filtros.page_size)
+        return stub_dashboard.montar_dashboard(consolidado)
+
+
+def montar_dashboard(db: Session, filtros: FiltrosDashboard) -> dict:
+    """KPIs e série vêm do banco; ponte e drill-down seguem do stub até a B3b."""
+    simulado = _simulado(filtros)
+    return {
+        "filtros": filtros.model_dump(include={"periodo_atual", "periodo_comparacao", *_regiao(filtros)}),
+        "indicadores": montar_indicadores(db, filtros),
+        "serie_historica": montar_serie(db, filtros),
+        "ponte_receita": simulado["ponte_receita"],
+        "drill_down": simulado["drill_down"],
+        "metadados": {
+            **simulado["metadados"],
+            "observacoes": ["Indicadores e série histórica calculados no banco; "
+                            "ponte de receita e drill-down simulados (B3b)."],
+        },
+    }

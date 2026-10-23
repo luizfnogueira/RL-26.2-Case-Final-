@@ -55,7 +55,7 @@ def somar_inadimplencia(db: Session, inicio: str, fim: str, filtros: dict) -> De
             consulta = consulta.where(getattr(UnidadeConsumidora, campo) == valor)
     return db.execute(consulta).scalar_one()
 
-def somar_continuidade(db: Session, inicio: str, fim: str, municipio: str | None) -> tuple[Decimal, Decimal]:
+def somar_continuidade(db: Session, inicio: str, fim: str, municipio: str | None) -> tuple[Decimal | None, Decimal | None]:
     """DEC e FEC da janela, como na Gold: o Cc muda a cada mês, então soma o DEC/FEC de cada mês."""
     condicoes = [DecFecAlimentadorMes.mes_referencia.between(inicio, fim)]
     if municipio is not None:
@@ -74,9 +74,10 @@ def somar_continuidade(db: Session, inicio: str, fim: str, municipio: str | None
     )
     dec, fec = db.execute(
         select(
-            func.coalesce(func.sum(por_mes.c.horas / por_mes.c.ucs), 0),
+            # sem coalesce: sem alimentador no recorte o DEC/FEC é ausente (None), não 0
+            func.sum(por_mes.c.horas / por_mes.c.ucs),
             # cast: no PostgreSQL, inteiro ÷ inteiro descarta as casas decimais e o FEC viraria 0
-            func.coalesce(func.sum(cast(por_mes.c.interrupcoes, Numeric) / por_mes.c.ucs), 0),
+            func.sum(cast(por_mes.c.interrupcoes, Numeric) / por_mes.c.ucs),
         )
     ).one()
     return dec, fec

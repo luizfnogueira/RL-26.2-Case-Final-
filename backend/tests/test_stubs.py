@@ -2,11 +2,23 @@
 from fastapi.testclient import TestClient
 import pytest
 
+from app.db.session import get_db
 from app.main import app
+from app.services import dashboard_service
 from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, exemplo
 
 client = TestClient(app)
 PERIODOS = {'periodo_atual': PA, 'periodo_comparacao': PC}
+
+
+@pytest.fixture(autouse=True)
+def dashboard_sem_banco(monkeypatch):
+    # KPIs e série reais são testados em test_dashboard.py; aqui só a ponte e o drill-down simulados
+    monkeypatch.setattr(dashboard_service, 'montar_indicadores', lambda db, f: exemplo('dashboard')['indicadores'])
+    monkeypatch.setattr(dashboard_service, 'montar_serie', lambda db, f: exemplo('dashboard')['serie_historica'])
+    app.dependency_overrides[get_db] = lambda: None
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 def get(url: str, **params) -> dict:
@@ -36,8 +48,7 @@ class TestPeriodos:
         erro(client.get('/dashboard', params=params), 422, 'DADOS_INVALIDOS')
 
     def test_periodo_valido_fora_do_cenario(self):
-        params = {'periodo_atual': '2024-07/2025-06', 'periodo_comparacao': PC}
-        erro(client.get('/dashboard', params=params), 422, 'CENARIO_STUB_INDISPONIVEL')
+        erro(client.get('/operacao', params={'periodo_atual': '2024-07/2025-06'}), 422, 'CENARIO_STUB_INDISPONIVEL')
 
     def test_bairro_exige_municipio(self):
         erro(client.get('/unidades', params={'bairro': 'Boa Vista'}), 422, 'DADOS_INVALIDOS')
@@ -45,7 +56,10 @@ class TestPeriodos:
 
 class TestDashboard:
     def test_consolidado_igual_ao_fixture(self):
-        assert get('/dashboard', **PERIODOS) == exemplo('dashboard')
+        dados, fixture = get('/dashboard', **PERIODOS), exemplo('dashboard')
+        for campo in ('filtros', 'ponte_receita', 'drill_down'):
+            assert dados[campo] == fixture[campo]
+        assert dados['metadados']['dados_ficticios'] is True
 
     def test_estrutura_do_consolidado(self):
         dados = get('/dashboard', **PERIODOS)
@@ -75,8 +89,6 @@ class TestDashboard:
             ponte['receita_energia_atual']['valor'], abs=0.05)
         assert sum(l['efeito_volume']['valor'] for l in drill['items']) == pytest.approx(
             ponte['efeito_volume']['valor'], abs=0.05)
-        assert dados['indicadores']['dec_medio']['atual']['valor'] is None
-        assert 'meta' not in dados['indicadores']['dec_medio']
 
     def test_drill_ordenado_e_com_breadcrumb(self):
         drill = get('/dashboard', **PERIODOS, nivel='classe', municipio='Recife', bairro='Boa Vista')['drill_down']
@@ -89,8 +101,10 @@ class TestDashboard:
     def test_nivel_exige_filtros_ascendentes(self, filtros):
         erro(client.get('/dashboard', params={**PERIODOS, **filtros}), 422, 'DADOS_INVALIDOS')
 
-    def test_recorte_inexistente(self):
-        erro(client.get('/dashboard', params={**PERIODOS, 'municipio': 'Caruaru'}), 422, 'CENARIO_STUB_INDISPONIVEL')
+    def test_recorte_fora_do_mock_usa_ponte_consolidada(self):
+        dados = get('/dashboard', **PERIODOS, municipio='Caruaru')
+        assert dados['filtros']['municipio'] == 'Caruaru'
+        assert dados['ponte_receita'] == exemplo('dashboard')['ponte_receita']
 
 
 class TestUnidades:
