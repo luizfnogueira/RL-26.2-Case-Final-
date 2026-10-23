@@ -21,7 +21,7 @@ def erro(response, status: int, codigo: str) -> None:
 
 
 def soma_ponte(ponte: dict) -> float:
-    return sum(ponte[c]['valor'] for c in ('receita_comparacao', 'efeito_preco', 'efeito_volume', 'bandeira_mix'))
+    return sum(ponte[c]['valor'] for c in ('receita_energia_comparacao', 'efeito_preco', 'efeito_volume'))
 
 
 class TestPeriodos:
@@ -54,8 +54,10 @@ class TestDashboard:
         serie = dados['serie_historica']
         assert len(serie) == 48 and serie[0]['mes'] == '2022-07' and serie[-1]['mes'] == '2026-06'
         ponte = dados['ponte_receita']
-        assert soma_ponte(ponte) == pytest.approx(ponte['receita_atual']['valor'])
-        assert ponte['receita_atual']['valor'] == 284_700_000
+        assert soma_ponte(ponte) == pytest.approx(ponte['receita_energia_atual']['valor'])
+        assert 'bandeira_mix' not in ponte
+        # A ponte é da receita de energia (sem tributos), menor que a receita faturada total.
+        assert ponte['receita_energia_atual']['valor'] < dados['indicadores']['receita_faturada']['atual']['valor']
         anual = sum(p['receita']['valor'] for p in serie[-12:])
         assert anual == pytest.approx(dados['indicadores']['receita_faturada']['atual']['valor'])
 
@@ -68,8 +70,9 @@ class TestDashboard:
     def test_recortes_mantem_somas(self, filtros):
         dados = get('/dashboard', **PERIODOS, **filtros)
         ponte, drill = dados['ponte_receita'], dados['drill_down']
-        assert soma_ponte(ponte) == pytest.approx(ponte['receita_atual']['valor'])
-        assert sum(l['receita_atual']['valor'] for l in drill['items']) == pytest.approx(ponte['receita_atual']['valor'])
+        assert soma_ponte(ponte) == pytest.approx(ponte['receita_energia_atual']['valor'])
+        assert sum(l['receita_energia_atual']['valor'] for l in drill['items']) == pytest.approx(
+            ponte['receita_energia_atual']['valor'], abs=0.05)
         assert sum(l['efeito_volume']['valor'] for l in drill['items']) == pytest.approx(
             ponte['efeito_volume']['valor'], abs=0.05)
         assert dados['indicadores']['dec_medio']['atual']['valor'] is None
@@ -196,7 +199,7 @@ class TestInsight:
         dados = client.post('/ia/insight', json=pedido).json()
         assert dados['texto'].startswith('Em Recife')
         dashboard = get('/dashboard', **PERIODOS, municipio='Recife')
-        assert dados['numeros_utilizados'][0]['valor'] == dashboard['ponte_receita']['receita_atual']['valor']
+        assert dados['numeros_utilizados'][0]['valor'] == dashboard['ponte_receita']['receita_energia_atual']['valor']
 
     def test_receita_com_indicador_divergente(self):
         pedido = exemplo('pedido_insight')

@@ -54,11 +54,11 @@ class PontoSerie(Schema):
 
 
 class PonteReceita(Schema):
-    receita_comparacao: Indicador
+    """Decomposição da receita de energia (sem tributos), como em gold.agg_preco_volume."""
+    receita_energia_comparacao: Indicador
     efeito_preco: Indicador
     efeito_volume: Indicador
-    bandeira_mix: Indicador
-    receita_atual: Indicador
+    receita_energia_atual: Indicador
     reajuste_percentual: Indicador
 
 
@@ -77,8 +77,8 @@ class ItemBreadcrumb(Schema):
 class LinhaDrill(Schema):
     nivel: NivelDrill
     nome: str
-    receita_atual: Indicador
-    receita_comparacao: Indicador
+    receita_energia_atual: Indicador
+    receita_energia_comparacao: Indicador
     energia_atual: Indicador
     energia_comparacao: Indicador
     variacao_energia_percentual: Indicador

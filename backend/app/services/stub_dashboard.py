@@ -8,6 +8,8 @@ from app.services.stubs import (
 
 CAMPOS = ('receita_atual', 'receita_comparacao', 'energia_atual', 'energia_comparacao',
           'ucs_ativas_atual', 'ucs_ativas_comparacao', 'inadimplencia_atual', 'inadimplencia_comparacao')
+# Parcela de energia da receita no stub (tributos fictícios de 28%); a Gold traz receita_energia pronta.
+FATOR_ENERGIA = 1 / 1.28
 ROTULO_RECORTE = 'Distribuição ilustrativa do consolidado; não representa metodologia nem diagnóstico real.'
 SEM_DEC_FEC = 'DEC/FEC por recorte não estão disponíveis no dashboard simulado; consulte GET /operacao.'
 
@@ -30,13 +32,21 @@ def _kpi(rotulo: str, atual: float, comparacao: float, unidade: str) -> dict:
     }
 
 
-def _efeitos(soma: dict, total: dict, ponte: dict) -> tuple[float, float]:
-    """Efeito-preço proporcional à receita atual; efeito-volume proporcional à variação de energia."""
-    preco = round(ponte['efeito_preco']['valor'] * soma['receita_atual'] / total['receita_atual'], 2)
-    volume = round(ponte['efeito_volume']['valor']
-                   * (soma['energia_atual'] - soma['energia_comparacao'])
-                   / (total['energia_atual'] - total['energia_comparacao']), 2)
-    return preco, volume
+def _decompor(recortes: list[dict]) -> dict:
+    """Preço × volume como gold.agg_preco_volume: por recorte, depois somado.
+
+    efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação;
+    efeito_preco = Δ receita de energia − efeito_volume (fecha sem resíduo).
+    """
+    atual = comparacao = volume = 0.0
+    for r in recortes:
+        receita_atual, receita_comparacao = r['receita_atual'] * FATOR_ENERGIA, r['receita_comparacao'] * FATOR_ENERGIA
+        volume += (r['energia_atual'] - r['energia_comparacao']) * receita_comparacao / r['energia_comparacao']
+        atual += receita_atual
+        comparacao += receita_comparacao
+    atual, comparacao, volume = round(atual, 2), round(comparacao, 2), round(volume, 2)
+    return {'atual': atual, 'comparacao': comparacao, 'volume': volume,
+            'preco': round(atual - comparacao - volume, 2)}
 
 
 def _indicadores(soma: dict, base: dict, filtrado: bool) -> dict:
@@ -54,7 +64,7 @@ def _indicadores(soma: dict, base: dict, filtrado: bool) -> dict:
         'energia_faturada': _kpi('Volume faturado', soma['energia_atual'], soma['energia_comparacao'], 'kWh'),
         'ucs_ativas': _kpi('UCs ativas', soma['ucs_ativas_atual'], soma['ucs_ativas_comparacao'], 'UCs'),
         'inadimplencia': {
-            **_kpi('Inadimplência', soma['inadimplencia_atual'], soma['inadimplencia_comparacao'], 'BRL'),
+            **_kpi('Valor em aberto', soma['inadimplencia_atual'], soma['inadimplencia_comparacao'], 'BRL'),
             'percentual_receita_atual': indicador(pct_atual, '%', PA),
             'percentual_receita_comparacao': indicador(pct_comparacao, '%', PC),
             'variacao_pontos_percentuais': indicador(round(pct_atual - pct_comparacao, 4), 'p.p.', PA),
@@ -74,44 +84,42 @@ def _serie(serie: list[dict], soma: dict, total: dict) -> list[dict]:
     return serie
 
 
-def _ponte(soma: dict, total: dict, ponte: dict) -> dict:
-    preco, volume = _efeitos(soma, total, ponte)
-    atual, comparacao = soma['receita_atual'], soma['receita_comparacao']
+def _ponte(recortes: list[dict]) -> dict:
+    d, soma = _decompor(recortes), _somar(recortes)
+    tarifa_atual = d['atual'] / soma['energia_atual']
+    tarifa_comparacao = d['comparacao'] / soma['energia_comparacao']
     return {
-        'receita_comparacao': indicador(comparacao, 'BRL', PC),
-        'efeito_preco': indicador(preco, 'BRL', PA),
-        'efeito_volume': indicador(volume, 'BRL', PA),
-        # Resíduo: garante receita_comparacao + efeitos = receita_atual em qualquer recorte.
-        'bandeira_mix': indicador(round(atual - comparacao - preco - volume, 2), 'BRL', PA),
-        'receita_atual': indicador(atual, 'BRL', PA),
-        'reajuste_percentual': ponte['reajuste_percentual'],
+        'receita_energia_comparacao': indicador(d['comparacao'], 'BRL', PC),
+        'efeito_preco': indicador(d['preco'], 'BRL', PA),
+        'efeito_volume': indicador(d['volume'], 'BRL', PA),
+        'receita_energia_atual': indicador(d['atual'], 'BRL', PA),
+        'reajuste_percentual': indicador(_variacao(tarifa_atual, tarifa_comparacao), '%', PA),
     }
 
 
-def _drill(filtros: FiltrosDashboard, recortes: list[dict], total: dict, ponte: dict) -> dict:
+def _drill(filtros: FiltrosDashboard, recortes: list[dict]) -> dict:
     nivel = filtros.nivel
     grupos: dict[str, list[dict]] = {}
     for recorte in recortes:
         grupos.setdefault(recorte[nivel], []).append(recorte)
     linhas = []
     for nome, grupo in grupos.items():
-        soma = _somar(grupo)
-        preco, volume = _efeitos(soma, total, ponte)
+        soma, d = _somar(grupo), _decompor(grupo)
         # Filtros para reenviar com o próximo nível: os atuais mais o valor desta linha.
         linha_filtros = {campo: getattr(filtros, campo) for campo in ('municipio', 'bairro', 'classe')}
         linha_filtros[nivel] = nome
         linhas.append({
             'nivel': nivel,
             'nome': nome,
-            'receita_atual': indicador(soma['receita_atual'], 'BRL', PA),
-            'receita_comparacao': indicador(soma['receita_comparacao'], 'BRL', PC),
+            'receita_energia_atual': indicador(d['atual'], 'BRL', PA),
+            'receita_energia_comparacao': indicador(d['comparacao'], 'BRL', PC),
             'energia_atual': indicador(soma['energia_atual'], 'kWh', PA),
             'energia_comparacao': indicador(soma['energia_comparacao'], 'kWh', PC),
             'variacao_energia_percentual': indicador(
                 _variacao(soma['energia_atual'], soma['energia_comparacao']), '%', PA),
             'queda_kwh': indicador(soma['energia_comparacao'] - soma['energia_atual'], 'kWh', PA),
-            'efeito_preco': indicador(preco, 'BRL', PA),
-            'efeito_volume': indicador(volume, 'BRL', PA),
+            'efeito_preco': indicador(d['preco'], 'BRL', PA),
+            'efeito_volume': indicador(d['volume'], 'BRL', PA),
             'filtros': linha_filtros,
         })
     linhas.sort(key=lambda linha: (-linha['queda_kwh']['valor'], linha['nome']))
@@ -143,7 +151,7 @@ def montar_dashboard(filtros: FiltrosDashboard) -> dict:
         'filtros': filtros.model_dump(include={'periodo_atual', 'periodo_comparacao', *CAMPOS_REGIAO}),
         'indicadores': _indicadores(soma, base['indicadores'], filtrado),
         'serie_historica': _serie(base['serie_historica'], soma, total) if filtrado else base['serie_historica'],
-        'ponte_receita': _ponte(soma, total, base['ponte_receita']),
-        'drill_down': _drill(filtros, selecionados, total, base['ponte_receita']),
+        'ponte_receita': _ponte(selecionados),
+        'drill_down': _drill(filtros, selecionados),
         'metadados': metadados,
     }

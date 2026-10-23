@@ -1,6 +1,8 @@
-# Contrato da API — V-Energy — V2 (proposta para revisão)
+# Contrato da API — V-Energy — V2 (proposta para revisão; alinhada à Gold em 23/10)
 
 Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
+
+**A Gold é a fonte de verdade.** Quando este contrato e a Gold divergem, quem se adapta é a API: o contrato e o código mudam, os dados não. As adaptações estão na seção 16; tabelas, colunas e regras da Gold estão no *Contrato de dados Gold → API* (v2).
 
 ## 1. Regras comuns
 
@@ -65,10 +67,15 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/dashboard.json)**
 
 - `indicadores`: exatamente seis KPIs — receita_faturada, energia_faturada, ucs_ativas, inadimplencia, dec_medio, fec_medio. Cada um tem atual, comparação, diferença e variação percentual; campos não aplicáveis retornam null.
-- Inadimplência inclui percentual da receita em cada período e variação em pontos percentuais. DEC/FEC incluem metas ilustrativas, não limites regulatórios certificados.
+- Definições da Gold (`agg_kpis_mensal`; com filtro, as mesmas regras sobre `fato_uc_mes`):
+  - `receita_faturada` = Σ `valor_total` (com tributos).
+  - `energia_faturada` = Σ `consumo_kwh` das leituras válidas (sem `flag_consumo_negativo`).
+  - `ucs_ativas` = UCs faturadas no **último mês** de cada janela: o retrato da base de clientes, como as distribuidoras reportam. Contar quem teve fatura em qualquer mês dos 12 inflaria o número com UCs desligadas no meio do período.
+  - `inadimplencia` = Σ `valor_total` das faturas `EM ABERTO` no período (`valor_em_aberto` da Gold); inclui o percentual da receita em cada período e a variação em pontos percentuais. Rótulo na tela: **“Valor em aberto”**. No mercado, inadimplência é o valor **vencido** e não pago; nesta base o histórico termina em jun/2026 e toda fatura em aberto já venceu, então os dois números coincidem.
+  - `dec_medio` / `fec_medio` = soma dos meses da janela; agregado de alimentadores pondera pelas UCs (Σ horas ÷ Σ UCs). Só interrupções acima de 3 minutos (PRODIST Módulo 8). Metas ilustrativas, não limites regulatórios certificados.
 - `serie_historica`: 48 pontos mensais, jul/2022–jun/2026, cada um com receita e energia. A janela da série é independente das duas janelas de comparação.
-- `ponte_receita`: receita_comparacao + efeito_preco + efeito_volume + bandeira_mix = receita_atual. Exemplo: 263,6 + 27,7 − 10,4 + 3,8 = 284,7 milhões. Inclui reajuste_percentual.
-- `drill_down`: nível, breadcrumb e lista paginada; receita, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
+- `ponte_receita`: decompõe a **receita de energia** (sem tributos), como `gold.agg_preco_volume`: receita_energia_comparacao + efeito_preco + efeito_volume = receita_energia_atual, sem resíduo. Exemplo do stub: 205,9 + 24,7 − 8,2 = 222,4 milhões. efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação, por recorte e depois somado; efeito_preco = variação da receita de energia − efeito_volume. reajuste_percentual = variação da tarifa média de energia. Não há parcela de bandeira/mix.
+- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
 - Nível bairro exige município; nível classe exige município e bairro. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
 
 ```http
@@ -76,7 +83,7 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
 ```
 
-Na integração, a API lê os efeitos pré-calculados na Gold. O cálculo de distribuição do mock não é a implementação B3b.
+Na integração, a API lê os efeitos pré-calculados em `gold.agg_preco_volume`, que só existe para P1 × P2 (`2022-07/2023-06` × `2025-07/2026-06`). Para outras janelas, `ponte_receita` e `drill_down` retornam 422 `CENARIO_STUB_INDISPONIVEL` com mensagem explicando a limitação. O cálculo de distribuição do mock não é a implementação B3b.
 
 ## 4. GET /unidades — busca da Tela 3
 
@@ -98,9 +105,9 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 
 - Cadastro, CPF/CNPJ mascarado e telefone anulável (não há telefone na fonte bruta inspecionada).
 - `consumo`: 12 pares de mês atual/mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura`.
-- `diagnostico_conta`: conta_alta (bool/null), veredito, último mês, mesmo mês do ano anterior, média de 12 meses, variação percentual, leitura_estimada e alerta.
-- Faturas abertas e pagas, medidor com última leitura, GD, interrupções recentes e chamados com nota/histórico. Exemplo tem 1 fatura aberta e 1 paga; a UI conta o que recebeu.
-- Média mensal injetada de GD não é geração medida no período. Diagnóstico é um caso fictício; limiar/regra real pertence à V1a e deve ser acordado pelo responsável.
+- `diagnostico_conta`: conta_alta (bool/null), veredito, último mês, mesmo mês do ano anterior, média de 12 meses, variação percentual, leitura_estimada e alerta. `conta_alta` vem de `gold.uc_consumo_comparativo.flag_conta_alta`: consumo do último mês **mais de 20% acima** do mesmo mês do ano anterior; null quando não há ano anterior ou algum dos consumos é ≤ 0. A média de 12 meses e o alerta de leitura estimada são calculados pela API a partir do `fato_uc_mes`.
+- Faturas abertas e pagas, medidor com última leitura, GD, interrupções recentes e chamados com nota e `tempo_atendimento_h`. Chamados **não trazem histórico**: a Gold não o publica (a ação dos eventos na fonte é aleatória). Exemplo tem 1 fatura aberta e 1 paga; a UI conta o que recebeu.
+- Média mensal injetada de GD não é geração medida no período. O exemplo é um caso fictício que segue a regra da Gold.
 
 No mock, somente UC-DEMO-001 tem a visão detalhada. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
 
@@ -114,7 +121,7 @@ GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=20
 
 `resumo`: UCs analisadas, priorizadas, potencial de recuperação e ordens ativas, com unidade/período, antes da paginação. Cada candidato: ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), ordem_ativa e id_ordem_ativa.
 
-Ordenar por score decrescente, ID como desempate; posição global após filtros. Desabilitar seleção de UC com ordem ativa no front; POST também valida duplicidade. Estimativa futura não é o kWh já recuperado do histórico.
+Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após filtros (na Gold, `posicao_fila`). Só UCs com `status_triagem = ELEGIVEL` entram. `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada; a tela deve deixar isso claro. Desabilitar seleção de UC com ordem ativa no front; POST também valida duplicidade. Estimativa futura não é o kWh já recuperado do histórico.
 
 ## 7. Ordens — Telas 4 e 5
 
@@ -278,46 +285,46 @@ Content-Type: application/json
   "id_uc": null,
   "indicadores": [
     {
-      "nome": "receita_atual",
-      "rotulo": "Receita atual",
-      "valor": 284700000,
+      "valor": 222421875.0,
       "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "receita_energia_atual",
+      "rotulo": "Receita de energia atual"
     },
     {
-      "nome": "receita_comparacao",
-      "rotulo": "Receita base",
-      "valor": 263600000,
+      "valor": 205937500.0,
       "unidade": "BRL",
-      "periodo_referencia": "2022-07/2023-06"
+      "periodo_referencia": "2022-07/2023-06",
+      "nome": "receita_energia_comparacao",
+      "rotulo": "Receita de energia base"
     },
     {
-      "nome": "variacao_volume",
-      "rotulo": "Volume",
       "valor": -3.8986,
       "unidade": "%",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "variacao_volume",
+      "rotulo": "Volume"
     },
     {
-      "nome": "reajuste",
-      "rotulo": "Reajuste",
-      "valor": 10.5,
+      "valor": 12.3861,
       "unidade": "%",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "reajuste",
+      "rotulo": "Reajuste"
     },
     {
+      "valor": 24655666.05,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06",
       "nome": "efeito_preco",
-      "rotulo": "Efeito-preço",
-      "valor": 27700000,
-      "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
+      "rotulo": "Efeito-preço"
     },
     {
-      "nome": "efeito_volume",
-      "rotulo": "Efeito-volume",
-      "valor": -10400000,
+      "valor": -8171291.05,
       "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "efeito_volume",
+      "rotulo": "Efeito-volume"
     }
   ]
 }
@@ -328,7 +335,7 @@ Content-Type: application/json
 
 Resposta separada do chat: `titulo`, `texto`, `numeros_utilizados[]` (nome, rótulo, valor, unidade, período), gerado_em e metadados com atualização da Gold.
 
-Receita usa **seis números**: receita atual, receita base, variação do volume, reajuste, efeito-preço e efeito-volume. Os números enviados são opcionais no stub; se presentes, precisam corresponder aos seis do cenário. Na integração, validar contra a Gold, não confiar em valores arbitrários do navegador.
+Receita usa **seis números**: receita de energia atual, receita de energia base, variação do volume, reajuste, efeito-preço e efeito-volume (os mesmos da `ponte_receita`). Os números enviados são opcionais no stub; se presentes, precisam corresponder aos seis do cenário. Na integração, validar contra a Gold, não confiar em valores arbitrários do navegador.
 
 Para UC360:
 
@@ -363,6 +370,8 @@ GET /health
 
 Esta V2 altera o contrato: `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens inteiros, campos das ordens/resultados no modelo do Gabriel; dashboard com seis KPIs, série e ponte; IA e insight com respostas distintas.
 
+Alinhamento com a Gold (23/10), que muda formatos para o front: `ponte_receita` passa a ter `receita_energia_comparacao`, `efeito_preco`, `efeito_volume`, `receita_energia_atual` e `reajuste_percentual` (sai `bandeira_mix`); as linhas do `drill_down` trocam `receita_atual`/`receita_comparacao` por `receita_energia_atual`/`receita_energia_comparacao`; chamados perdem `historico` e ganham `tempo_atendimento_h`; o insight da receita usa `receita_energia_atual`/`receita_energia_comparacao`. Gheyson precisa atualizar `types/` e mocks.
+
 Contrato, schemas, routers e fixtures do backend estão na mesma versão (V2). `backend/tests/test_stubs.py` compara a resposta de cada rota com o fixture vinculado neste documento; se um mudar sem o outro, o teste falha. Gheyson gera `types/` e mocks a partir desses fixtures (F3).
 
 ## 13. Diferenças em relação à Arquitetura V1
@@ -381,13 +390,12 @@ O stub precisa de números para o front trabalhar, mas as regras abaixo **não e
 
 | Regra | Onde aparece | Valor no stub | Dono | Quando |
 | --- | --- | --- | --- | --- |
-| Veredito “conta alta” (limiar e comparação) | `diagnostico_conta` | Ilustrativo (último mês acima do ano anterior e da média) | Irvin Amilcar (V1a) | 22–23/10 |
-| Agregação regional de DEC/FEC (média ponderada por UCs, sem recalcular denominador por bairro) | `ranking_regional` | Ilustrativa | Arthur (D-R/R1a) | 21–23/10 |
+| Agregação regional de DEC/FEC por bairro (alimentadores que atendem o bairro, ponderados por UCs) | `ranking_regional` | Ilustrativa | Arthur (R1a) | 23/10 |
 | Metas de DEC/FEC | `dec_medio.meta`, `fec_medio.meta` | 12,0 h e 7,5 interrupções (ilustrativas) | Arthur | 23/10 |
-| Decomposição preço/volume/bandeira-mix | `ponte_receita`, `drill_down` | Distribuição ilustrativa do consolidado | Dono da Gold de receita (Equipe 3, seção 2, item 6) | Amostra 23/10, final 26/10 |
-| Score e motivos da fila; corte de priorização (score ≥ 60) | `candidatos` | Ilustrativos | Equipe 3 (Gold da fila) e Gabriel (A1) | 26/10 |
 | Nomes reais de tabelas Gold, SQL e auditoria do agente | `resposta_ia` (`gold_receita_demo`) | Ilustrativos | Equipe 3 (GenAI) | Contrato 20/10, módulo até 29/10 |
 | Timestamp de carga da Gold | `metadados.gold_atualizada_em` | Fixo | Dados | B2 (21/10) |
+
+A conta alta, a decomposição preço/volume e o score da fila deixaram de ser provisórios: são definidos pela Gold (seção 16). O corte de priorização do resumo da fila (score ≥ 60) segue ilustrativo no stub.
 
 Fontes ausentes não devem virar valores fictícios em produção. Telefone permanece null até existir fonte.
 
@@ -403,3 +411,19 @@ Este documento fica como “proposta para revisão” até ser aprovado na daily
 - [ ] Gabriel: item 3 da seção 13 e os adaptadores de `schemas/inspecoes.py`.
 
 Depois da aprovação, troque o título para “V2 (aprovada em DD/MM)” e registre a data na ata da daily.
+
+## 16. Alinhamento com a Gold
+
+A Gold não muda para atender o portal. Onde este contrato divergia dela, a API se adapta assim:
+
+| Tema | Gold | Como a API se adapta |
+| --- | --- | --- |
+| Inadimplência | `valor_em_aberto`: faturas `EM ABERTO`, sem olhar o vencimento | Mesmo número, inclusive nos KPIs com filtro, com o rótulo “Valor em aberto”. O conceito de mercado (vencido e não pago) coincide nesta base, porque toda fatura em aberto já venceu |
+| KPIs com filtro | `agg_kpis_mensal` é só global | Sem filtro, lê `agg_kpis_mensal`; com filtro, agrega `fato_uc_mes` + `dim_uc` com as mesmas regras, e DEC/FEC por `agg_dec_fec_mensal` |
+| UCs ativas | `ucs_atendidas` é o total do cadastro, igual nos dois períodos | API deriva do `fato_uc_mes`: UCs faturadas no último mês de cada janela (retrato da base de clientes, prática do setor) |
+| Energia por recorte | `agg_receita_mensal` não exclui `flag_consumo_negativo`; `agg_kpis_mensal` exclui | KPI de energia sempre pela regra do `agg_kpis_mensal` (soma o `fato_uc_mes` sem os negativos); `agg_receita_mensal` só para receita e drill-down |
+| Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2 | Seção 3: sem `bandeira_mix`; outras janelas recebem 422 |
+| Conta alta | `flag_conta_alta`: consumo > 20% acima do mesmo mês do ano anterior | Seção 5: veredito pela flag; média de 12 meses e alerta de leitura estimada calculados pela API |
+| Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
+| Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao` e converte `motivos_json` em `motivos[]` |
+

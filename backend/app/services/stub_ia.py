@@ -66,8 +66,8 @@ def _insight_receita(dados: PedidoInsight) -> dict:
     dashboard = montar_dashboard(FiltrosDashboard(**filtros.model_dump()))
     ponte = dashboard['ponte_receita']
     numeros = [
-        _numero('receita_atual', 'Receita atual', ponte['receita_atual']),
-        _numero('receita_comparacao', 'Receita base', ponte['receita_comparacao']),
+        _numero('receita_energia_atual', 'Receita de energia atual', ponte['receita_energia_atual']),
+        _numero('receita_energia_comparacao', 'Receita de energia base', ponte['receita_energia_comparacao']),
         _numero('variacao_volume', 'Volume', dashboard['indicadores']['energia_faturada']['variacao_percentual']),
         _numero('reajuste', 'Reajuste', ponte['reajuste_percentual']),
         _numero('efeito_preco', 'Efeito-preço', ponte['efeito_preco']),
@@ -78,7 +78,8 @@ def _insight_receita(dados: PedidoInsight) -> dict:
     regiao = ' / '.join(getattr(filtros, c) for c in CAMPOS_REGIAO if getattr(filtros, c))
     recorte = f'Em {regiao}' if regiao else 'No consolidado'
     texto = (
-        f'{recorte}, a receita passou de {_brl(v["receita_comparacao"])} para {_brl(v["receita_atual"])}. '
+        f'{recorte}, a receita de energia passou de {_brl(v["receita_energia_comparacao"])} '
+        f'para {_brl(v["receita_energia_atual"])}. '
         f'O reajuste de {_pct(v["reajuste"], sinal=False)} gerou um efeito-preço de {_brl(v["efeito_preco"])}, '
         f'enquanto o volume faturado variou {_pct(v["variacao_volume"])} e respondeu por um efeito-volume '
         f'de {_brl(v["efeito_volume"])}.'

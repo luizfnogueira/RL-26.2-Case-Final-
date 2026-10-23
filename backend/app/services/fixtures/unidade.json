@@ -191,7 +191,7 @@
   ],
   "diagnostico_conta": {
     "conta_alta": true,
-    "veredito": "Conta alta: o último mês ficou acima do mesmo mês do ano anterior e da média de 12 meses.",
+    "veredito": "Conta alta: o consumo do último mês ficou mais de 20% acima do mesmo mês do ano anterior (regra da Gold, flag_conta_alta).",
     "ultimo_mes": {
       "valor": 412,
       "unidade": "kWh",
@@ -298,20 +298,7 @@
       "data_abertura": "2026-07-02T10:05:00-03:00",
       "data_fechamento": "2026-07-03T16:30:00-03:00",
       "nota_satisfacao": 3.0,
-      "historico": [
-        {
-          "sequencia": 1,
-          "data": "2026-07-02T10:05:00-03:00",
-          "acao": "ABERTURA",
-          "canal": "APP"
-        },
-        {
-          "sequencia": 2,
-          "data": "2026-07-03T16:30:00-03:00",
-          "acao": "ENCERRAMENTO",
-          "canal": "BACKOFFICE"
-        }
-      ]
+      "tempo_atendimento_h": 30.42
     }
   ],
   "metadados": {

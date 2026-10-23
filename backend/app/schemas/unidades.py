@@ -109,13 +109,6 @@ class Interrupcao(Schema):
     duracao_min: float | None
 
 
-class EventoChamado(Schema):
-    sequencia: int
-    data: AwareDatetime
-    acao: str
-    canal: str
-
-
 class Chamado(Schema):
     protocolo: str
     canal: str
@@ -124,7 +117,7 @@ class Chamado(Schema):
     data_abertura: AwareDatetime
     data_fechamento: AwareDatetime | None
     nota_satisfacao: float | None
-    historico: list[EventoChamado]
+    tempo_atendimento_h: float | None
 
 
 class Unidade360(Schema):

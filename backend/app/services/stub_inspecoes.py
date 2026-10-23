@@ -11,7 +11,9 @@ def listar_candidatos(filtros: FiltrosCandidatos) -> dict:
     verificar_cenario(filtros.periodo_atual, filtros.periodo_comparacao)
     base = exemplo('candidatos')
     ativas = {o['id_uc']: o['id_ordem'] for o in exemplo('inspecoes')['items'] if o['status'] in STATUS_ATIVOS}
-    candidatos = sorted(filtrar_regiao(base['items'], filtros), key=lambda c: (-c['score'], c['id_uc']))
+    # Mesma ordem de gold.tb_fila_perdas: score, kWh estimado e id_uc.
+    candidatos = sorted(filtrar_regiao(base['items'], filtros),
+                        key=lambda c: (-c['score'], -c['energia_estimada']['valor'], c['id_uc']))
     for posicao, candidato in enumerate(candidatos, start=1):
         candidato.update(posicao=posicao, ordem_ativa=candidato['id_uc'] in ativas,
                          id_ordem_ativa=ativas.get(candidato['id_uc']))
