@@ -82,6 +82,11 @@ def somar_continuidade(db: Session, inicio: str, fim: str, municipio: str | None
     ).one()
     return dec, fec
 
+def meses_da_base(db: Session) -> list[str]:
+    """Calendário da base (papel da gold.dim_mes): todos os meses com fatura, sem filtro de região."""
+    consulta = select(Fatura.mes_referencia).distinct().order_by(Fatura.mes_referencia)
+    return list(db.scalars(consulta).all())
+
 def serie_receita(db: Session, inicio: str, fim: str, filtros: dict) -> list[tuple[str, Decimal]]:
     consulta = (
         select(Fatura.mes_referencia, func.sum(Fatura.valor_total))

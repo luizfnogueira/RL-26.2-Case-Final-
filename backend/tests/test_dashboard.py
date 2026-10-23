@@ -108,6 +108,12 @@ def test_variacao_e_diferenca(client):
     assert "meta" not in get(client)["indicadores"]["dec_medio"]
 
 
+def test_serie_independe_das_janelas_de_comparacao(client):
+    serie = get(client, periodo_atual="2023-07/2024-06", periodo_comparacao="2022-07/2023-06")["serie_historica"]
+    assert len(serie) == 48 and serie[0]["mes"] == "2022-07" and serie[-1]["mes"] == "2026-06"
+    assert serie == get(client)["serie_historica"]
+
+
 def test_serie_de_48_meses_fecha_com_o_kpi(client):
     dados = get(client)
     serie = dados["serie_historica"]

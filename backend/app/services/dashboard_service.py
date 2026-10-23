@@ -139,29 +139,23 @@ def montar_indicadores(db: Session, filtros: FiltrosDashboard) -> dict:
 
 
 
-MESES_SERIE = 48
-
-
 def montar_serie(db: Session, filtros: FiltrosDashboard) -> list[dict]:
-    """48 meses de receita e energia, terminando no último mês do período atual."""
-    _, fim = limites(filtros.periodo_atual)
-    # Volta 47 meses a partir do fim: com fim 2026-06, o início é 2022-07
-    indice_fim = int(fim[:4]) * 12 + int(fim[5:]) - 1
-    indice_inicio = indice_fim - (MESES_SERIE - 1)
-    inicio = f"{indice_inicio // 12}-{indice_inicio % 12 + 1:02d}"
-
+    """Um ponto por mês do calendário da base (jul/2022–jun/2026), independente das janelas de comparação."""
+    meses = dashboard_repository.meses_da_base(db)
+    if not meses:
+        return []
     regiao = _regiao(filtros)
-    receita = dashboard_repository.serie_receita(db, inicio, fim, regiao)
-    energia = dict(dashboard_repository.serie_energia(db, inicio, fim, regiao))   # {mes: kWh}
+    receita = dict(dashboard_repository.serie_receita(db, meses[0], meses[-1], regiao))   # {mes: BRL}
+    energia = dict(dashboard_repository.serie_energia(db, meses[0], meses[-1], regiao))   # {mes: kWh}
 
-    # Um ponto por mês; mês sem leitura fica com energia None (ausente), nunca 0
+    # Mês sem fatura ou sem leitura no recorte fica com valor None (ausente), nunca 0 e nunca fora da série
     return [
         {
             "mes": mes,
-            "receita": indicador(valor_receita, "BRL", mes),
+            "receita": indicador(receita.get(mes), "BRL", mes),
             "energia": indicador(energia.get(mes), "kWh", mes),
         }
-        for mes, valor_receita in receita
+        for mes in meses
     ]
 
 
