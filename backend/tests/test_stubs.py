@@ -131,23 +131,6 @@ class TestUnidades:
              'CENARIO_STUB_INDISPONIVEL')
 
 
-class TestCandidatos:
-    def test_igual_ao_fixture(self):
-        assert get('/inspecoes/candidatos', periodo_atual=PA) == exemplo('candidatos')
-
-    def test_ordem_e_ordens_ativas(self):
-        dados = get('/inspecoes/candidatos', periodo_atual=PA)
-        scores = [c['score'] for c in dados['items']]
-        assert scores == sorted(scores, reverse=True)
-        ativas = {c['id_uc']: c['id_ordem_ativa'] for c in dados['items'] if c['ordem_ativa']}
-        assert ativas == {'UC-DEMO-002': 1, 'UC-DEMO-005': 2}
-
-    def test_posicao_global_apos_filtros(self):
-        dados = get('/inspecoes/candidatos', periodo_atual=PA, municipio='Olinda', page_size=1, page=2)
-        assert dados['total'] == 2 and dados['items'][0]['posicao'] == 2
-        assert dados['resumo']['ucs_analisadas']['valor'] == 2
-
-
 class TestOperacao:
     def test_igual_ao_fixture(self):
         assert get('/operacao', periodo_atual=PA) == exemplo('operacao')

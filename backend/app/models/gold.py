@@ -7,7 +7,7 @@ fechar o contrato da Gold, os ajustes ficam aqui e nos repositories; nada muda n
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import GoldBase
@@ -45,6 +45,22 @@ class UnidadeConsumidora(GoldBase):
     flag_documento_classe_inconsistente: Mapped[bool] = flag()
     flag_classe_subgrupo_inconsistente: Mapped[bool] = flag()
     flag_alimentador_municipio_inconsistente: Mapped[bool] = flag()
+
+
+class FilaPerdasAuditoria(GoldBase):
+    __tablename__ = "tb_fila_perdas_auditoria"
+    id_uc: Mapped[str] = mapped_column(String(8), primary_key=True)
+
+class FilaPerdas(GoldBase):
+    __tablename__ = "tb_fila_perdas"
+
+    id_uc: Mapped[str] = mapped_column(String(8), primary_key=True)
+    posicao_fila: Mapped[int | None] = mapped_column(Integer)
+    status_triagem: Mapped[str] = mapped_column(String(20), index=True)
+    score: Mapped[Decimal] = mapped_column(Numeric(5, 2))
+    kwh_estimado: Mapped[Decimal] = mapped_column(Energia)
+    motivos_json: Mapped[str] = mapped_column(Text)
+    confianca_evidencia: Mapped[str] = mapped_column(String(20))
 
 
 class Medidor(GoldBase):

@@ -7,6 +7,7 @@ O schema `portal` (ordens de inspeção) é criado se faltar e nunca é apagado.
 Os domínios e formatos seguem as Silvers de data-engineering/bronze-to-silver.
 """
 import argparse
+import json
 import random
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -60,6 +61,18 @@ ASSUNTO_SUBASSUNTOS = {
     "LIGACAO NOVA": ["SOLICITACAO", "VISTORIA", "PRAZO"],
     "RELIGACAO": ["URGENCIA", "APOS PAGAMENTO"],
 }
+MOTIVOS_FILA = [
+    "Queda de consumo sem geração distribuída",
+    "Consumo acima do mesmo mês do ano anterior",
+    "Leitura estimada no último mês",
+    "Consumo zerado em meses consecutivos",
+    "Variação atípica entre meses consecutivos",
+    "Histórico de religação",
+    "Medidor sem manutenção há mais de 5 anos",
+    "Consumo abaixo da média da classe",
+]
+STATUS_TRIAGEM = {"ELEGIVEL": 0.90, "EM_ANALISE": 0.06, "DESCLASSIFICADO": 0.04}
+CONFIANCA_EVIDENCIA = {"ALTA": 0.35, "MEDIA": 0.40, "BAIXA": 0.20, "INDETERMINADA": 0.05}
 
 
 def _mes(i: int) -> date:
@@ -95,7 +108,8 @@ def gerar(n_ucs: int = 400, semente: int = 2026) -> dict[type, list[dict]]:
     regioes = list(alimentadores)
     dados: dict[type, list[dict]] = {modelo: [] for modelo in (
         gold.UnidadeConsumidora, gold.Medidor, gold.Fatura, gold.Leitura, gold.GeracaoDistribuida,
-        gold.Inspecao, gold.OcorrenciaRede, gold.Atendimento, gold.AtendimentoHistorico, gold.DecFecAlimentadorMes)}
+        gold.Inspecao, gold.OcorrenciaRede, gold.Atendimento, gold.AtendimentoHistorico,
+        gold.DecFecAlimentadorMes, gold.FilaPerdasAuditoria, gold.FilaPerdas)}
     seq = {nome: 0 for nome in ("medidor", "fatura", "inspecao", "ocorrencia", "atendimento")}
 
     def proximo(nome: str) -> int:
@@ -131,8 +145,35 @@ def gerar(n_ucs: int = 400, semente: int = 2026) -> dict[type, list[dict]]:
     for uc in ucs:
         _gerar_uc(rng, uc, dados, proximo)
 
+    _gerar_fila_perdas(rng, ucs, dados)
     _gerar_ocorrencias(rng, ucs, dados, proximo)
     return dados
+
+
+def _gerar_fila_perdas(rng: random.Random, ucs: list[dict], dados: dict) -> None:
+    for uc in ucs:
+        dados[gold.FilaPerdasAuditoria].append({"id_uc": uc["id_uc"]})
+
+    if not ucs:
+        return
+
+    escolhidas = rng.sample(ucs, k=max(1, round(len(ucs) * 0.30)))
+    for uc in escolhidas:
+        dados[gold.FilaPerdas].append({
+            "id_uc": uc["id_uc"],
+            "posicao_fila": None,
+            "status_triagem": _escolher(rng, STATUS_TRIAGEM),
+            "score": _brl(rng.uniform(10, 99.9)),
+            "kwh_estimado": _brl(rng.uniform(80, 2_500)),
+            "motivos_json": json.dumps(rng.sample(MOTIVOS_FILA, k=rng.randint(1, 3)), ensure_ascii=False),
+            "confianca_evidencia": _escolher(rng, CONFIANCA_EVIDENCIA),
+        })
+    elegiveis = sorted(
+        (linha for linha in dados[gold.FilaPerdas] if linha["status_triagem"] == "ELEGIVEL"),
+        key=lambda linha: (-linha["score"], -linha["kwh_estimado"], linha["id_uc"]),
+    )
+    for posicao, linha in enumerate(elegiveis, start=1):
+        linha["posicao_fila"] = posicao
 
 
 def _gerar_uc(rng: random.Random, uc: dict, dados: dict, proximo) -> None:

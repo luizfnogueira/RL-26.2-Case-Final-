@@ -13,8 +13,8 @@ app = FastAPI(
     version="0.2.0",
     description=(
         "API do case V-Energy — contrato V2 (docs/api-contract.md). As ordens de inspeção "
-        "(GET/POST/PATCH /inspecoes) persistem no schema portal; as demais rotas ainda usam "
-        "exemplos fictícios do P1."
+        "(GET/POST/PATCH /inspecoes) persistem no schema portal; a fila de candidatos lê a Gold/seed "
+        "e as ordens ativas do portal; as demais rotas ainda usam exemplos fictícios do P1."
     ),
 )
 register_error_handlers(app)

@@ -7,8 +7,9 @@ from app.core.exceptions import (
     JustificativaObrigatoriaException, ResultadoIncompletoException, TransicaoInvalidaException,
 )
 from app.db.session import get_db
+from app.repositories.candidato_repository import SqlAlchemyCandidatoRepository
 from app.repositories.inspecao_repository import SqlAlchemyOrdemInspecaoRepository
-from app.routers.common import STUB, respostas
+from app.routers.common import respostas
 from app.schemas.inspecao import (
     OrdemInspecaoAvancarCampo,
     OrdemInspecaoCreate,
@@ -19,8 +20,8 @@ from app.schemas.inspecao import (
 from app.schemas.inspecoes import (
     AtualizarInspecao, Candidatos, CriarInspecao, FiltrosCandidatos, FiltrosInspecoes, Ordem, Ordens,
 )
+from app.services.candidato_service import CandidatoService
 from app.services.inspecao_service import OrdemInspecaoService
-from app.services.stub_inspecoes import listar_candidatos
 from app.services.stubs import exemplo
 
 router = APIRouter(prefix='/inspecoes', tags=['Inspeções'])
@@ -31,6 +32,10 @@ PERSISTENCIA = (' Ordens e histórico são persistidos no schema portal; a recar
 
 def get_service(db: Annotated[Session, Depends(get_db)]) -> OrdemInspecaoService:
     return OrdemInspecaoService(repository=SqlAlchemyOrdemInspecaoRepository(db))
+
+
+def get_candidatos_service(db: Annotated[Session, Depends(get_db)]) -> CandidatoService:
+    return CandidatoService(repository=SqlAlchemyCandidatoRepository(db))
 
 
 def para_transporte(ordem: OrdemInspecaoResponse) -> dict:
@@ -48,10 +53,18 @@ def metadados() -> dict:
 
 
 @router.get('/candidatos', response_model=Candidatos, summary='Fila priorizada de candidatos',
-            description=STUB + ' Ordenada por score decrescente e ID; resumo calculado antes da paginação.',
+            description=(
+                'Fila lida da Gold/seed, sem stub. Filtros geográficos por AND; ordenação por score '
+                'decrescente, kWh estimado decrescente e ID crescente. A posição é global após os '
+                'filtros e antes da paginação. O resumo também ignora a paginação. O indicador de '
+                'ordem ativa é lido do schema portal.'
+            ),
             responses=respostas('candidatos', erros=('CENARIO_STUB_INDISPONIVEL',)))
-async def candidatos(filtros: Annotated[FiltrosCandidatos, Query()]):
-    return listar_candidatos(filtros)
+async def candidatos(
+    filtros: Annotated[FiltrosCandidatos, Query()],
+    servico: Annotated[CandidatoService, Depends(get_candidatos_service)],
+):
+    return servico.listar(filtros)
 
 
 @router.get('', response_model=Ordens, summary='Listar ordens de inspeção',
