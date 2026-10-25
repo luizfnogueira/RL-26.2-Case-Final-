@@ -10,7 +10,7 @@ import argparse
 import json
 import random
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import Engine, insert, text
 
@@ -73,6 +73,7 @@ MOTIVOS_FILA = [
 ]
 STATUS_TRIAGEM = {"ELEGIVEL": 0.90, "EM_ANALISE": 0.06, "DESCLASSIFICADO": 0.04}
 CONFIANCA_EVIDENCIA = {"ALTA": 0.35, "MEDIA": 0.40, "BAIXA": 0.20, "INDETERMINADA": 0.05}
+PERIODOS_PRECO_VOLUME = {"P1": ("2022-07", "2023-06"), "P2": ("2025-07", "2026-06")}   # dim_mes.periodo
 
 
 def _mes(i: int) -> date:
@@ -109,7 +110,7 @@ def gerar(n_ucs: int = 400, semente: int = 2026) -> dict[type, list[dict]]:
     dados: dict[type, list[dict]] = {modelo: [] for modelo in (
         gold.UnidadeConsumidora, gold.Medidor, gold.Fatura, gold.Leitura, gold.GeracaoDistribuida,
         gold.Inspecao, gold.OcorrenciaRede, gold.Atendimento, gold.AtendimentoHistorico,
-        gold.DecFecAlimentadorMes, gold.FilaPerdasAuditoria, gold.FilaPerdas)}
+        gold.DecFecAlimentadorMes, gold.FilaPerdasAuditoria, gold.FilaPerdas, gold.AggPrecoVolume)}
     seq = {nome: 0 for nome in ("medidor", "fatura", "inspecao", "ocorrencia", "atendimento")}
 
     def proximo(nome: str) -> int:
@@ -147,6 +148,7 @@ def gerar(n_ucs: int = 400, semente: int = 2026) -> dict[type, list[dict]]:
 
     _gerar_fila_perdas(rng, ucs, dados)
     _gerar_ocorrencias(rng, ucs, dados, proximo)
+    _gerar_preco_volume(ucs, dados)
     return dados
 
 
@@ -320,6 +322,48 @@ def _gerar_ocorrencias(rng: random.Random, ucs: list[dict], dados: dict, proximo
                 "horas_interrupcao": _brl(minutos / 60),
                 "dec": Decimal(f"{minutos / 60 / total:.4f}"), "fec": Decimal(f"{interrupcoes / total:.4f}"),
             })
+
+
+def _gerar_preco_volume(ucs: list[dict], dados: dict) -> None:
+    """agg_preco_volume com a fórmula do gold_receita: P1 × P2 por município × bairro × classe.
+
+    efeito_volume = (kWh P2 − kWh P1) × tarifa P1 (sem tarifa P1, a P2: tudo vira volume);
+    efeito_preco = variação da receita de energia − efeito_volume, que fecha sem resíduo.
+    """
+    recorte = {uc["id_uc"]: (uc["municipio"], uc["bairro"], uc["classe"]) for uc in ucs}
+
+    def periodo(mes: str) -> str | None:
+        return next((nome for nome, (inicio, fim) in PERIODOS_PRECO_VOLUME.items() if inicio <= mes <= fim), None)
+
+    somas: dict[tuple, dict[str, Decimal]] = {}
+
+    def soma(id_uc: str) -> dict[str, Decimal]:
+        # Período sem faturas no recorte fica 0 (conhecido), como o fillna(0) da Gold
+        return somas.setdefault(recorte[id_uc], {f"{q}_{c}": Decimal(0) for q in ("P1", "P2") for c in ("receita", "kwh")})
+
+    for fatura in dados[gold.Fatura]:
+        if p := periodo(fatura["mes_referencia"]):
+            soma(fatura["id_uc"])[f"{p}_receita"] += fatura["valor_energia"]
+    for leitura in dados[gold.Leitura]:
+        p = periodo(leitura["mes_referencia"])
+        if p and not leitura["flag_consumo_negativo"]:   # consumo_kwh_valido
+            soma(leitura["id_uc"])[f"{p}_kwh"] += leitura["consumo_kwh"]
+
+    centavo, sexta_casa = Decimal("0.01"), Decimal("0.000001")
+    for (municipio, bairro, classe), total in sorted(somas.items()):
+        tarifa_p1 = total["P1_receita"] / total["P1_kwh"] if total["P1_kwh"] else None
+        tarifa_p2 = total["P2_receita"] / total["P2_kwh"] if total["P2_kwh"] else None
+        tarifa_base = tarifa_p1 if tarifa_p1 is not None else tarifa_p2
+        variacao = total["P2_receita"] - total["P1_receita"]
+        efeito_volume = ((total["P2_kwh"] - total["P1_kwh"]) * (tarifa_base or 0)).quantize(centavo, ROUND_HALF_UP)
+        dados[gold.AggPrecoVolume].append({
+            "municipio": municipio, "bairro": bairro, "classe": classe,
+            "receita_energia_p1": total["P1_receita"], "receita_energia_p2": total["P2_receita"],
+            "kwh_p1": total["P1_kwh"], "kwh_p2": total["P2_kwh"],
+            "tarifa_p1": None if tarifa_p1 is None else tarifa_p1.quantize(sexta_casa, ROUND_HALF_UP),
+            "tarifa_p2": None if tarifa_p2 is None else tarifa_p2.quantize(sexta_casa, ROUND_HALF_UP),
+            "variacao_receita": variacao, "efeito_volume": efeito_volume, "efeito_preco": variacao - efeito_volume,
+        })
 
 
 def preparar_schemas(engine: Engine) -> None:

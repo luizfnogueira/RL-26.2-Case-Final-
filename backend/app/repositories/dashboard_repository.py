@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import Numeric, cast, func, select
 from sqlalchemy.orm import Session
 
-from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura
+from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura, AggPrecoVolume
 
 def somar_receita(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
     consulta = (
@@ -112,3 +112,11 @@ def serie_energia(db: Session, inicio: str, fim: str, filtros: dict) -> list[tup
         if valor is not None:
             consulta = consulta.where(getattr(UnidadeConsumidora, campo) == valor)
     return [tuple(linha) for linha in db.execute(consulta).all()]
+
+def linhas_preco_volume(db: Session, filtros: dict) -> list[AggPrecoVolume]:
+    """Recortes da gold.agg_preco_volume que batem com os filtros de município, bairro e classe."""
+    consulta = select(AggPrecoVolume)
+    for campo, valor in filtros.items():
+        if valor is not None:
+            consulta = consulta.where(getattr(AggPrecoVolume, campo) == valor)
+    return list(db.scalars(consulta).all())
