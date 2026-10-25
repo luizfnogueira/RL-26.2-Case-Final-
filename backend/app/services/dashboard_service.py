@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-from app.core.exceptions import CenarioStubIndisponivelException
 from app.repositories import dashboard_repository
 from app.services.stubs import indicador, paginar
 from app.schemas.common import limites
@@ -162,11 +161,14 @@ def montar_serie(db: Session, filtros: FiltrosDashboard) -> list[dict]:
 PERIODO_P2, PERIODO_P1 = "2025-07/2026-06", "2022-07/2023-06"
 
 
-def validar_decomposicao(filtros: FiltrosDashboard) -> None:
+def sem_decomposicao(filtros: FiltrosDashboard) -> str | None:
+    """Motivo de a Gold não ter a decomposição do pedido; None quando ela existe."""
     if (filtros.periodo_atual, filtros.periodo_comparacao) != (PERIODO_P2, PERIODO_P1):
-        raise CenarioStubIndisponivelException(
-            f"A decomposição preço × volume da Gold só existe para periodo_atual={PERIODO_P2} "
-            f"e periodo_comparacao={PERIODO_P1}.")
+        return (f"Ponte de receita e drill-down só existem para periodo_atual={PERIODO_P2} e "
+                f"periodo_comparacao={PERIODO_P1}, as janelas da decomposição da Gold.")
+    if filtros.alimentador is not None:
+        return "Ponte de receita e drill-down não existem por alimentador; a decomposição da Gold é por município, bairro e classe."
+    return None
 
 
 def montar_ponte(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dict:
@@ -242,13 +244,11 @@ def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
 
 def montar_dashboard(db: Session, filtros: FiltrosDashboard) -> dict:
     """KPIs e série calculados no banco; ponte e drill-down lidos da decomposição da Gold."""
-    validar_decomposicao(filtros)
     observacoes = ["Dados fictícios do seed, com as regras da Gold."]
-    if filtros.alimentador is not None:
-        # A Gold não decompõe por alimentador: ponte e drill-down ausentes, KPIs e série seguem filtrados
+    if motivo := sem_decomposicao(filtros):
+        # Fora da decomposição da Gold: ponte e drill-down ausentes; KPIs e série seguem calculados
         linhas = []
-        observacoes.append("Ponte de receita e drill-down não existem por alimentador; "
-                           "a decomposição da Gold é por município, bairro e classe.")
+        observacoes.append(motivo)
     else:
         regiao = {campo: getattr(filtros, campo) for campo in ("municipio", "bairro", "classe")}
         linhas = dashboard_repository.linhas_preco_volume(db, regiao)

@@ -1,6 +1,6 @@
 # Contrato da API — V-Energy — V2 (proposta para revisão; alinhada à Gold em 23/10)
 
-Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
+Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL, e `GET /dashboard` e `GET /inspecoes/candidatos` leem o banco; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
 
 **A Gold é a fonte de verdade.** Quando este contrato e a Gold divergem, quem se adapta é a API: o contrato e o código mudam, os dados não. As adaptações estão na seção 16; tabelas, colunas e regras da Gold estão no *Contrato de dados Gold → API* (v2).
 
@@ -83,7 +83,7 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
 ```
 
-Na integração, a API lê os efeitos pré-calculados em `gold.agg_preco_volume`, que só existe para P1 × P2 (`2022-07/2023-06` × `2025-07/2026-06`). Para outras janelas, `ponte_receita` e `drill_down` retornam 422 `CENARIO_STUB_INDISPONIVEL` com mensagem explicando a limitação. O cálculo de distribuição do mock não é a implementação B3b.
+A API lê os efeitos pré-calculados em `gold.agg_preco_volume` e só os soma; não refaz a decomposição. A tabela existe para P1 × P2 (`periodo_atual=2025-07/2026-06`, `periodo_comparacao=2022-07/2023-06`) e por município, bairro e classe. Fora disso — outras janelas ou filtro de alimentador — `ponte_receita` vem com todos os valores null e `drill_down` com a lista vazia, e `metadados.observacoes` diz o motivo; os KPIs e a série seguem calculados normalmente.
 
 ## 4. GET /unidades — busca da Tela 3
 
@@ -423,7 +423,7 @@ A Gold não muda para atender o portal. Onde este contrato divergia dela, a API 
 | KPIs com filtro | `agg_kpis_mensal` é só global | Sem filtro, lê `agg_kpis_mensal`; com filtro, agrega `fato_uc_mes` + `dim_uc` com as mesmas regras, e DEC/FEC por `agg_dec_fec_mensal` |
 | UCs ativas | `fato_alimentador_mes.ucs_atendidas`: UCs ligadas até o fim de cada mês | Mesma regra: UCs ligadas até o fim do último mês da janela; com filtro de bairro ou classe, contadas na `dim_uc` pela `data_ligacao` |
 | Energia | `consumo_kwh_valido` no `fato_uc_mes`, somado igual em `agg_kpis_mensal` e `agg_receita_mensal` | KPI de energia e série somam `consumo_kwh_valido` |
-| Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2 | Seção 3: sem `bandeira_mix`; outras janelas recebem 422 |
+| Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2, por município × bairro × classe | Seção 3: soma os efeitos da Gold; outras janelas ou filtro de alimentador recebem ponte null e drill-down vazio, com KPIs e série normais |
 | Conta alta | `flag_conta_alta`: consumo > 20% acima do mesmo mês do ano anterior | Seção 5: veredito pela flag; média de 12 meses e alerta de leitura estimada calculados pela API |
 | Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
 | Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json`; `confianca_evidencia` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao`, converte `motivos_json` em `motivos[]` e repassa `confianca_evidencia` |

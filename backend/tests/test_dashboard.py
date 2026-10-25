@@ -116,7 +116,6 @@ def test_variacao_e_diferenca(client):
 
 
 def test_serie_independe_das_janelas_de_comparacao(engine):
-    # Direto no service: a rota recusa outras janelas por causa da ponte (só P1 × P2)
     outra = FiltrosDashboard(periodo_atual="2023-07/2024-06", periodo_comparacao="2022-07/2023-06")
     padrao = FiltrosDashboard(**PERIODOS)
     with Session(bind=engine) as db:
@@ -220,12 +219,20 @@ def test_drill_breadcrumb_e_paginacao(client):
     assert len(drill["items"]) == 1 and drill["total"] == len({r["classe"] for r in recortes(municipio=MUNICIPIO, bairro=BAIRRO)})
 
 
-def test_outro_periodo_retorna_422(client):
-    response = client.get("/dashboard", params={"periodo_atual": "2024-07/2025-06", "periodo_comparacao": "2023-07/2024-06"})
-    assert response.status_code == 422 and response.json()["codigo"] == "CENARIO_STUB_INDISPONIVEL"
+def test_outro_periodo_tem_kpis_e_ponte_ausente(client):
+    outro = {"periodo_atual": "2024-07/2025-06", "periodo_comparacao": "2023-07/2024-06"}
+    dados = get(client, **outro)
+    assert dados["indicadores"]["receita_faturada"]["atual"]["valor"] == pytest.approx(esperado(outro["periodo_atual"])["receita"])
+    assert all(valor is None for valor in valores(dados["ponte_receita"]).values())
+    assert dados["drill_down"]["items"] == []
+    assert any("2025-07/2026-06" in obs for obs in dados["metadados"]["observacoes"])
 
 
-@pytest.mark.parametrize("filtros", [{"alimentador": DADOS[UnidadeConsumidora][0]["alimentador"]}, {"municipio": "INEXISTENTE"}])
+@pytest.mark.parametrize("filtros", [
+    {"alimentador": DADOS[UnidadeConsumidora][0]["alimentador"]},
+    {"municipio": "INEXISTENTE"},
+    {"periodo_atual": "2024-07/2025-06", "periodo_comparacao": "2023-07/2024-06"},
+])
 def test_sem_decomposicao_no_recorte_ponte_ausente(client, filtros):
     dados = get(client, **filtros)
     assert all(valor is None for valor in valores(dados["ponte_receita"]).values())
