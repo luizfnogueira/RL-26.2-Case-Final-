@@ -2,11 +2,10 @@ from decimal import Decimal
 
 from app.core.exceptions import CenarioStubIndisponivelException
 from app.repositories import dashboard_repository
-from app.services import stub_dashboard
-from app.services.stubs import PERIODO_ATUAL, PERIODO_COMPARACAO, indicador
+from app.services.stubs import indicador, paginar
 from app.schemas.common import limites
 from app.schemas.dashboard import FiltrosDashboard
-
+from app.models.gold import AggPrecoVolume
 from sqlalchemy.orm import Session
 
 
@@ -159,28 +158,109 @@ def montar_serie(db: Session, filtros: FiltrosDashboard) -> list[dict]:
     ]
 
 
-def _simulado(filtros: FiltrosDashboard) -> dict:
-    """Ponte e drill-down do stub; fora dos recortes e períodos do mock, usa o consolidado simulado."""
-    try:
-        return stub_dashboard.montar_dashboard(filtros)
-    except CenarioStubIndisponivelException:
-        consolidado = FiltrosDashboard(periodo_atual=PERIODO_ATUAL, periodo_comparacao=PERIODO_COMPARACAO,
-                                       page=filtros.page, page_size=filtros.page_size)
-        return stub_dashboard.montar_dashboard(consolidado)
+# A decomposição da Gold (agg_preco_volume) só existe para P1 × P2 e por município × bairro × classe
+PERIODO_P2, PERIODO_P1 = "2025-07/2026-06", "2022-07/2023-06"
+
+
+def validar_decomposicao(filtros: FiltrosDashboard) -> None:
+    if (filtros.periodo_atual, filtros.periodo_comparacao) != (PERIODO_P2, PERIODO_P1):
+        raise CenarioStubIndisponivelException(
+            f"A decomposição preço × volume da Gold só existe para periodo_atual={PERIODO_P2} "
+            f"e periodo_comparacao={PERIODO_P1}.")
+
+
+def montar_ponte(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dict:
+    """Cascata da receita de energia: comparação + efeito preço + efeito volume = atual (P1 → P2).
+
+    Só soma os efeitos que a Gold já calculou por recorte; não refaz a decomposição.
+    """
+    if linhas:
+        receita_comparacao = sum(linha.receita_energia_p1 for linha in linhas)
+        receita_atual = sum(linha.receita_energia_p2 for linha in linhas)
+        efeito_preco = sum(linha.efeito_preco for linha in linhas)
+        efeito_volume = sum(linha.efeito_volume for linha in linhas)
+        kwh_comparacao = sum(linha.kwh_p1 for linha in linhas)
+        kwh_atual = sum(linha.kwh_p2 for linha in linhas)
+    else:
+        # Recorte sem linhas na Gold: ausente (None), nunca 0
+        receita_comparacao = receita_atual = efeito_preco = efeito_volume = kwh_comparacao = kwh_atual = None
+
+    # Tarifa do conjunto = receita total ÷ kWh total (somar as tarifas dos recortes não dá a tarifa média)
+    tarifa_comparacao = receita_comparacao / kwh_comparacao if kwh_comparacao else None
+    tarifa_atual = receita_atual / kwh_atual if kwh_atual else None
+
+    return {
+        "receita_energia_comparacao": indicador(receita_comparacao, "BRL", filtros.periodo_comparacao),
+        "efeito_preco": indicador(efeito_preco, "BRL", filtros.periodo_atual),
+        "efeito_volume": indicador(efeito_volume, "BRL", filtros.periodo_atual),
+        "receita_energia_atual": indicador(receita_atual, "BRL", filtros.periodo_atual),
+        "reajuste_percentual": indicador(variacao(tarifa_atual, tarifa_comparacao), "%", filtros.periodo_atual),
+    }
+
+
+def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dict:
+    """Uma linha por item do nível pedido, ordenada pela maior queda de kWh (depois nome), paginada."""
+    nivel = filtros.nivel
+    grupos: dict[str, list[AggPrecoVolume]] = {}
+    for linha in linhas:
+        grupos.setdefault(getattr(linha, nivel), []).append(linha)
+
+    itens = []
+    for nome, grupo in grupos.items():
+        receita_comparacao = sum(linha.receita_energia_p1 for linha in grupo)
+        receita_atual = sum(linha.receita_energia_p2 for linha in grupo)
+        kwh_comparacao = sum(linha.kwh_p1 for linha in grupo)
+        kwh_atual = sum(linha.kwh_p2 for linha in grupo)
+        # Filtros para reenviar com o próximo nível: os atuais mais o valor desta linha
+        linha_filtros = {campo: getattr(filtros, campo) for campo in ("municipio", "bairro", "classe")}
+        linha_filtros[nivel] = nome
+        itens.append({
+            "nivel": nivel,
+            "nome": nome,
+            "receita_energia_atual": indicador(receita_atual, "BRL", filtros.periodo_atual),
+            "receita_energia_comparacao": indicador(receita_comparacao, "BRL", filtros.periodo_comparacao),
+            "energia_atual": indicador(kwh_atual, "kWh", filtros.periodo_atual),
+            "energia_comparacao": indicador(kwh_comparacao, "kWh", filtros.periodo_comparacao),
+            "variacao_energia_percentual": indicador(variacao(kwh_atual, kwh_comparacao), "%", filtros.periodo_atual),
+            "queda_kwh": indicador(kwh_comparacao - kwh_atual, "kWh", filtros.periodo_atual),
+            "efeito_preco": indicador(sum(linha.efeito_preco for linha in grupo), "BRL", filtros.periodo_atual),
+            "efeito_volume": indicador(sum(linha.efeito_volume for linha in grupo), "BRL", filtros.periodo_atual),
+            "filtros": linha_filtros,
+        })
+    itens.sort(key=lambda item: (-item["queda_kwh"]["valor"], item["nome"]))
+
+    vazio = {"municipio": None, "bairro": None, "classe": None}
+    breadcrumb = [{"nivel": "consolidado", "rotulo": "Todos os municípios", "filtros": vazio}]
+    if nivel in ("bairro", "classe"):
+        breadcrumb.append({"nivel": "municipio", "rotulo": filtros.municipio,
+                           "filtros": {**vazio, "municipio": filtros.municipio}})
+    if nivel == "classe":
+        breadcrumb.append({"nivel": "bairro", "rotulo": filtros.bairro,
+                           "filtros": {**vazio, "municipio": filtros.municipio, "bairro": filtros.bairro}})
+    return {"nivel": nivel, "breadcrumb": breadcrumb, **paginar(itens, filtros)}
 
 
 def montar_dashboard(db: Session, filtros: FiltrosDashboard) -> dict:
-    """KPIs e série vêm do banco; ponte e drill-down seguem do stub até a B3b."""
-    simulado = _simulado(filtros)
+    """KPIs e série calculados no banco; ponte e drill-down lidos da decomposição da Gold."""
+    validar_decomposicao(filtros)
+    observacoes = ["Dados fictícios do seed, com as regras da Gold."]
+    if filtros.alimentador is not None:
+        # A Gold não decompõe por alimentador: ponte e drill-down ausentes, KPIs e série seguem filtrados
+        linhas = []
+        observacoes.append("Ponte de receita e drill-down não existem por alimentador; "
+                           "a decomposição da Gold é por município, bairro e classe.")
+    else:
+        regiao = {campo: getattr(filtros, campo) for campo in ("municipio", "bairro", "classe")}
+        linhas = dashboard_repository.linhas_preco_volume(db, regiao)
     return {
         "filtros": filtros.model_dump(include={"periodo_atual", "periodo_comparacao", *_regiao(filtros)}),
         "indicadores": montar_indicadores(db, filtros),
         "serie_historica": montar_serie(db, filtros),
-        "ponte_receita": simulado["ponte_receita"],
-        "drill_down": simulado["drill_down"],
+        "ponte_receita": montar_ponte(linhas, filtros),
+        "drill_down": montar_drill(linhas, filtros),
         "metadados": {
-            **simulado["metadados"],
-            "observacoes": ["Indicadores e série histórica calculados no banco; "
-                            "ponte de receita e drill-down simulados (B3b)."],
+            "dados_ficticios": True,
+            "gold_atualizada_em": None,
+            "observacoes": observacoes,
         },
     }
