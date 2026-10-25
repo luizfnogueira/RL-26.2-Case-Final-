@@ -5,11 +5,18 @@ from decimal import Decimal
 from sqlalchemy import Numeric, cast, func, select
 from sqlalchemy.orm import Session
 
-from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura
+from app.core.config import GOLD_SOURCE
+if GOLD_SOURCE == 'real':
+    from app.models.gold_real import AggDecFecMensal as DecFecAlimentadorMes, FatoUCMes as Fatura, FatoUCMes as Leitura, DimUC as UnidadeConsumidora
+else:
+    from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura
+
+ENERGIA = Leitura.consumo_kwh_valido if GOLD_SOURCE == 'real' else Leitura.consumo_kwh
+UCS = DecFecAlimentadorMes.ucs_atendidas if GOLD_SOURCE == 'real' else DecFecAlimentadorMes.ucs_total
 
 def somar_receita(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
     consulta = (
-        select(func.coalesce(func.sum(Fatura.valor_total), 0))
+        select((func.sum(Fatura.valor_total) if GOLD_SOURCE == 'real' else func.coalesce(func.sum(Fatura.valor_total), 0)))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Fatura.id_uc)
         .where(Fatura.mes_referencia.between(inicio, fim))
     )
@@ -20,9 +27,9 @@ def somar_receita(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
 
 def somar_energia(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
     consulta = (
-        select(func.coalesce(func.sum(Leitura.consumo_kwh), 0))
+        select(func.sum(ENERGIA) if GOLD_SOURCE == 'real' else func.coalesce(func.sum(ENERGIA), 0))
         .join(UnidadeConsumidora, Leitura.id_uc == UnidadeConsumidora.id_uc)
-        .where(Leitura.mes_referencia.between(inicio, fim), Leitura.flag_consumo_negativo == False)
+        .where(Leitura.mes_referencia.between(inicio, fim), *([] if GOLD_SOURCE == 'real' else [Leitura.flag_consumo_negativo == False]))
     )
     for campo, valor in filtros.items():
         if valor is not None:
@@ -43,7 +50,7 @@ def contar_ucs_ativas(db: Session, inicio: str, fim: str, filtros: dict) -> int:
 
 def somar_inadimplencia(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
     consulta = (
-        select(func.coalesce(func.sum(Fatura.valor_total), 0))
+        select((func.sum(Fatura.valor_total) if GOLD_SOURCE == 'real' else func.coalesce(func.sum(Fatura.valor_total), 0)))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Fatura.id_uc)
         .where(
             Fatura.mes_referencia.between(inicio, fim),
@@ -66,7 +73,7 @@ def somar_continuidade(db: Session, inicio: str, fim: str, municipio: str | None
         select(
             func.sum(DecFecAlimentadorMes.horas_interrupcao).label("horas"),
             func.sum(DecFecAlimentadorMes.interrupcoes).label("interrupcoes"),
-            func.sum(DecFecAlimentadorMes.ucs_total).label("ucs"),
+            func.sum(UCS).label("ucs"),
         )
         .where(*condicoes)
         .group_by(DecFecAlimentadorMes.mes_referencia)
@@ -102,9 +109,9 @@ def serie_receita(db: Session, inicio: str, fim: str, filtros: dict) -> list[tup
 
 def serie_energia(db: Session, inicio: str, fim: str, filtros: dict) -> list[tuple[str, Decimal]]:
     consulta = (
-        select(Leitura.mes_referencia, func.sum(Leitura.consumo_kwh))
+        select(Leitura.mes_referencia, func.sum(ENERGIA))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Leitura.id_uc)
-        .where(Leitura.mes_referencia.between(inicio, fim), Leitura.flag_consumo_negativo == False)
+        .where(Leitura.mes_referencia.between(inicio, fim), *([] if GOLD_SOURCE == 'real' else [Leitura.flag_consumo_negativo == False]))
         .group_by(Leitura.mes_referencia)
         .order_by(Leitura.mes_referencia)
     )

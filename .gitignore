@@ -11,3 +11,18 @@ venv/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Gold real: somente codigo e fixtures sinteticos entram no Git.
+backend/data/gold/*
+!backend/data/gold/.gitkeep
+*.db
+*.db.*
+*.sqlite*
+_manifesto.csv
+# Copias privadas, inclusive fora do diretorio padrao; fixtures sinteticos permitidos.
+*.csv
+!backend/tests/fixtures/**/*.csv
+*.dump
+*.backup
+*.bak
+backups/

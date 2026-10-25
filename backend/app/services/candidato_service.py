@@ -46,8 +46,9 @@ class CandidatoService:
         self.repository = repository
 
     def listar(self, filtros: FiltrosCandidatos) -> dict:
-        # Até a Gold da fila (Equipe 3, 26/10) o seed só cobre a janela do contrato.
+        # A exportacao da fila e um snapshot da janela P2, sem historico por janela.
         verificar_cenario(filtros.periodo_atual, filtros.periodo_comparacao)
+        manifest = getattr(self.repository, 'metadados', lambda: None)()
 
         itens, total, resumo = self.repository.consultar(
             municipio=filtros.municipio,
@@ -67,11 +68,13 @@ class CandidatoService:
             "periodo_referencia": periodo,
             "resumo": _resumo(resumo, periodo),
             "metadados": {
-                "dados_ficticios": True,
-                "gold_atualizada_em": None,
+                "dados_ficticios": manifest is None,
+                "gold_atualizada_em": manifest['exportado_em_utc'] if manifest else None,
                 "observacoes": [
-                    "Fila lida do seed da Gold (A1) até a entrega da Gold da Equipe 3; "
-                    "as ordens ativas vêm do schema portal."
+                    ("Gold V10 real: somente INSPECAO_PRIORITARIA nesta rota; "
+                     "VALIDACAO_DOCUMENTAL preservada na Gold. Score nao e probabilidade de fraude; "
+                     "kWh estimado e heuristico. Janela fixa P2 da exportacao."
+                     if manifest else "Fila ficticia do seed; ordens ativas do portal.")
                 ],
             },
         }

@@ -58,6 +58,9 @@ class OrdemInspecaoService:
                 f"Unidade Consumidora '{id_uc}' não encontrada no cadastro."
             )
 
+        validar_acao = getattr(self.repository, 'validar_acao', None)
+        if validar_acao:
+            validar_acao(id_uc)
         ordem_ativa = self.repository.obter_ativa_por_uc(id_uc)
         if ordem_ativa is not None:
             raise OrdemAtivaExistenteException(

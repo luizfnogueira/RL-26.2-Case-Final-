@@ -4,6 +4,8 @@
 
 Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do portal no schema `portal`; a recarga da Gold nunca toca no `portal`.
 
+O fluxo de carga real é CSV → PostgreSQL, sem banco intermediário; use `GOLD_SOURCE=real`. O seed permanece somente para desenvolvimento em banco separado. A documentação técnica e o guia operacional são distribuídos separadamente pela equipe no Drive, junto das orientações de acesso aos dados privados.
+
 ### Pré-requisitos
 
 - Docker com Docker Compose
@@ -17,7 +19,10 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
 cd backend
 cp .env.example .env                              # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
 docker compose up -d --build --wait               # sobe o PostgreSQL e a API e espera ficarem prontos
-docker compose exec api python -m app.db.seed     # carrega os dados fictícios da Gold
+# Coloque os 14 CSVs e _manifesto.csv privados em backend/data/gold.
+docker compose exec api python -m app.db.init_portal  # apenas na instalação inicial
+docker compose exec api python -m app.db.importar_gold_postgres
+docker compose exec api python -m app.db.verificar_gold --csv-dir data/gold
 ```
 
 Documentação da API em http://localhost:8000/docs. O código em `app/` é montado no container: ao salvar, a API recarrega sozinha.
@@ -28,7 +33,6 @@ Comandos úteis:
 
 - logs da API: `docker compose logs -f api`
 - parar: `docker compose stop` (os dados ficam no volume)
-- apagar tudo e recomeçar: `docker compose down -v`
 - após mudar o `requirements.txt`: `docker compose up -d --build --wait`
 
 ### Testes

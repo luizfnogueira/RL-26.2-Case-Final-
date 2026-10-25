@@ -64,8 +64,8 @@ def montar_indicadores(db: Session, filtros: FiltrosDashboard) -> dict:
     aberto_atual = dashboard_repository.somar_inadimplencia(db, inicio_atual, fim_atual, regiao)
     aberto_comparacao = dashboard_repository.somar_inadimplencia(db, inicio_comparacao, fim_comparacao, regiao)
     
-    pct_atual = round(aberto_atual / receita_atual * 100, 4) if receita_atual else None
-    pct_comparacao = round(aberto_comparacao / receita_comparacao * 100, 4) if receita_comparacao else None
+    pct_atual = round(aberto_atual / receita_atual * 100, 4) if receita_atual and aberto_atual is not None else None
+    pct_comparacao = round(aberto_comparacao / receita_comparacao * 100, 4) if receita_comparacao and aberto_comparacao is not None else None
     pontos_percentuais = (
         None if pct_atual is None or pct_comparacao is None else round(pct_atual - pct_comparacao, 4))
 

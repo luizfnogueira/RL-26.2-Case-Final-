@@ -6,7 +6,8 @@ from typing import Optional, Protocol
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.gold import FilaPerdas, FilaPerdasAuditoria, UnidadeConsumidora
+from app.models.gold_source import FilaPerdas, FilaPerdasAuditoria, UnidadeConsumidora
+from app.core.config import GOLD_SOURCE
 from app.models.portal import OrdemInspecao
 from app.schemas.inspecao import STATUS_ATIVOS
 
@@ -76,6 +77,8 @@ def _condicoes_regiao(
 
 
 def _ordem_fila() -> list:
+    if GOLD_SOURCE == 'real':
+        return [FilaPerdas.posicao_fila.asc()]
     return [
         FilaPerdas.score.desc(),
         FilaPerdas.kwh_estimado.desc(),
@@ -106,6 +109,13 @@ class SqlAlchemyCandidatoRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def metadados(self):
+        if GOLD_SOURCE != 'real':
+            return None
+        from sqlalchemy import text
+        value = self.db.execute(text("SELECT metadata_json FROM gold._carga_metadata WHERE tabela='tb_fila_perdas'")).scalar_one()
+        return json.loads(value)['manifest']
+
     def consultar(
         self,
         *,
@@ -118,6 +128,9 @@ class SqlAlchemyCandidatoRepository:
     ) -> tuple[list[CandidatoFila], int, ResumoFila]:
         regiao = _condicoes_regiao(municipio, bairro, classe, alimentador)
         elegivel = FilaPerdas.status_triagem == STATUS_ELEGIVEL
+        if GOLD_SOURCE == 'real':
+            # A rota existente gera ordens; validacao documental fica na auditoria.
+            elegivel = elegivel & (FilaPerdas.acao_recomendada == 'INSPECAO_PRIORITARIA')
         ativas = _subconsulta_ordens_ativas()
 
         # A posição é global dentro do resultado filtrado, antes da paginação.
