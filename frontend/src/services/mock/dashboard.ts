@@ -46,6 +46,8 @@ const CAMPOS: Campo[] = [
   'inadimplencia_atual',
   'inadimplencia_comparacao',
 ]
+// Parcela de energia da receita no stub (tributos fictícios de 28%); a Gold traz receita_energia pronta.
+const FATOR_ENERGIA = 1 / 1.28
 const ROTULO_RECORTE =
   'Distribuição ilustrativa do consolidado; não representa metodologia nem diagnóstico real.'
 const SEM_DEC_FEC =
@@ -71,16 +73,38 @@ function kpi(rotulo: string, atual: number, comparacao: number, unidade: string)
   }
 }
 
-/** Efeito-preço proporcional à receita atual; efeito-volume, à variação de energia. */
-function efeitos(soma: Soma, total: Soma, ponte: PonteReceita): [number, number] {
-  const preco = arredondar(
-    ((ponte.efeito_preco.valor ?? 0) * soma.receita_atual) / total.receita_atual,
-  )
-  const volume = arredondar(
-    ((ponte.efeito_volume.valor ?? 0) * (soma.energia_atual - soma.energia_comparacao)) /
-      (total.energia_atual - total.energia_comparacao),
-  )
-  return [preco, volume]
+interface Decomposicao {
+  atual: number
+  comparacao: number
+  volume: number
+  preco: number
+}
+
+/**
+ * Preço × volume como em gold.agg_preco_volume: por recorte, depois somado.
+ * efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação;
+ * efeito_preco = variação da receita de energia − efeito_volume (fecha sem resíduo).
+ */
+function decompor(recortes: Recorte[]): Decomposicao {
+  let atual = 0
+  let comparacao = 0
+  let volume = 0
+  for (const r of recortes) {
+    const receitaAtual = r.receita_atual * FATOR_ENERGIA
+    const receitaComparacao = r.receita_comparacao * FATOR_ENERGIA
+    // Regra 4.8 do contrato Gold: segmento sem kWh na comparação (sem tarifa-base) leva toda a
+    // variação para o volume.
+    volume +=
+      r.energia_comparacao > 0
+        ? ((r.energia_atual - r.energia_comparacao) * receitaComparacao) / r.energia_comparacao
+        : receitaAtual - receitaComparacao
+    atual += receitaAtual
+    comparacao += receitaComparacao
+  }
+  atual = arredondar(atual)
+  comparacao = arredondar(comparacao)
+  volume = arredondar(volume)
+  return { atual, comparacao, volume, preco: arredondar(atual - comparacao - volume) }
 }
 
 function indicadores(
@@ -104,7 +128,7 @@ function indicadores(
     energia_faturada: kpi('Volume faturado', soma.energia_atual, soma.energia_comparacao, 'kWh'),
     ucs_ativas: kpi('UCs ativas', soma.ucs_ativas_atual, soma.ucs_ativas_comparacao, 'UCs'),
     inadimplencia: {
-      ...kpi('Inadimplência', soma.inadimplencia_atual, soma.inadimplencia_comparacao, 'BRL'),
+      ...kpi('Valor em aberto', soma.inadimplencia_atual, soma.inadimplencia_comparacao, 'BRL'),
       percentual_receita_atual: indicador(pctAtual, '%', PA),
       percentual_receita_comparacao: indicador(pctComparacao, '%', PC),
       variacao_pontos_percentuais: indicador(arredondar(pctAtual - pctComparacao, 4), 'p.p.', PA),
@@ -128,18 +152,17 @@ function serie(pontos: PontoSerie[], soma: Soma, total: Soma): PontoSerie[] {
   return pontos
 }
 
-function ponteReceita(soma: Soma, total: Soma, ponte: PonteReceita): PonteReceita {
-  const [preco, volume] = efeitos(soma, total, ponte)
-  const atual = soma.receita_atual
-  const comparacao = soma.receita_comparacao
+function ponteReceita(recortes: Recorte[]): PonteReceita {
+  const d = decompor(recortes)
+  const soma = somar(recortes)
+  const tarifaAtual = d.atual / soma.energia_atual
+  const tarifaComparacao = d.comparacao / soma.energia_comparacao
   return {
-    receita_comparacao: indicador(comparacao, 'BRL', PC),
-    efeito_preco: indicador(preco, 'BRL', PA),
-    efeito_volume: indicador(volume, 'BRL', PA),
-    // Resíduo: garante receita_comparacao + efeitos = receita_atual em qualquer recorte.
-    bandeira_mix: indicador(arredondar(atual - comparacao - preco - volume), 'BRL', PA),
-    receita_atual: indicador(atual, 'BRL', PA),
-    reajuste_percentual: ponte.reajuste_percentual,
+    receita_energia_comparacao: indicador(d.comparacao, 'BRL', PC),
+    efeito_preco: indicador(d.preco, 'BRL', PA),
+    efeito_volume: indicador(d.volume, 'BRL', PA),
+    receita_energia_atual: indicador(d.atual, 'BRL', PA),
+    reajuste_percentual: indicador(variacao(tarifaAtual, tarifaComparacao), '%', PA),
   }
 }
 
@@ -170,7 +193,7 @@ function validar(params: Registro): ParamsNormalizados {
   return { periodo_atual: atual, periodo_comparacao: comparacao, nivel, page, pageSize, ...filtros }
 }
 
-function drill(p: ParamsNormalizados, recortes: Recorte[], total: Soma, ponte: PonteReceita) {
+function drill(p: ParamsNormalizados, recortes: Recorte[]) {
   const grupos = new Map<string, Recorte[]>()
   for (const recorte of recortes) {
     const chave = recorte[p.nivel]
@@ -178,7 +201,7 @@ function drill(p: ParamsNormalizados, recortes: Recorte[], total: Soma, ponte: P
   }
   const linhas: LinhaDrill[] = [...grupos].map(([nome, grupo]) => {
     const soma = somar(grupo)
-    const [preco, volume] = efeitos(soma, total, ponte)
+    const d = decompor(grupo)
     // Filtros para reenviar com o próximo nível: os atuais mais o valor desta linha.
     const filtros = {
       municipio: p.municipio ?? null,
@@ -189,8 +212,8 @@ function drill(p: ParamsNormalizados, recortes: Recorte[], total: Soma, ponte: P
     return {
       nivel: p.nivel,
       nome,
-      receita_atual: indicador(soma.receita_atual, 'BRL', PA),
-      receita_comparacao: indicador(soma.receita_comparacao, 'BRL', PC),
+      receita_energia_atual: indicador(d.atual, 'BRL', PA),
+      receita_energia_comparacao: indicador(d.comparacao, 'BRL', PC),
       energia_atual: indicador(soma.energia_atual, 'kWh', PA),
       energia_comparacao: indicador(soma.energia_comparacao, 'kWh', PC),
       variacao_energia_percentual: indicador(
@@ -199,8 +222,8 @@ function drill(p: ParamsNormalizados, recortes: Recorte[], total: Soma, ponte: P
         PA,
       ),
       queda_kwh: indicador(soma.energia_comparacao - soma.energia_atual, 'kWh', PA),
-      efeito_preco: indicador(preco, 'BRL', PA),
-      efeito_volume: indicador(volume, 'BRL', PA),
+      efeito_preco: indicador(d.preco, 'BRL', PA),
+      efeito_volume: indicador(d.volume, 'BRL', PA),
       filtros,
     }
   })
@@ -261,8 +284,8 @@ export async function montarDashboard(parametros: ParamsDashboard | Registro): P
     },
     indicadores: indicadores(soma, base.indicadores, filtrado),
     serie_historica: filtrado ? serie(base.serie_historica, soma, total) : base.serie_historica,
-    ponte_receita: ponteReceita(soma, total, base.ponte_receita),
-    drill_down: drill(p, selecionados, total, base.ponte_receita),
+    ponte_receita: ponteReceita(selecionados),
+    drill_down: drill(p, selecionados),
     metadados,
   }
 }

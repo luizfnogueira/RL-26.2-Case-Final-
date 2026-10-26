@@ -78,7 +78,7 @@
       }
     },
     "inadimplencia": {
-      "rotulo": "Inadimplência",
+      "rotulo": "Valor em aberto",
       "atual": {
         "valor": 12811500.0,
         "unidade": "BRL",
@@ -136,11 +136,6 @@
         "valor": -13.6398,
         "unidade": "%",
         "periodo_referencia": "2025-07/2026-06"
-      },
-      "meta": {
-        "valor": 12.0,
-        "unidade": "h/UC",
-        "periodo_referencia": "2025-07/2026-06"
       }
     },
     "fec_medio": {
@@ -163,11 +158,6 @@
       "variacao_percentual": {
         "valor": -13.6691,
         "unidade": "%",
-        "periodo_referencia": "2025-07/2026-06"
-      },
-      "meta": {
-        "valor": 7.5,
-        "unidade": "interrupcoes/UC",
         "periodo_referencia": "2025-07/2026-06"
       }
     }
@@ -799,33 +789,28 @@
     }
   ],
   "ponte_receita": {
-    "receita_comparacao": {
-      "valor": 263600000.0,
+    "receita_energia_comparacao": {
+      "valor": 205937500.0,
       "unidade": "BRL",
       "periodo_referencia": "2022-07/2023-06"
     },
     "efeito_preco": {
-      "valor": 27700000.0,
+      "valor": 24655666.05,
       "unidade": "BRL",
       "periodo_referencia": "2025-07/2026-06"
     },
     "efeito_volume": {
-      "valor": -10400000.0,
+      "valor": -8171291.05,
       "unidade": "BRL",
       "periodo_referencia": "2025-07/2026-06"
     },
-    "bandeira_mix": {
-      "valor": 3800000.0,
-      "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
-    },
-    "receita_atual": {
-      "valor": 284700000.0,
+    "receita_energia_atual": {
+      "valor": 222421875.0,
       "unidade": "BRL",
       "periodo_referencia": "2025-07/2026-06"
     },
     "reajuste_percentual": {
-      "valor": 10.5,
+      "valor": 12.3861,
       "unidade": "%",
       "periodo_referencia": "2025-07/2026-06"
     }
@@ -835,13 +820,13 @@
       {
         "nivel": "municipio",
         "nome": "Recife",
-        "receita_atual": {
-          "valor": 128509122.0,
+        "receita_energia_atual": {
+          "valor": 100397751.56,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
-        "receita_comparacao": {
-          "valor": 121256000.0,
+        "receita_energia_comparacao": {
+          "valor": 94731250.0,
           "unidade": "BRL",
           "periodo_referencia": "2022-07/2023-06"
         },
@@ -866,12 +851,12 @@
           "periodo_referencia": "2025-07/2026-06"
         },
         "efeito_preco": {
-          "valor": 12503346.26,
+          "valor": 11129222.02,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
         "efeito_volume": {
-          "valor": -6991171.85,
+          "valor": -5462720.46,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
@@ -884,13 +869,13 @@
       {
         "nivel": "municipio",
         "nome": "Jaboatão dos Guararapes",
-        "receita_atual": {
-          "valor": 62231341.0,
+        "receita_energia_atual": {
+          "valor": 48618235.16,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
-        "receita_comparacao": {
-          "valor": 57992000.0,
+        "receita_energia_comparacao": {
+          "valor": 45306250.0,
           "unidade": "BRL",
           "periodo_referencia": "2022-07/2023-06"
         },
@@ -915,12 +900,12 @@
           "periodo_referencia": "2025-07/2026-06"
         },
         "efeito_preco": {
-          "valor": 6054823.13,
+          "valor": 5389380.93,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
         "efeito_volume": {
-          "valor": -2650323.0,
+          "valor": -2077395.77,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
@@ -933,13 +918,13 @@
       {
         "nivel": "municipio",
         "nome": "Olinda",
-        "receita_atual": {
-          "valor": 93959537.0,
+        "receita_energia_atual": {
+          "valor": 73405888.28,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
-        "receita_comparacao": {
-          "valor": 84352000.0,
+        "receita_energia_comparacao": {
+          "valor": 65900000.0,
           "unidade": "BRL",
           "periodo_referencia": "2022-07/2023-06"
         },
@@ -964,12 +949,12 @@
           "periodo_referencia": "2025-07/2026-06"
         },
         "efeito_preco": {
-          "valor": 9141830.61,
+          "valor": 8137063.11,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
         "efeito_volume": {
-          "valor": -758505.15,
+          "valor": -631174.83,
           "unidade": "BRL",
           "periodo_referencia": "2025-07/2026-06"
         },
