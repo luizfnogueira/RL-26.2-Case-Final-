@@ -106,6 +106,10 @@ const { dados, erro, carregando, recarregar } = useConsulta(
 
 Com `VITE_USE_MOCKS=false`, o cliente HTTP (`services/http.ts`) é o único lugar que envia `Authorization: Bearer <token>`, lendo o token de `auth/tokenStorage.ts` (`get`, `set`, `clear`, chave `venergy_token`). Login e cadastro não levam token. Um 401 em qualquer outra rota limpa o token e chama o gancho registrado por `aoNaoAutorizado(fn)` (em `auth/naoAutorizado.ts`); sem gancho, o navegador vai para `/login?destino=...`. O 401 de credenciais inválidas no login não derruba a sessão. A tela de login só deve aceitar `destino` quando for um caminho do próprio portal (começa com `/` e não com `//`).
 
+### Tela 2: diagnóstico da receita (`/receita`)
+
+Filtros na URL (`periodo_atual`, `periodo_comparacao`, `municipio`, `bairro`, `classe`, `page`). O nível do drill-down segue os filtros (sem município lista municípios; com município, bairros; com bairro, classes) e o breadcrumb remove os filtros descendentes. A ponte decompõe a **receita de energia, sem tributos** (base → efeito-preço → efeito-volume → atual), por isso não coincide com a receita faturada do painel. O bloco "Análise da IA" chama `POST /ia/insight` com os seis números da ponte; se a IA falhar, só esse bloco mostra o erro. O gráfico (`components/graficos/Cascata.tsx`) é SVG próprio, sem biblioteca, com tooltip por barra, legenda e visão em tabela.
+
 ### Componentes comuns e filtros
 
 Em `src/components/ui`: `Button`, `Card`, `Input`, `Select`, `Modal`, `Tabela` (ordenação local ou no servidor, com paginação), `Paginacao`, `Badge`, `Skeleton`, `ErrorState`, `EmptyState` e `SeloFicticio` (rótulo "Dado fictício" para telas com mock). Para ver todos funcionando: `npm run dev` e abra `/dev/componentes` (a rota não existe no build de produção).
