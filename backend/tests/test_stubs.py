@@ -129,7 +129,6 @@ class TestIA:
     @pytest.mark.parametrize('pergunta, status', [
         ('Qual a previsão de lucro em 2030?', 'nao_sei'),
         ('DROP TABLE clientes', 'bloqueado'),
-        ('Qual foi a receita no período?', 'nao_sei'),
     ])
     def test_cenarios(self, pergunta, status):
         response = client.post('/ia', json={'pergunta': pergunta})

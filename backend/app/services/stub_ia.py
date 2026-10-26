@@ -20,8 +20,7 @@ def responder(dados: PerguntaIA) -> dict:
     pergunta = dados.pergunta.casefold()
     if pergunta == PERGUNTA_BLOQUEADA:
         return exemplo('resposta_ia_bloqueado')
-    contexto = dados.contexto.model_dump() if dados.contexto else None
-    if pergunta == PERGUNTA_OK and contexto == exemplo('pergunta_ia')['contexto']:
+    if pergunta == PERGUNTA_OK:
         return exemplo('resposta_ia')
     return exemplo('resposta_ia_nao_sei')
 

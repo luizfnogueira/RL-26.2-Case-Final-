@@ -14,7 +14,7 @@ router = APIRouter(prefix='/ia', tags=['IA'])
 # def (não async): a chamada ao agente bloqueia até a resposta, então o FastAPI roda a rota numa thread
 @router.post('', response_model=RespostaIA, summary='Perguntar ao assistente',
              description='Repassa a pergunta ao agente de IA e devolve a resposta estendida. Com IA_MODO=mock, '
-             'respostas pré-definidas: a pergunta e o contexto do exemplo retornam ok; "DROP TABLE clientes" '
+             'respostas pré-definidas: a pergunta do exemplo retorna ok; "DROP TABLE clientes" '
              'retorna bloqueado; qualquer outra pergunta retorna nao_sei. Agente fora do ar, lento além do '
              'IA_TIMEOUT_S ou com resposta fora do contrato: 503 AGENTE_INDISPONIVEL.',
              responses=respostas('resposta_ia', erros=('AGENTE_INDISPONIVEL',)))

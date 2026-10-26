@@ -27,7 +27,7 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
-| POST /ia | pergunta; contexto opcional com períodos/filtros |
+| POST /ia | pergunta |
 | POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
 
 Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não está disponível no mock operacional e retorna erro explícito se enviada. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
@@ -242,15 +242,7 @@ Content-Type: application/json
 
 ```json
 {
-  "pergunta": "Qual foi a receita no período?",
-  "contexto": {
-    "periodo_atual": "2025-07/2026-06",
-    "periodo_comparacao": "2022-07/2023-06",
-    "municipio": null,
-    "bairro": null,
-    "classe": null,
-    "alimentador": null
-  }
+  "pergunta": "Qual foi a receita no período?"
 }
 ```
 
@@ -263,14 +255,14 @@ Cenários demonstrativos:
 
 | Pergunta | Status / resposta completa |
 | --- | --- |
-| Qual foi a receita no período? + contexto do exemplo | ok — exemplo acima |
+| Qual foi a receita no período? | ok — exemplo acima |
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
 - `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
-- `real`: a pergunta e o contexto vão para o agente, que gera e executa a consulta somente leitura na Gold.
+- `real`: a pergunta vai para o agente, que gera e executa a consulta somente leitura na Gold.
 
 Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. Chaves e endereço do agente ficam só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos; validar os nomes reais com a Equipe 3.
 

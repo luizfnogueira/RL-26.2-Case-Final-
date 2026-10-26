@@ -105,6 +105,13 @@ def test_ia_modo_invalido_impede_a_api_de_subir(monkeypatch):
         importlib.reload(config)
 
 
+def test_entrada_e_so_a_pergunta():
+    # Arquitetura V1: entra só {"pergunta"}; campo a mais é recusado
+    response = client.post("/ia", json={"pergunta": "Qual foi a receita no período?", "contexto": {}})
+    assert response.status_code == 422
+    assert response.json()["codigo"] == "DADOS_INVALIDOS"
+
+
 def test_pergunta_vazia_e_dados_invalidos():
     response = client.post("/ia", json={"pergunta": "   "})
     assert response.status_code == 422
