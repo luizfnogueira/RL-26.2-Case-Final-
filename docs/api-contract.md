@@ -28,6 +28,7 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta |
+| GET /filtros | sem parâmetros |
 | POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
 
 Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não está disponível no mock operacional e retorna erro explícito se enviada. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
@@ -362,6 +363,27 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 | variacao_percentual | Variação sobre o ano anterior | % | último mês |
 
 `indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
+
+## 10.1 GET /filtros — opções dos filtros de região
+
+```http
+GET /filtros
+```
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/filtros.json)**
+
+```json
+{
+  "municipios": ["CAMARAGIBE", "JABOATÃO DOS GUARARAPES", "OLINDA", "PAULISTA", "RECIFE"],
+  "bairros": [{ "municipio": "RECIFE", "bairro": "BOA VISTA" }],
+  "classes": ["COMERCIAL", "INDUSTRIAL", "PODER PUBLICO", "RESIDENCIAL", "RURAL"],
+  "alimentadores": [{ "alimentador": "ALM-REC-001", "municipio": "RECIFE" }],
+  "metadados": { "dados_ficticios": true, "gold_atualizada_em": null, "observacoes": [] }
+}
+```
+
+- Valores distintos do cadastro de UCs (`gold.dim_uc`), em ordem alfabética e **exatamente como estão na Gold** (maiúsculas: `RECIFE`, `BOA VISTA`). É o valor a enviar nos parâmetros `municipio`, `bairro`, `classe` e `alimentador` das outras rotas.
+- Bairro e alimentador vêm com o município: o mesmo nome de bairro existe em vários municípios (CENTRO aparece em 8). O front filtra as listas pelo município escolhido, sem nova requisição.
 
 ## 11. GET /health
 
