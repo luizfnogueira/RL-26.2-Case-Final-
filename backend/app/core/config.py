@@ -20,3 +20,11 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg://vgrid:vgrid@localhost:5432/vgrid360",
 )
+
+# Assistente de IA (POST /ia). mock = respostas simuladas, sem chamar o agente da Equipe 3.
+IA_MODO = os.getenv("IA_MODO", "mock")
+if IA_MODO not in ("mock", "real"):
+    raise RuntimeError(f"IA_MODO inválido: {IA_MODO!r}. Use mock ou real.")
+IA_TIMEOUT_S = float(os.getenv("IA_TIMEOUT_S", "30"))
+IA_AGENTE_URL = os.getenv("IA_AGENTE_URL", "")
+IA_API_KEY = os.getenv("IA_API_KEY", "")  # só no .env: nunca no código, na resposta ou no front

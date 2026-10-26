@@ -55,8 +55,9 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
 | 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
+| 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
 
-`AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`; falhas 503 de fonte/agente serão usadas na integração real. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
+`AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
 
 ## 3. GET /dashboard — Telas 1 e 2
 
@@ -266,7 +267,12 @@ Cenários demonstrativos:
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 
-Outras perguntas retornam nao_sei no stub. Não há agente, parser SQL de segurança ou execução de comandos. A demonstração de bloqueio não substitui as proteções da integração real. Nome `gold_receita_demo` e SQL são ilustrativos; validar os nomes reais com Equipe 3.
+A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
+
+- `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
+- `real`: a pergunta e o contexto vão para o agente, que gera e executa a consulta somente leitura na Gold.
+
+Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. Chaves e endereço do agente ficam só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos; validar os nomes reais com a Equipe 3.
 
 ## 10. POST /ia/insight — Telas 2 e 3
 
