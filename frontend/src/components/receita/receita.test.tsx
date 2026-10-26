@@ -9,8 +9,13 @@ import {
   tetoDoEixo,
   type EtapaCascata,
 } from '@/components/graficos/geometria'
+import type { ResultadoConsulta } from '@/hooks/useConsulta'
 import ReceitaPage from '@/pages/ReceitaPage'
-import { buscarDashboard } from '@/services'
+import { buscarDashboard, gerarInsight } from '@/services'
+import { PREFIXO_TEXTO_ALTERNATIVO, type RespostaInsight } from '@/types/ia'
+import AnaliseIA from './AnaliseIA'
+import DrillDownReceita from './DrillDownReceita'
+import PonteDaReceita from './PonteDaReceita'
 import { reiniciarOrdens } from '@/services/mock'
 import { formatarReais, formatarReaisCompleto } from '@/utils/formatacao'
 import { etapasDaPonte, explicarResultado, numerosDoInsight, variacaoDaReceita } from './explicacao'
@@ -135,6 +140,152 @@ describe('explicação e números do insight', () => {
     expect(numerosDoInsight(dashboard)).toBeNull()
     expect(etapasDaPonte(dashboard)).toBeNull()
     expect(explicarResultado(dashboard)).toEqual([])
+  })
+})
+
+describe('sem decomposição na Gold (fora de P1 × P2 ou com alimentador)', () => {
+  const consultaDe = (dados: RespostaInsight | null): ResultadoConsulta<RespostaInsight> => ({
+    dados,
+    erro: null,
+    carregando: false,
+    recarregar: () => undefined,
+  })
+
+  it('o mock imita a API: ponte null, drill-down vazio e o motivo na última observação', async () => {
+    const d = await buscarDashboard({
+      periodo_atual: ATUAL,
+      periodo_comparacao: COMPARACAO,
+      alimentador: 'ALM-DEMO-001',
+    })
+    expect(Object.values(d.ponte_receita).every((i) => i.valor === null)).toBe(true)
+    expect(d.drill_down.items).toEqual([])
+    expect(d.drill_down.total).toBe(0)
+    expect(d.metadados.observacoes.at(-1)).toMatch(/não existem por alimentador/)
+    // KPIs e série seguem normais
+    expect(d.indicadores.receita_faturada.atual.valor).not.toBeNull()
+    expect(d.serie_historica).toHaveLength(48)
+    expect(etapasDaPonte(d)).toBeNull()
+    expect(explicarResultado(d)).toEqual([])
+    expect(numerosDoInsight(d)).toBeNull()
+  })
+
+  it('o insight da receita responde 422 DECOMPOSICAO_INDISPONIVEL nesse recorte', async () => {
+    await expect(
+      gerarInsight({
+        contexto: 'receita',
+        filtros: {
+          periodo_atual: ATUAL,
+          periodo_comparacao: COMPARACAO,
+          alimentador: 'ALM-DEMO-001',
+        },
+      }),
+    ).rejects.toMatchObject({ status: 422, codigo: 'DECOMPOSICAO_INDISPONIVEL' })
+  })
+
+  it('mostra o motivo no gráfico e no drill-down vazio em vez de números inventados', async () => {
+    const d = await buscarDashboard({
+      periodo_atual: ATUAL,
+      periodo_comparacao: COMPARACAO,
+      alimentador: 'ALM-DEMO-001',
+    })
+    const motivo = d.metadados.observacoes.at(-1) ?? ''
+    render(
+      <MemoryRouter>
+        <PonteDaReceita dashboard={d} />
+        <DrillDownReceita
+          drill={d.drill_down}
+          aoSelecionar={() => undefined}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+          motivoVazio={motivo}
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Decomposição indisponível para este recorte')).toBeTruthy()
+    expect(screen.getAllByText(motivo)).toHaveLength(2)
+    expect(screen.queryByRole('img')).toBeNull()
+  })
+
+  it('texto alternativo da API não é rotulado como gerado por IA', () => {
+    const base = {
+      titulo: 'Resumo',
+      texto: 'A receita passou de R$ 150 milhões para R$ 162 milhões.',
+      numeros_utilizados: [],
+      gerado_em: new Date().toISOString(),
+    }
+    const comIA = {
+      ...base,
+      metadados: {
+        dados_ficticios: false,
+        gold_atualizada_em: null,
+        observacoes: ['Dados do seed.'],
+      },
+    }
+    const alternativo = {
+      ...base,
+      metadados: {
+        dados_ficticios: false,
+        gold_atualizada_em: null,
+        observacoes: [
+          'Dados do seed.',
+          `${PREFIXO_TEXTO_ALTERNATIVO} o módulo de IA não respondeu; resumo montado por regra.`,
+        ],
+      },
+    }
+    const { rerender } = render(<AnaliseIA consulta={consultaDe(comIA)} />)
+    expect(screen.getByText('Gerado por IA')).toBeTruthy()
+    expect(screen.queryByText('Texto alternativo')).toBeNull()
+    rerender(<AnaliseIA consulta={consultaDe(alternativo)} />)
+    expect(screen.queryByText('Gerado por IA')).toBeNull()
+    expect(screen.getByText('Texto alternativo')).toBeTruthy()
+    expect(screen.getByText('o módulo de IA não respondeu; resumo montado por regra.')).toBeTruthy()
+  })
+})
+
+describe('nomes em maiúsculas vindos do banco', () => {
+  it('a tabela e o breadcrumb mostram "Boa Vista", mas a URL leva o valor do banco', () => {
+    const indicador = (valor: number, unidade: string) => ({
+      valor,
+      unidade,
+      periodo_referencia: ATUAL,
+    })
+    const linha = {
+      nivel: 'bairro' as const,
+      nome: 'BOA VISTA',
+      receita_energia_atual: indicador(10, 'BRL'),
+      receita_energia_comparacao: indicador(9, 'BRL'),
+      energia_atual: indicador(90, 'kWh'),
+      energia_comparacao: indicador(100, 'kWh'),
+      variacao_energia_percentual: indicador(-10, '%'),
+      queda_kwh: indicador(10, 'kWh'),
+      efeito_preco: indicador(2, 'BRL'),
+      efeito_volume: indicador(-1, 'BRL'),
+      filtros: { municipio: 'RECIFE', bairro: 'BOA VISTA', classe: null },
+    }
+    const vazio = { municipio: null, bairro: null, classe: null }
+    const selecionadas: unknown[] = []
+    render(
+      <DrillDownReceita
+        drill={{
+          nivel: 'bairro',
+          page: 1,
+          page_size: 10,
+          total: 1,
+          items: [linha],
+          breadcrumb: [
+            { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
+            { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
+          ],
+        }}
+        aoSelecionar={(l) => selecionadas.push(l.filtros)}
+        aoNavegar={() => undefined}
+        aoMudarPagina={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('cell', { name: 'Boa Vista' })).toBeTruthy()
+    expect(screen.getByText('Recife')).toBeTruthy()
+    fireEvent.click(screen.getByRole('cell', { name: 'Boa Vista' }))
+    expect(selecionadas).toEqual([{ municipio: 'RECIFE', bairro: 'BOA VISTA', classe: null }])
   })
 })
 

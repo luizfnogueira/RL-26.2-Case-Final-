@@ -39,6 +39,12 @@ export interface PedidoInsight {
   indicadores?: IndicadorNomeado[]
 }
 
+/**
+ * Quando o módulo de IA falha, a API devolve 200 com um texto por regra e uma observação que
+ * começa por este prefixo (contrato, seção 10). Nesse caso o texto não é "gerado por IA".
+ */
+export const PREFIXO_TEXTO_ALTERNATIVO = 'Texto alternativo:'
+
 export interface RespostaInsight {
   titulo: string
   texto: string

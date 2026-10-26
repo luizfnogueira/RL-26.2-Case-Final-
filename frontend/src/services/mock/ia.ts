@@ -190,6 +190,14 @@ async function insightReceita(corpo: Registro, filtros: Registro): Promise<Respo
     throw invalido('Insight de receita exige periodo_comparacao.')
   const dashboard = await montarDashboard(filtros)
   const p = dashboard.ponte_receita
+  // Como a API real: sem decomposição na Gold (ex.: filtro de alimentador) não há insight da receita.
+  if (p.efeito_preco.valor === null || p.efeito_volume.valor === null) {
+    throw erroApi(
+      422,
+      'DECOMPOSICAO_INDISPONIVEL',
+      'A Gold não tem decomposição de preço e volume para este recorte.',
+    )
+  }
   const nome = (
     n: string,
     rotulo: string,

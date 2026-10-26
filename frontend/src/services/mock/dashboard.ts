@@ -50,6 +50,8 @@ const CAMPOS: Campo[] = [
 const FATOR_ENERGIA = 1 / 1.28
 const ROTULO_RECORTE =
   'Distribuição ilustrativa do consolidado; não representa metodologia nem diagnóstico real.'
+const SEM_DECOMPOSICAO_ALIMENTADOR =
+  'Ponte de receita e drill-down não existem por alimentador; a decomposição da Gold é por município, bairro e classe.'
 const SEM_DEC_FEC =
   'DEC/FEC por recorte não estão disponíveis no dashboard simulado; consulte GET /operacao.'
 
@@ -166,6 +168,16 @@ function ponteReceita(recortes: Recorte[]): PonteReceita {
   }
 }
 
+function ponteNula(): PonteReceita {
+  return {
+    receita_energia_comparacao: indicador(null, 'BRL', PC),
+    efeito_preco: indicador(null, 'BRL', PA),
+    efeito_volume: indicador(null, 'BRL', PA),
+    receita_energia_atual: indicador(null, 'BRL', PA),
+    reajuste_percentual: indicador(null, '%', PA),
+  }
+}
+
 interface ParamsNormalizados {
   periodo_atual: string
   periodo_comparacao: string
@@ -272,6 +284,10 @@ export async function montarDashboard(parametros: ParamsDashboard | Registro): P
   const filtrado = selecionados.length < recortes.length
   const metadados = base.metadados
   if (filtrado) metadados.observacoes.push(ROTULO_RECORTE, SEM_DEC_FEC)
+  // Como a API real: a decomposição da Gold é por município, bairro e classe. Com filtro de
+  // alimentador a ponte vem com valores null, o drill-down vazio e o motivo na última observação.
+  const semDecomposicao = p.alimentador !== undefined
+  if (semDecomposicao) metadados.observacoes.push(SEM_DECOMPOSICAO_ALIMENTADOR)
 
   return {
     filtros: {
@@ -284,8 +300,8 @@ export async function montarDashboard(parametros: ParamsDashboard | Registro): P
     },
     indicadores: indicadores(soma, base.indicadores, filtrado),
     serie_historica: filtrado ? serie(base.serie_historica, soma, total) : base.serie_historica,
-    ponte_receita: ponteReceita(selecionados),
-    drill_down: drill(p, selecionados),
+    ponte_receita: semDecomposicao ? ponteNula() : ponteReceita(selecionados),
+    drill_down: drill(p, semDecomposicao ? [] : selecionados),
     metadados,
   }
 }

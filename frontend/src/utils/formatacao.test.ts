@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatarEnergia,
   formatarIndicador,
+  formatarNome,
   formatarPercentual,
   formatarReais,
   formatarReaisCompleto,
@@ -41,6 +42,21 @@ describe('formatarEnergia e formatarPercentual', () => {
     expect(formatarPercentual(12.3861)).toBe('12,4%')
     expect(formatarPercentual(8.0, { sinal: true })).toBe('+8,0%')
     expect(formatarPercentual(-3.8986)).toBe('−3,9%')
+  })
+})
+
+describe('formatarNome', () => {
+  it('ajusta só o rótulo de nomes em maiúsculas, como a Gold guarda', () => {
+    expect(formatarNome('RECIFE')).toBe('Recife')
+    expect(formatarNome('BOA VISTA')).toBe('Boa Vista')
+    expect(formatarNome('JABOATÃO DOS GUARARAPES')).toBe('Jaboatão dos Guararapes')
+    expect(formatarNome('ÁGUA FRIA')).toBe('Água Fria')
+  })
+
+  it('não mexe em nomes que já estão em caixa mista nem em textos sem letras', () => {
+    expect(formatarNome('Recife')).toBe('Recife')
+    expect(formatarNome('Jaboatão dos Guararapes')).toBe('Jaboatão dos Guararapes')
+    expect(formatarNome('123')).toBe('123')
   })
 })
 

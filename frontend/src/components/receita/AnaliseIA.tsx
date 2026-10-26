@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import SeloFicticio from '@/components/ui/SeloFicticio'
 import Skeleton from '@/components/ui/Skeleton'
 import type { ResultadoConsulta } from '@/hooks/useConsulta'
-import type { RespostaInsight } from '@/types/ia'
+import { PREFIXO_TEXTO_ALTERNATIVO, type RespostaInsight } from '@/types/ia'
 import { cx } from '@/utils/cx'
 import { formatarAtualizacao } from '@/utils/datas'
 import { formatarIndicador } from '@/utils/formatacao'
@@ -25,6 +25,11 @@ export default function AnaliseIA({ consulta, indisponivel }: Props) {
   const { dados, erro, carregando, recarregar } = consulta
   const [aberto, setAberto] = useState(false)
   const idLista = useId()
+  // Módulo de IA fora do ar: a API devolve um texto por regra e avisa. Nesse caso não rotulamos
+  // o texto como gerado por IA.
+  const textoAlternativo = dados?.metadados.observacoes.find((o) =>
+    o.startsWith(PREFIXO_TEXTO_ALTERNATIVO),
+  )
 
   return (
     <section
@@ -44,7 +49,11 @@ export default function AnaliseIA({ consulta, indisponivel }: Props) {
             <p className="text-legenda font-medium tracking-wider text-teal-profundo uppercase">
               Análise da IA
             </p>
-            <Badge variante="info">Gerado por IA</Badge>
+            {textoAlternativo ? (
+              <Badge variante="alerta">Texto alternativo</Badge>
+            ) : (
+              <Badge variante="info">Gerado por IA</Badge>
+            )}
             <Badge
               variante="neutro"
               title="O texto usa só números já calculados na Gold; a IA não estima valores."
@@ -80,6 +89,11 @@ export default function AnaliseIA({ consulta, indisponivel }: Props) {
             <div className={cx('transition-opacity', carregando && 'opacity-60')}>
               <h2 className="mt-2 text-titulo-lg font-normal">{dados.titulo}</h2>
               <p className="mt-1 text-corpo text-ink-2">{dados.texto}</p>
+              {textoAlternativo && (
+                <p className="mt-1 text-legenda text-alerta-escuro">
+                  {textoAlternativo.slice(PREFIXO_TEXTO_ALTERNATIVO.length).trim()}
+                </p>
+              )}
 
               <button
                 type="button"

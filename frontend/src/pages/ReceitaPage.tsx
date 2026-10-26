@@ -110,6 +110,9 @@ export default function ReceitaPage() {
 
   const atualizando = dashboard.carregando && dados !== null
   const semDecomposicao = dados !== null && numerosDoInsight(dados) === null
+  // Fora de P1 × P2 ou com alimentador, a API zera a ponte, esvazia o drill-down e explica o motivo
+  // na última observação; KPIs e série seguem normais.
+  const motivoSemDecomposicao = semDecomposicao ? dados?.metadados.observacoes.at(-1) : undefined
 
   return (
     <Pagina
@@ -160,6 +163,7 @@ export default function ReceitaPage() {
               })
             }
             aoMudarPagina={mudarPagina}
+            motivoVazio={motivoSemDecomposicao}
           />
           <p className="flex items-center gap-2 text-legenda text-ink-2">
             <SeloFicticio metadados={dados.metadados} />

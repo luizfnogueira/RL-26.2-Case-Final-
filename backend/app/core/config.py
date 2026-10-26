@@ -28,3 +28,5 @@ if IA_MODO not in ("mock", "real"):
 IA_TIMEOUT_S = float(os.getenv("IA_TIMEOUT_S", "30"))
 IA_AGENTE_URL = os.getenv("IA_AGENTE_URL", "")
 IA_API_KEY = os.getenv("IA_API_KEY", "")  # só no .env: nunca no código, na resposta ou no front
+# Módulo de insight da Equipe 3 (POST /ia/insight da receita). Vazio no modo real = texto alternativo.
+IA_INSIGHT_URL = os.getenv("IA_INSIGHT_URL", "")

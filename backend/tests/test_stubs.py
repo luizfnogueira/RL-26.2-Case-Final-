@@ -4,8 +4,6 @@ import pytest
 
 from app.db.session import get_db
 from app.main import app
-from app.schemas.dashboard import FiltrosDashboard
-from app.services import stub_dashboard
 from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, exemplo
 
 client = TestClient(app)
@@ -140,25 +138,8 @@ class TestIA:
 
 
 class TestInsight:
-    def test_receita_igual_ao_fixture(self):
-        response = client.post('/ia/insight', json=exemplo('pedido_insight'))
-        assert response.json() == exemplo('resposta_insight')
-        assert len(response.json()['numeros_utilizados']) == 6
-
-    def test_receita_sem_indicadores_e_com_recorte(self):
-        pedido = {**exemplo('pedido_insight'), 'indicadores': []}
-        assert client.post('/ia/insight', json=pedido).json() == exemplo('resposta_insight')
-        pedido['filtros'] = {**pedido['filtros'], 'municipio': 'Recife'}
-        dados = client.post('/ia/insight', json=pedido).json()
-        assert dados['texto'].startswith('Em Recife')
-        # O insight simulado lê a ponte do stub do dashboard (stub_dashboard), não o banco
-        dashboard = stub_dashboard.montar_dashboard(FiltrosDashboard(**PERIODOS, municipio='Recife'))
-        assert dados['numeros_utilizados'][0]['valor'] == dashboard['ponte_receita']['receita_energia_atual']['valor']
-
-    def test_receita_com_indicador_divergente(self):
-        pedido = exemplo('pedido_insight')
-        pedido['indicadores'][0]['valor'] = 1
-        erro(client.post('/ia/insight', json=pedido), 422, 'DADOS_INVALIDOS')
+    # O insight da receita lê a ponte real (banco) desde a B5: ver tests/test_insight.py.
+    # Aqui ficam o resumo da unidade (ainda stub) e a validação de entrada.
 
     def test_unidade(self):
         response = client.post('/ia/insight', json=exemplo('pedido_insight_unidade'))

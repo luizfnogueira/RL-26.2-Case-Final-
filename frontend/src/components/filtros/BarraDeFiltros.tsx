@@ -3,6 +3,7 @@ import Button from '@/components/ui/Button'
 import Select, { type OpcaoSelect } from '@/components/ui/Select'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
 import type { CampoFiltro, FiltrosUrl, OpcoesFiltros } from '@/types/filtros'
+import { formatarNome } from '@/utils/formatacao'
 import { PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO, formatarPeriodo } from '@/utils/periodos'
 import { cx } from '@/utils/cx'
 
@@ -26,8 +27,9 @@ const ROTULOS: Record<CampoFiltro, string> = {
 
 const PERIODOS_PADRAO = [PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO]
 
-const comoOpcoes = (valores: readonly string[] = []): OpcaoSelect[] =>
-  valores.map((valor) => ({ valor, rotulo: valor }))
+/** O valor segue como está no banco (é o que vai para a API); só o rótulo é ajustado. */
+const comoOpcoes = (valores: readonly string[] = [], nomes = false): OpcaoSelect[] =>
+  valores.map((valor) => ({ valor, rotulo: nomes ? formatarNome(valor) : valor }))
 
 /**
  * Barra de filtros reutilizável. Mostra só os filtros pedidos em `campos` e guarda cada escolha
@@ -50,15 +52,15 @@ export default function BarraDeFiltros({ campos, padroes, opcoes = {}, className
       case 'periodo_comparacao':
         return periodos.map((p) => ({ ...p, desabilitada: p.valor === filtros.periodo_atual }))
       case 'municipio':
-        return comoOpcoes(opcoes.municipios)
+        return comoOpcoes(opcoes.municipios, true)
       case 'bairro': {
         const { bairros } = opcoes
-        if (Array.isArray(bairros)) return comoOpcoes(bairros)
+        if (Array.isArray(bairros)) return comoOpcoes(bairros, true)
         const porMunicipio = (bairros ?? {}) as Readonly<Record<string, readonly string[]>>
-        return comoOpcoes(filtros.municipio ? porMunicipio[filtros.municipio] : [])
+        return comoOpcoes(filtros.municipio ? porMunicipio[filtros.municipio] : [], true)
       }
       case 'classe':
-        return comoOpcoes(opcoes.classes)
+        return comoOpcoes(opcoes.classes, true)
       case 'alimentador':
         return comoOpcoes(opcoes.alimentadores)
     }

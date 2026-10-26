@@ -54,6 +54,27 @@ export function formatarPercentual(valor: number, { sinal = false }: OpcoesSinal
   return comSinal(valor, `${umaCasa.format(Math.abs(valor))}%`, sinal)
 }
 
+const MINUSCULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e'])
+
+/**
+ * Só para exibir: a Gold guarda município, bairro e classe em maiúsculas ("BOA VISTA"). O valor
+ * enviado à API continua exatamente como está no banco; aqui só se ajusta o rótulo. Nomes que já
+ * vêm em caixa mista (os mocks) passam sem mudança. Não use em códigos como "ALM-DEMO-001".
+ */
+export function formatarNome(nome: string): string {
+  const maiusculo = nome.toLocaleUpperCase('pt-BR')
+  if (nome !== maiusculo || nome === nome.toLocaleLowerCase('pt-BR')) return nome
+  return nome
+    .toLocaleLowerCase('pt-BR')
+    .split(' ')
+    .map((palavra, i) =>
+      i > 0 && MINUSCULAS.has(palavra)
+        ? palavra
+        : palavra.charAt(0).toLocaleUpperCase('pt-BR') + palavra.slice(1),
+    )
+    .join(' ')
+}
+
 /** Formata um indicador da API pela unidade; null vira travessão (nunca zero). */
 export function formatarIndicador(indicador: Pick<Indicador, 'valor' | 'unidade'>): string {
   const { valor, unidade } = indicador

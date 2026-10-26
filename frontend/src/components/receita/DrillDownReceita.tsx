@@ -6,6 +6,7 @@ import type { DrillDown, ItemBreadcrumb, LinhaDrill, NivelDrill } from '@/types/
 import { cx } from '@/utils/cx'
 import {
   formatarEnergia,
+  formatarNome,
   formatarPercentual,
   formatarReais,
   formatarReaisCompleto,
@@ -25,6 +26,8 @@ type Props = {
   /** Volta pelo breadcrumb: a tela remove os filtros descendentes. */
   aoNavegar: (item: ItemBreadcrumb) => void
   aoMudarPagina: (page: number) => void
+  /** Por que a lista veio vazia (a API explica em `metadados.observacoes` fora de P1 × P2). */
+  motivoVazio?: string
 }
 
 /** Cor do número pelo sinal; o sinal escrito (+/−) garante que a cor não é a única pista. */
@@ -49,6 +52,7 @@ export default function DrillDownReceita({
   aoSelecionar,
   aoNavegar,
   aoMudarPagina,
+  motivoVazio,
 }: Props) {
   const podeDescer = drill.nivel !== 'classe'
 
@@ -56,7 +60,7 @@ export default function DrillDownReceita({
     {
       id: 'nome',
       cabecalho: ROTULO_NIVEL[drill.nivel],
-      celula: (l) => <strong className="font-medium">{l.nome}</strong>,
+      celula: (l) => <strong className="font-medium">{formatarNome(l.nome)}</strong>,
     },
     {
       id: 'variacao',
@@ -138,7 +142,7 @@ export default function DrillDownReceita({
                 {i > 0 && <ChevronRight size={14} aria-hidden="true" className="text-ink-3" />}
                 {ultimo ? (
                   <span aria-current="page" className="font-medium text-teal-profundo">
-                    {item.rotulo}
+                    {formatarNome(item.rotulo)}
                   </span>
                 ) : (
                   <button
@@ -146,7 +150,7 @@ export default function DrillDownReceita({
                     onClick={() => aoNavegar(item)}
                     className="rounded-sm text-ink-2 hover:text-teal-profundo hover:underline"
                   >
-                    {item.rotulo}
+                    {formatarNome(item.rotulo)}
                   </button>
                 )}
               </li>
@@ -171,7 +175,7 @@ export default function DrillDownReceita({
         vazio={
           <EmptyState
             titulo="Sem recortes neste nível"
-            descricao="Nenhum recorte tem dados para os filtros escolhidos."
+            descricao={motivoVazio ?? 'Nenhum recorte tem dados para os filtros escolhidos.'}
           />
         }
       />
