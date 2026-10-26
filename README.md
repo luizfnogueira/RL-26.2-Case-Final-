@@ -48,7 +48,6 @@ docker compose exec -e TEST_DATABASE_URL=postgresql+psycopg://USUARIO:SENHA@post
 Troque `USUARIO` e `SENHA` pelos valores do `.env`. Sem essa variável, esses testes são ignorados e o
 restante da suíte roda normalmente.
 
-
 ## Frontend
 
 React + TypeScript (Vite) + Tailwind CSS, com a identidade visual FILO (tokens em `frontend/src/index.css`, espelhando as variáveis do Figma).
@@ -70,10 +69,10 @@ O portal abre em http://localhost:5173.
 
 ### Variáveis de ambiente (`frontend/.env`)
 
-| Variável         | Padrão                  | Uso                                                              |
-| ---------------- | ----------------------- | ---------------------------------------------------------------- |
-| `VITE_API_URL`   | `http://localhost:8000` | URL base da API FastAPI                                          |
-| `VITE_USE_MOCKS` | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend  |
+| Variável             | Padrão                  | Uso                                                                   |
+| -------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `VITE_API_URL`       | `http://localhost:8000` | URL base da API FastAPI                                               |
+| `VITE_USE_MOCKS`     | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend       |
 | `VITE_MOCK_DELAY_MS` | `350`                   | Atraso artificial dos mocks (ms), para ver os estados de carregamento |
 
 ### Scripts
@@ -100,5 +99,26 @@ O front fala com a API só por `src/services`. Cada função devolve tipos de `s
 const { dados, erro, carregando, recarregar } = useConsulta(
   (sinal) => buscarDashboard({ periodo_atual, periodo_comparacao }, sinal),
   [periodo_atual, periodo_comparacao],
-)
+);
 ```
+
+### Componentes comuns e filtros
+
+Em `src/components/ui`: `Button`, `Card`, `Input`, `Select`, `Modal`, `Tabela` (ordenação local ou no servidor, com paginação), `Paginacao`, `Badge`, `Skeleton`, `ErrorState`, `EmptyState` e `SeloFicticio` (rótulo "Dado fictício" para telas com mock). Para ver todos funcionando: `npm run dev` e abra `/dev/componentes` (a rota não existe no build de produção).
+
+Os filtros ficam na URL, com os mesmos nomes dos parâmetros da API, então recarregar a página, voltar no navegador ou compartilhar o link preservam o estado. A tela monta a barra com os filtros que usa e lê os valores com o mesmo conjunto:
+
+```tsx
+const CAMPOS = ['periodo_atual', 'periodo_comparacao', 'municipio', 'bairro'] as const
+const PADROES = { periodo_atual: '2025-07/2026-06', periodo_comparacao: '2022-07/2023-06' }
+
+const { filtros } = useFiltrosUrl(CAMPOS, PADROES)
+const { dados, erro, carregando, recarregar } = useConsulta(
+  (sinal) => buscarDashboard({ ...PADROES, ...filtros }, sinal),
+  [filtros],
+)
+
+<BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
+```
+
+`bairro` só habilita depois do município, e trocar o município limpa o bairro. Os domínios dos filtros (`opcoes`) vêm de `src/data/filtros.mock.ts`: o contrato ainda não tem rota para listá-los.
