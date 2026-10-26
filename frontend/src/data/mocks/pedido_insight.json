@@ -11,46 +11,46 @@
   "id_uc": null,
   "indicadores": [
     {
-      "nome": "receita_atual",
-      "rotulo": "Receita atual",
-      "valor": 284700000,
+      "valor": 222421875.0,
       "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "receita_energia_atual",
+      "rotulo": "Receita de energia atual"
     },
     {
-      "nome": "receita_comparacao",
-      "rotulo": "Receita base",
-      "valor": 263600000,
+      "valor": 205937500.0,
       "unidade": "BRL",
-      "periodo_referencia": "2022-07/2023-06"
+      "periodo_referencia": "2022-07/2023-06",
+      "nome": "receita_energia_comparacao",
+      "rotulo": "Receita de energia base"
     },
     {
-      "nome": "variacao_volume",
-      "rotulo": "Volume",
       "valor": -3.8986,
       "unidade": "%",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "variacao_volume",
+      "rotulo": "Volume"
     },
     {
-      "nome": "reajuste",
-      "rotulo": "Reajuste",
-      "valor": 10.5,
+      "valor": 12.3861,
       "unidade": "%",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "reajuste",
+      "rotulo": "Reajuste"
     },
     {
+      "valor": 24655666.05,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-07/2026-06",
       "nome": "efeito_preco",
-      "rotulo": "Efeito-preço",
-      "valor": 27700000,
-      "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
+      "rotulo": "Efeito-preço"
     },
     {
-      "nome": "efeito_volume",
-      "rotulo": "Efeito-volume",
-      "valor": -10400000,
+      "valor": -8171291.05,
       "unidade": "BRL",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-07/2026-06",
+      "nome": "efeito_volume",
+      "rotulo": "Efeito-volume"
     }
   ]
 }

@@ -52,12 +52,12 @@ describe('GET /dashboard', () => {
     ])
     expect(d.serie_historica).toHaveLength(48)
     const p = d.ponte_receita
+    expect(Object.keys(p)).not.toContain('bandeira_mix')
     const soma =
-      (p.receita_comparacao.valor ?? 0) +
+      (p.receita_energia_comparacao.valor ?? 0) +
       (p.efeito_preco.valor ?? 0) +
-      (p.efeito_volume.valor ?? 0) +
-      (p.bandeira_mix.valor ?? 0)
-    expect(soma).toBeCloseTo(p.receita_atual.valor ?? 0, 1)
+      (p.efeito_volume.valor ?? 0)
+    expect(soma).toBeCloseTo(p.receita_energia_atual.valor ?? 0, 1)
     expect(d.metadados.dados_ficticios).toBe(true)
   })
 
@@ -79,11 +79,25 @@ describe('GET /dashboard', () => {
     expect(d.indicadores.dec_medio.atual.valor).toBeNull()
     const p = d.ponte_receita
     const soma =
-      (p.receita_comparacao.valor ?? 0) +
+      (p.receita_energia_comparacao.valor ?? 0) +
       (p.efeito_preco.valor ?? 0) +
-      (p.efeito_volume.valor ?? 0) +
-      (p.bandeira_mix.valor ?? 0)
-    expect(soma).toBeCloseTo(p.receita_atual.valor ?? 0, 1)
+      (p.efeito_volume.valor ?? 0)
+    expect(soma).toBeCloseTo(p.receita_energia_atual.valor ?? 0, 1)
+  })
+
+  it('a ponte do consolidado coincide com o fixture e a soma das linhas fecha', async () => {
+    const d = await buscarDashboard({ ...DASH, page_size: 100 })
+    const base = (await import('@/data/mocks/dashboard.json')).default
+    const p = d.ponte_receita
+    expect(p.receita_energia_atual.valor).toBeCloseTo(
+      base.ponte_receita.receita_energia_atual.valor,
+      0,
+    )
+    expect(p.efeito_preco.valor).toBeCloseTo(base.ponte_receita.efeito_preco.valor, 0)
+    expect(p.efeito_volume.valor).toBeCloseTo(base.ponte_receita.efeito_volume.valor, 0)
+    const linhas = d.drill_down.items
+    const preco = linhas.reduce((s, l) => s + (l.efeito_preco.valor ?? 0), 0)
+    expect(preco).toBeCloseTo(p.efeito_preco.valor ?? 0, 0)
   })
 
   it('rejeita períodos fora do cenário e combinações inválidas', async () => {
@@ -286,6 +300,20 @@ describe('GET /operacao', () => {
     const fec = await buscarOperacao({ periodo_atual: ATUAL, ordenar_por: 'fec' })
     const fecs = fec.ranking_alimentadores.items.map((a) => a.fec.valor ?? 0)
     expect(fecs).toEqual([...fecs].sort((a, b) => b - a))
+    const chi = await buscarOperacao({ periodo_atual: ATUAL, ordenar_por: 'chi' })
+    const horas = chi.ranking_alimentadores.items.map((a) => a.horas_interrupcao.valor ?? 0)
+    expect(horas).toEqual([...horas].sort((a, b) => b - a))
+    expect(chi.filtros.ordenar_por).toBe('chi')
+    const invalido = buscarOperacao({ periodo_atual: ATUAL, ordenar_por: 'x' as 'dec' })
+    expect((await erroDe(invalido)).codigo).toBe('DADOS_INVALIDOS')
+  })
+
+  it('traz DEC/FEC sem dia crítico e horas de interrupção nos rankings regionais', async () => {
+    const o = await buscarOperacao({ periodo_atual: ATUAL })
+    for (const r of o.ranking_regional.items) {
+      expect(r.dec_sem_dia_critico.valor).not.toBeNull()
+      expect(r.horas_interrupcao.unidade).toBe('h')
+    }
   })
 
   it('filtra por alimentador (série e rankings) e muda o nível regional', async () => {
@@ -350,8 +378,8 @@ describe('POST /ia/insight', () => {
   it('gera o insight da receita com os seis números do cenário', async () => {
     const i = await gerarInsight(receita)
     expect(i.numeros_utilizados.map((n) => n.nome)).toEqual([
-      'receita_atual',
-      'receita_comparacao',
+      'receita_energia_atual',
+      'receita_energia_comparacao',
       'variacao_volume',
       'reajuste',
       'efeito_preco',

@@ -17,6 +17,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 91.5,
+      "confianca_evidencia": "ALTA",
       "ordem_ativa": true,
       "id_ordem_ativa": 1
     },
@@ -37,6 +38,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 87.2,
+      "confianca_evidencia": "MEDIA",
       "ordem_ativa": false,
       "id_ordem_ativa": null
     },
@@ -57,6 +59,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 78.4,
+      "confianca_evidencia": "ALTA",
       "ordem_ativa": true,
       "id_ordem_ativa": 2
     },
@@ -76,6 +79,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 66.0,
+      "confianca_evidencia": "MEDIA",
       "ordem_ativa": false,
       "id_ordem_ativa": null
     },
@@ -95,6 +99,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 58.3,
+      "confianca_evidencia": "BAIXA",
       "ordem_ativa": false,
       "id_ordem_ativa": null
     },
@@ -114,6 +119,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 47.9,
+      "confianca_evidencia": "BAIXA",
       "ordem_ativa": false,
       "id_ordem_ativa": null
     },
@@ -133,6 +139,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 41.2,
+      "confianca_evidencia": "BAIXA",
       "ordem_ativa": false,
       "id_ordem_ativa": null
     },
@@ -152,6 +159,7 @@
         "periodo_referencia": "2025-07/2026-06"
       },
       "score": 35.6,
+      "confianca_evidencia": "INDETERMINADA",
       "ordem_ativa": false,
       "id_ordem_ativa": null
     }
@@ -167,12 +175,12 @@
       "periodo_referencia": "2025-07/2026-06"
     },
     "ucs_priorizadas": {
-      "valor": 4.0,
+      "valor": 8.0,
       "unidade": "UCs",
       "periodo_referencia": "2025-07/2026-06"
     },
     "potencial_recuperacao": {
-      "valor": 4290.0,
+      "valor": 7310.0,
       "unidade": "kWh",
       "periodo_referencia": "2025-07/2026-06"
     },

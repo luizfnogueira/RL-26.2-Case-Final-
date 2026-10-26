@@ -1,20 +1,20 @@
 {
   "titulo": "Por que a receita mudou?",
-  "texto": "No consolidado, a receita passou de R$ 263,6 milhões para R$ 284,7 milhões. O reajuste de 10,5% gerou um efeito-preço de R$ 27,7 milhões, enquanto o volume faturado variou −3,9% e respondeu por um efeito-volume de −R$ 10,4 milhões. O crescimento da receita veio do preço, não de mais consumo.",
+  "texto": "No consolidado, a receita de energia passou de R$ 205,9 milhões para R$ 222,4 milhões. O reajuste de 12,4% gerou um efeito-preço de R$ 24,7 milhões, enquanto o volume faturado variou −3,9% e respondeu por um efeito-volume de −R$ 8,2 milhões. O crescimento da receita veio do preço, não de mais consumo.",
   "numeros_utilizados": [
     {
-      "valor": 284700000.0,
+      "valor": 222421875.0,
       "unidade": "BRL",
       "periodo_referencia": "2025-07/2026-06",
-      "nome": "receita_atual",
-      "rotulo": "Receita atual"
+      "nome": "receita_energia_atual",
+      "rotulo": "Receita de energia atual"
     },
     {
-      "valor": 263600000.0,
+      "valor": 205937500.0,
       "unidade": "BRL",
       "periodo_referencia": "2022-07/2023-06",
-      "nome": "receita_comparacao",
-      "rotulo": "Receita base"
+      "nome": "receita_energia_comparacao",
+      "rotulo": "Receita de energia base"
     },
     {
       "valor": -3.8986,
@@ -24,21 +24,21 @@
       "rotulo": "Volume"
     },
     {
-      "valor": 10.5,
+      "valor": 12.3861,
       "unidade": "%",
       "periodo_referencia": "2025-07/2026-06",
       "nome": "reajuste",
       "rotulo": "Reajuste"
     },
     {
-      "valor": 27700000.0,
+      "valor": 24655666.05,
       "unidade": "BRL",
       "periodo_referencia": "2025-07/2026-06",
       "nome": "efeito_preco",
       "rotulo": "Efeito-preço"
     },
     {
-      "valor": -10400000.0,
+      "valor": -8171291.05,
       "unidade": "BRL",
       "periodo_referencia": "2025-07/2026-06",
       "nome": "efeito_volume",

@@ -104,18 +104,17 @@ async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
     const milhoes = (v: number | null) => numero((v ?? 0) / 1_000_000)
     return montar({
       resposta:
-        `A receita faturada passou de R$ ${milhoes(p.receita_comparacao.valor)} milhões para R$ ${milhoes(p.receita_atual.valor)} milhões. ` +
+        `A receita de energia passou de R$ ${milhoes(p.receita_energia_comparacao.valor)} milhões para R$ ${milhoes(p.receita_energia_atual.valor)} milhões. ` +
         `O reajuste de ${numero(p.reajuste_percentual.valor ?? 0)}% explica R$ ${milhoes(p.efeito_preco.valor)} milhões; a queda de volume retirou R$ ${milhoes(Math.abs(p.efeito_volume.valor ?? 0))} milhões.`,
       sql: 'SELECT efeito, valor_brl FROM gold_receita_demo ORDER BY ordem',
       tabelas: ['gold_receita_demo'],
       dados: {
         colunas: ['efeito', 'valor_brl'],
         linhas: [
-          ['Receita base', p.receita_comparacao.valor],
+          ['Receita de energia base', p.receita_energia_comparacao.valor],
           ['Efeito-preço', p.efeito_preco.valor],
           ['Efeito-volume', p.efeito_volume.valor],
-          ['Bandeira / mix', p.bandeira_mix.valor],
-          ['Receita atual', p.receita_atual.valor],
+          ['Receita de energia atual', p.receita_energia_atual.valor],
         ],
       },
     })
@@ -194,11 +193,11 @@ async function insightReceita(corpo: Registro, filtros: Registro): Promise<Respo
   const nome = (
     n: string,
     rotulo: string,
-    ind: IndicadorNomeado | typeof p.receita_atual,
+    ind: IndicadorNomeado | typeof p.receita_energia_atual,
   ): IndicadorNomeado => ({ nome: n, rotulo, ...ind })
   const numeros = [
-    nome('receita_atual', 'Receita atual', p.receita_atual),
-    nome('receita_comparacao', 'Receita base', p.receita_comparacao),
+    nome('receita_energia_atual', 'Receita de energia atual', p.receita_energia_atual),
+    nome('receita_energia_comparacao', 'Receita de energia base', p.receita_energia_comparacao),
     nome('variacao_volume', 'Volume', dashboard.indicadores.energia_faturada.variacao_percentual),
     nome('reajuste', 'Reajuste', p.reajuste_percentual),
     nome('efeito_preco', 'Efeito-preço', p.efeito_preco),
@@ -210,7 +209,7 @@ async function insightReceita(corpo: Registro, filtros: Registro): Promise<Respo
     .map((c) => texto(filtros, c))
     .filter(Boolean)
   let textoInsight =
-    `${regional.length ? `Em ${regional.join(' / ')}` : 'No consolidado'}, a receita passou de ${brl(v.receita_comparacao)} para ${brl(v.receita_atual)}. ` +
+    `${regional.length ? `Em ${regional.join(' / ')}` : 'No consolidado'}, a receita de energia passou de ${brl(v.receita_energia_comparacao)} para ${brl(v.receita_energia_atual)}. ` +
     `O reajuste de ${pct(v.reajuste, false)} gerou um efeito-preço de ${brl(v.efeito_preco)}, ` +
     `enquanto o volume faturado variou ${pct(v.variacao_volume)} e respondeu por um efeito-volume de ${brl(v.efeito_volume)}.`
   if (v.efeito_preco > 0 && v.efeito_volume < 0)

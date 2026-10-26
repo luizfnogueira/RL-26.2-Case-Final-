@@ -2,6 +2,7 @@
 // sobre os alimentadores filtrados.
 import type {
   Operacao,
+  OrdenarPor,
   ParamsOperacao,
   RankingAlimentador,
   RankingRegional,
@@ -18,13 +19,28 @@ import {
 } from './util'
 import { invalido, paginacao, periodo, regiao, texto } from './validacao'
 
-type Indicadores = 'dec' | 'fec'
+type Medias = 'dec' | 'fec' | 'dec_sem_dia_critico' | 'fec_sem_dia_critico'
+type Totais = 'interrupcoes' | 'horas_interrupcao'
 
-function ordenar<
-  T extends { posicao: number; dec: { valor: number | null }; fec: { valor: number | null } },
->(items: T[], por: Indicadores, nome: (item: T) => string): T[] {
+const UNIDADES: Record<Medias | Totais, string> = {
+  dec: 'h/UC',
+  fec: 'interrupcoes/UC',
+  dec_sem_dia_critico: 'h/UC',
+  fec_sem_dia_critico: 'interrupcoes/UC',
+  interrupcoes: 'interrupcoes',
+  horas_interrupcao: 'h',
+}
+const CAMPO_ORDENACAO = { dec: 'dec', fec: 'fec', chi: 'horas_interrupcao' } as const
+
+function ordenar<T extends { posicao: number } & Record<Medias | Totais, { valor: number | null }>>(
+  items: T[],
+  por: OrdenarPor,
+  nome: (item: T) => string,
+): T[] {
+  const campo = CAMPO_ORDENACAO[por]
   items.sort(
-    (a, b) => (b[por].valor ?? 0) - (a[por].valor ?? 0) || nome(a).localeCompare(nome(b), 'pt-BR'),
+    (a, b) =>
+      (b[campo].valor ?? 0) - (a[campo].valor ?? 0) || nome(a).localeCompare(nome(b), 'pt-BR'),
   )
   items.forEach((item, i) => (item.posicao = i + 1))
   return items
@@ -54,19 +70,28 @@ function regional(
   }
   return [...grupos.values()].map(({ municipio, bairro, itens }) => {
     const ucs = itens.reduce((s, a) => s + a.ucs_atendidas, 0)
-    const media = (campo: Indicadores) =>
-      itens.reduce((s, a) => s + (a[campo].valor ?? 0) * a.ucs_atendidas, 0) / ucs
+    const media = (campo: Medias) =>
+      indicador(
+        arredondar(itens.reduce((s, a) => s + (a[campo].valor ?? 0) * a.ucs_atendidas, 0) / ucs),
+        UNIDADES[campo],
+        PERIODO_ATUAL,
+      )
+    const total = (campo: Totais) =>
+      indicador(
+        arredondar(itens.reduce((s, a) => s + (a[campo].valor ?? 0), 0)),
+        UNIDADES[campo],
+        PERIODO_ATUAL,
+      )
     return {
       posicao: 0,
       municipio,
       bairro,
-      dec: indicador(arredondar(media('dec')), 'h/UC', PERIODO_ATUAL),
-      fec: indicador(arredondar(media('fec')), 'interrupcoes/UC', PERIODO_ATUAL),
-      interrupcoes: indicador(
-        itens.reduce((s, a) => s + (a.interrupcoes.valor ?? 0), 0),
-        'interrupcoes',
-        PERIODO_ATUAL,
-      ),
+      dec: media('dec'),
+      fec: media('fec'),
+      dec_sem_dia_critico: media('dec_sem_dia_critico'),
+      fec_sem_dia_critico: media('fec_sem_dia_critico'),
+      interrupcoes: total('interrupcoes'),
+      horas_interrupcao: total('horas_interrupcao'),
     }
   })
 }
@@ -74,8 +99,10 @@ function regional(
 export async function montarOperacao(parametros: ParamsOperacao | Registro): Promise<Operacao> {
   const params = parametros as Registro
   const atual = periodo(params, 'periodo_atual', true) as string
-  const ordenarPor = (texto(params, 'ordenar_por') ?? 'dec') as Indicadores
-  if (!['dec', 'fec'].includes(ordenarPor)) throw invalido('ordenar_por deve ser dec ou fec.')
+  const ordenarPor = (texto(params, 'ordenar_por') ?? 'dec') as OrdenarPor
+  if (!['dec', 'fec', 'chi'].includes(ordenarPor)) {
+    throw invalido('ordenar_por deve ser dec, fec ou chi.')
+  }
   const nivel = (texto(params, 'nivel_regional') ?? 'municipio') as 'municipio' | 'bairro'
   if (!['municipio', 'bairro'].includes(nivel))
     throw invalido('nivel_regional deve ser municipio ou bairro.')

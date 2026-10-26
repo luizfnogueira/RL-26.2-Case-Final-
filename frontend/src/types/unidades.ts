@@ -8,7 +8,7 @@ import type {
   Periodo,
 } from './comum'
 
-export type TipoLeitura = 'REAL' | 'ESTIMADA'
+export type TipoLeitura = 'REAL' | 'ESTIMADA' | 'MEDIA' | 'AUTENTICADA' | 'NAO REALIZADA'
 
 /** Query de GET /unidades. */
 export interface ParamsUnidades extends FiltrosRegiao, ParamsPaginacao {
@@ -42,9 +42,9 @@ export interface Cadastro extends Unidade {
   logradouro: string
   numero: string
   uf: string
-  cep: string
+  cep: string | null
   subgrupo_tarifario: string
-  data_ligacao: string
+  data_ligacao: string | null
   latitude: number | null
   longitude: number | null
 }
@@ -75,7 +75,6 @@ export interface Fatura {
   valor_energia: number
   tributos: number
   valor_total: number
-  moeda: string
   bandeira_tarifaria: string
   data_emissao: string
   data_vencimento: string
@@ -94,9 +93,6 @@ export interface Medidor {
   modelo: string
   tipo: string
   data_instalacao: string
-  data_retirada: string | null
-  data_ultima_manutencao: string | null
-  status: string
   ultima_leitura: Leitura | null
 }
 
@@ -118,13 +114,6 @@ export interface Interrupcao {
   duracao_min: number | null
 }
 
-export interface EventoChamado {
-  sequencia: number
-  data: string
-  acao: string
-  canal: string
-}
-
 export interface Chamado {
   protocolo: string
   canal: string
@@ -133,7 +122,7 @@ export interface Chamado {
   data_abertura: string
   data_fechamento: string | null
   nota_satisfacao: number | null
-  historico: EventoChamado[]
+  tempo_atendimento_h: number | null
 }
 
 export interface Unidade360 {

@@ -191,7 +191,7 @@
   ],
   "diagnostico_conta": {
     "conta_alta": true,
-    "veredito": "Conta alta: o último mês ficou acima do mesmo mês do ano anterior e da média de 12 meses.",
+    "veredito": "Conta alta: o consumo do último mês ficou mais de 20% acima do mesmo mês do ano anterior (regra da Gold, flag_conta_alta).",
     "ultimo_mes": {
       "valor": 412,
       "unidade": "kWh",
@@ -222,7 +222,6 @@
       "valor_energia": 370.8,
       "tributos": 115.2,
       "valor_total": 486.0,
-      "moeda": "BRL",
       "bandeira_tarifaria": "Amarela",
       "data_emissao": "2026-07-01",
       "data_vencimento": "2026-07-12",
@@ -237,7 +236,6 @@
       "valor_energia": 270.9,
       "tributos": 84.1,
       "valor_total": 355.0,
-      "moeda": "BRL",
       "bandeira_tarifaria": "Verde",
       "data_emissao": "2026-06-01",
       "data_vencimento": "2026-06-12",
@@ -250,9 +248,6 @@
     "modelo": "MODELO-DEMO",
     "tipo": "ELETRONICO",
     "data_instalacao": "2018-03-12",
-    "data_retirada": null,
-    "data_ultima_manutencao": "2024-11-05",
-    "status": "ATIVO",
     "ultima_leitura": {
       "data": "2026-06-28",
       "leitura_kwh": 18452.0,
@@ -298,20 +293,7 @@
       "data_abertura": "2026-07-02T10:05:00-03:00",
       "data_fechamento": "2026-07-03T16:30:00-03:00",
       "nota_satisfacao": 3.0,
-      "historico": [
-        {
-          "sequencia": 1,
-          "data": "2026-07-02T10:05:00-03:00",
-          "acao": "ABERTURA",
-          "canal": "APP"
-        },
-        {
-          "sequencia": 2,
-          "data": "2026-07-03T16:30:00-03:00",
-          "acao": "ENCERRAMENTO",
-          "canal": "BACKOFFICE"
-        }
-      ]
+      "tempo_atendimento_h": 30.42
     }
   ],
   "metadados": {
