@@ -8,12 +8,11 @@ import { PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO, formatarPeriodo } from
 import { cx } from '@/utils/cx'
 
 type Props = {
-  /** Quais filtros mostrar, na ordem. Filtros que a tela não usa simplesmente não aparecem. */
   campos: readonly CampoFiltro[]
-  /** Valores iniciais (também usados por "Limpar filtros"). Passe os mesmos de `useFiltrosUrl`. */
   padroes?: FiltrosUrl
   opcoes?: OpcoesFiltros
   className?: string
+  mostrarLimparSempre?: boolean
 }
 
 const ROTULOS: Record<CampoFiltro, string> = {
@@ -27,16 +26,16 @@ const ROTULOS: Record<CampoFiltro, string> = {
 
 const PERIODOS_PADRAO = [PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO]
 
-/** O valor segue como está no banco (é o que vai para a API); só o rótulo é ajustado. */
 const comoOpcoes = (valores: readonly string[] = [], nomes = false): OpcaoSelect[] =>
   valores.map((valor) => ({ valor, rotulo: nomes ? formatarNome(valor) : valor }))
 
-/**
- * Barra de filtros reutilizável. Mostra só os filtros pedidos em `campos` e guarda cada escolha
- * na URL (com os nomes dos parâmetros da API), então recarregar a página mantém os filtros.
- * A tela lê os mesmos valores com `useFiltrosUrl(campos, padroes)`.
- */
-export default function BarraDeFiltros({ campos, padroes, opcoes = {}, className }: Props) {
+export default function BarraDeFiltros({
+  campos,
+  padroes,
+  opcoes = {},
+  className,
+  mostrarLimparSempre = false,
+}: Props) {
   const { filtros, definir, limpar, alterados } = useFiltrosUrl(campos, padroes)
 
   const periodos: OpcaoSelect[] = (opcoes.periodos ?? PERIODOS_PADRAO).map((valor) => ({
@@ -47,7 +46,6 @@ export default function BarraDeFiltros({ campos, padroes, opcoes = {}, className
   function opcoesDe(campo: CampoFiltro): OpcaoSelect[] {
     switch (campo) {
       case 'periodo_atual':
-        // Os dois períodos precisam ser diferentes (a API responde 422 se forem iguais).
         return periodos.map((p) => ({ ...p, desabilitada: p.valor === filtros.periodo_comparacao }))
       case 'periodo_comparacao':
         return periodos.map((p) => ({ ...p, desabilitada: p.valor === filtros.periodo_atual }))
@@ -81,14 +79,13 @@ export default function BarraDeFiltros({ campos, padroes, opcoes = {}, className
               opcoes={opcoesDe(campo)}
               valor={filtros[campo] ?? ''}
               aoMudar={(valor) => definir({ [campo]: valor })}
-              // Período sempre tem valor; os demais aceitam "Todos".
               vazio={ehPeriodo ? (padroes?.[campo] ? undefined : 'Selecione') : 'Todos'}
               disabled={campo === 'bairro' && !filtros.municipio}
               className="lg:w-52"
             />
           )
         })}
-        {alterados && (
+        {(alterados || mostrarLimparSempre) && (
           <Button
             variante="fantasma"
             tamanho="sm"
