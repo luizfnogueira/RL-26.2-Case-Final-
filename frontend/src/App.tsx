@@ -23,6 +23,17 @@ const router = createBrowserRouter([
       { path: 'perdas/ordens', element: <OrdensPage /> },
       { path: 'operacao', element: <OperacaoPage /> },
       { path: 'assistente', element: <AssistentePage /> },
+      // Galeria dos componentes comuns: só em desenvolvimento, fora do build de produção.
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: 'dev/componentes',
+              lazy: async () => ({
+                Component: (await import('@/pages/dev/ComponentesPage')).default,
+              }),
+            },
+          ]
+        : []),
       { path: '*', element: <NotFoundPage /> },
     ],
   },
