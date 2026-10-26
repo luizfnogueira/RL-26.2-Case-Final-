@@ -1,5 +1,17 @@
+import { tratarNaoAutorizado } from '@/auth/naoAutorizado'
+import { tokenStorage } from '@/auth/tokenStorage'
 import { API_URL, USE_MOCKS } from './env'
 import { ApiError } from './erro-api'
+
+/**
+ * Rotas que não levam token: o 401 delas é "credenciais inválidas", não "sessão expirada",
+ * então também não dispara o gancho de logout.
+ */
+const ROTAS_SEM_SESSAO = ['/auth/login', '/auth/register']
+
+function ehRotaSemSessao(caminho: string): boolean {
+  return ROTAS_SEM_SESSAO.some((rota) => caminho === rota || caminho.startsWith(`${rota}?`))
+}
 
 export type Metodo = 'GET' | 'POST' | 'PATCH'
 
@@ -57,11 +69,18 @@ export async function requisitar<T>(
   }
 
   const temCorpo = opcoes.corpo !== undefined
+  const semSessao = ehRotaSemSessao(caminho)
+  // Único ponto que anexa o token: sempre e só para a API (a URL base vem de VITE_API_URL).
+  const token = semSessao ? null : tokenStorage.get()
+  const cabecalhos: Record<string, string> = {}
+  if (temCorpo) cabecalhos['Content-Type'] = 'application/json'
+  if (token) cabecalhos.Authorization = `Bearer ${token}`
+
   let resposta: Response
   try {
     resposta = await fetch(`${API_URL}${caminho}${construirQuery(opcoes.params)}`, {
       method: metodo,
-      headers: temCorpo ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(cabecalhos).length > 0 ? cabecalhos : undefined,
       body: temCorpo ? JSON.stringify(opcoes.corpo) : undefined,
       signal: opcoes.sinal,
     })
@@ -76,6 +95,8 @@ export async function requisitar<T>(
 
   const corpo = await lerJson(resposta)
   if (!resposta.ok) {
+    // Gancho único do 401: sessão inválida. O erro continua sendo lançado para a tela que pediu.
+    if (resposta.status === 401 && !semSessao) tratarNaoAutorizado()
     if (ehCorpoDeErro(corpo)) throw new ApiError(resposta.status, corpo.codigo, corpo.mensagem)
     throw new ApiError(
       resposta.status,
