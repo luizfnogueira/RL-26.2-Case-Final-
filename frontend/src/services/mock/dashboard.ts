@@ -92,7 +92,12 @@ function decompor(recortes: Recorte[]): Decomposicao {
   for (const r of recortes) {
     const receitaAtual = r.receita_atual * FATOR_ENERGIA
     const receitaComparacao = r.receita_comparacao * FATOR_ENERGIA
-    volume += ((r.energia_atual - r.energia_comparacao) * receitaComparacao) / r.energia_comparacao
+    // Regra 4.8 do contrato Gold: segmento sem kWh na comparação (sem tarifa-base) leva toda a
+    // variação para o volume.
+    volume +=
+      r.energia_comparacao > 0
+        ? ((r.energia_atual - r.energia_comparacao) * receitaComparacao) / r.energia_comparacao
+        : receitaAtual - receitaComparacao
     atual += receitaAtual
     comparacao += receitaComparacao
   }

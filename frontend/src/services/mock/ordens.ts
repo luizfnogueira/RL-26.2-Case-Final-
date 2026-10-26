@@ -28,7 +28,6 @@ import {
 } from './util'
 import { compararPeriodos, invalido, paginacao, periodo, regiao, texto } from './validacao'
 
-const SCORE_PRIORIZACAO = 60
 const STATUS: StatusOrdem[] = ['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 
 interface Estado {
@@ -92,22 +91,33 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
   const filtros = regiao(params)
   verificarCenario(atual, comparacao)
 
-  const [base, e] = await Promise.all([fixtures.candidatos(), obterEstado()])
+  const [base, cadastro, e] = await Promise.all([
+    fixtures.candidatos(),
+    fixtures.unidades(),
+    obterEstado(),
+  ])
   const ativas = new Map(e.ordens.filter(ehAtiva).map((o) => [o.id_uc, o.id_ordem]))
+  // Mesma ordem de gold.tb_fila_perdas: score, kWh estimado e id_uc (contrato Gold, regra 4.10).
   const candidatos = filtrarRegiao(base.items, filtros).sort(
-    (a, b) => b.score - a.score || (a.id_uc < b.id_uc ? -1 : 1),
+    (a, b) =>
+      b.score - a.score ||
+      (b.energia_estimada.valor ?? 0) - (a.energia_estimada.valor ?? 0) ||
+      (a.id_uc < b.id_uc ? -1 : 1),
   )
   candidatos.forEach((c: Candidato, i) => {
     c.posicao = i + 1
     c.ordem_ativa = ativas.has(c.id_uc)
     c.id_ordem_ativa = ativas.get(c.id_uc) ?? null
   })
-  const priorizados = candidatos.filter((c) => c.score >= SCORE_PRIORIZACAO)
+  // Como na Gold: analisadas = UCs do cadastro (universo da auditoria); priorizadas = UCs na fila
+  // (todas elegíveis, sem corte de score); potencial = Σ kwh_estimado, um proxy, não energia comprovada.
+  const analisadas = filtrarRegiao(cadastro.items, filtros)
+  const priorizados = candidatos
   return {
     ...paginar(candidatos, page, pageSize),
     periodo_referencia: PERIODO_ATUAL,
     resumo: {
-      ucs_analisadas: indicador(candidatos.length, 'UCs', PERIODO_ATUAL),
+      ucs_analisadas: indicador(analisadas.length, 'UCs', PERIODO_ATUAL),
       ucs_priorizadas: indicador(priorizados.length, 'UCs', PERIODO_ATUAL),
       potencial_recuperacao: indicador(
         arredondar(priorizados.reduce((soma, c) => soma + (c.energia_estimada.valor ?? 0), 0)),

@@ -152,6 +152,26 @@ describe('GET /inspecoes/candidatos', () => {
     expect(c.resumo.ordens_ativas.valor).toBe(c.items.filter((i) => i.ordem_ativa).length)
   })
 
+  it('segue a regra da Gold: desempate por kWh estimado e resumo sem corte de score', async () => {
+    const c = await buscarCandidatos({ periodo_atual: ATUAL })
+    const desempate = await buscarCandidatos({ periodo_atual: ATUAL, municipio: 'Recife' })
+    const pares = desempate.items.map((i) => [i.score, i.energia_estimada.valor ?? 0])
+    for (let k = 1; k < pares.length; k++) {
+      const [sa, ka] = pares[k - 1]
+      const [sb, kb] = pares[k]
+      expect(sa > sb || (sa === sb && ka >= kb)).toBe(true)
+    }
+    // Todas as UCs da fila são elegíveis: priorizadas = fila inteira e potencial = Σ kwh_estimado.
+    expect(c.resumo.ucs_priorizadas.valor).toBe(c.total)
+    expect(c.resumo.potencial_recuperacao.valor).toBeCloseTo(
+      c.items.reduce((s, i) => s + (i.energia_estimada.valor ?? 0), 0),
+      1,
+    )
+    expect(c.items.every((i) => i.confianca_evidencia.length > 0)).toBe(true)
+    // Analisadas vêm do cadastro, não da fila.
+    expect(c.resumo.ucs_analisadas.valor).toBeGreaterThanOrEqual(c.total)
+  })
+
   it('pagina e filtra por região', async () => {
     const pagina = await buscarCandidatos({ periodo_atual: ATUAL, page: 2, page_size: 3 })
     expect(pagina.items).toHaveLength(3)
