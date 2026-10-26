@@ -228,3 +228,26 @@ class DecFecAlimentadorMes(GoldBase):
     horas_interrupcao: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     dec: Mapped[Decimal] = mapped_column(Numeric(10, 4))
     fec: Mapped[Decimal] = mapped_column(Numeric(10, 4))
+
+
+class AggPrecoVolume(GoldBase):
+    """gold.agg_preco_volume (gold_receita): preço × volume da receita de energia, P1 × P2, por recorte.
+
+    efeito_volume = (kWh P2 − kWh P1) × tarifa P1; efeito_preco = variacao_receita − efeito_volume.
+    Tarifa nula quando o kWh do período é 0.
+    """
+
+    __tablename__ = "agg_preco_volume"
+
+    municipio: Mapped[str] = mapped_column(String(100), primary_key=True)
+    bairro: Mapped[str] = mapped_column(String(100), primary_key=True)
+    classe: Mapped[str] = mapped_column(String(20), primary_key=True)
+    receita_energia_p1: Mapped[Decimal] = mapped_column(Dinheiro)
+    receita_energia_p2: Mapped[Decimal] = mapped_column(Dinheiro)
+    kwh_p1: Mapped[Decimal] = mapped_column(Energia)
+    kwh_p2: Mapped[Decimal] = mapped_column(Energia)
+    tarifa_p1: Mapped[Decimal | None] = mapped_column(Numeric(14, 6))
+    tarifa_p2: Mapped[Decimal | None] = mapped_column(Numeric(14, 6))
+    variacao_receita: Mapped[Decimal] = mapped_column(Dinheiro)
+    efeito_volume: Mapped[Decimal] = mapped_column(Dinheiro)
+    efeito_preco: Mapped[Decimal] = mapped_column(Dinheiro)

@@ -9,7 +9,6 @@ StatusIA = Literal['ok', 'nao_sei', 'bloqueado']
 
 class PerguntaIA(Schema):
     pergunta: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
-    contexto: Contexto | None = None
 
 
 class DadosIA(Schema):

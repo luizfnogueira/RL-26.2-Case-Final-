@@ -1,4 +1,6 @@
 """Respostas pré-definidas do assistente e do insight; não há agente, SQL executado nem parser de segurança."""
+import re
+
 from app.core.exceptions import AppException, UCInexistenteException
 from app.schemas.dashboard import FiltrosDashboard
 from app.schemas.ia import PedidoInsight, PerguntaIA
@@ -7,6 +9,8 @@ from app.services.stubs import CAMPOS_REGIAO, exemplo, verificar_cenario
 
 PERGUNTA_OK = 'qual foi a receita no período?'
 PERGUNTA_BLOQUEADA = 'drop table clientes'
+# Pedido de alterar ou apagar dados: bloqueado, como no mock do front (services/mock/ia.ts)
+DESTRUTIVA = re.compile(r'\b(drop|delete|truncate|apague|apagar|exclua|excluir|remova|remover)\b', re.IGNORECASE)
 UC_INSIGHT = 'UC-DEMO-001'
 NUMEROS_UNIDADE = (
     ('ultimo_mes', 'Último mês'),
@@ -18,10 +22,9 @@ NUMEROS_UNIDADE = (
 
 def responder(dados: PerguntaIA) -> dict:
     pergunta = dados.pergunta.casefold()
-    if pergunta == PERGUNTA_BLOQUEADA:
+    if pergunta == PERGUNTA_BLOQUEADA or DESTRUTIVA.search(dados.pergunta):
         return exemplo('resposta_ia_bloqueado')
-    contexto = dados.contexto.model_dump() if dados.contexto else None
-    if pergunta == PERGUNTA_OK and contexto == exemplo('pergunta_ia')['contexto']:
+    if pergunta == PERGUNTA_OK:
         return exemplo('resposta_ia')
     return exemplo('resposta_ia_nao_sei')
 

@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, ScrollRestoration, useLocation } from 'react-router'
+import AssistenteProvider from '@/components/assistente/AssistenteProvider'
+import { useAssistente } from '@/components/assistente/contexto'
+import PainelAssistente from '@/components/assistente/PainelAssistente'
 import BarraSuperiorMobile from './BarraSuperiorMobile'
 import BotaoIA from './BotaoIA'
 import MenuLateral from './MenuLateral'
@@ -7,14 +10,36 @@ import MenuMobile from './MenuMobile'
 import MenuTrilho from './MenuTrilho'
 import Rodape from './Rodape'
 
+/** Botão flutuante ou painel do Assistente. Na tela /assistente a conversa já ocupa a página. */
+function AreaAssistente() {
+  const { painelAberto, fecharPainel } = useAssistente()
+  const { pathname } = useLocation()
+  const naTelaDoAssistente = pathname === '/assistente'
+
+  useEffect(() => {
+    if (naTelaDoAssistente) fecharPainel()
+  }, [naTelaDoAssistente, fecharPainel])
+
+  if (naTelaDoAssistente) return null
+  return painelAberto ? <PainelAssistente /> : <BotaoIA />
+}
+
 /**
  * Casca do portal: menu (lateral no desktop, trilho de ícones no tablet, gaveta no celular),
- * área da página, rodapé e botão flutuante da IA.
+ * área da página, rodapé e Assistente (botão flutuante e painel), com a conversa guardada
+ * enquanto o usuário troca de tela.
  */
 export default function AppLayout() {
+  return (
+    <AssistenteProvider>
+      <Casca />
+    </AssistenteProvider>
+  )
+}
+
+function Casca() {
   const [recolhido, setRecolhido] = useState(false)
   const [menuAberto, setMenuAberto] = useState(false)
-  const { pathname } = useLocation()
 
   return (
     <div className="min-h-dvh bg-filo font-sans text-ink">
@@ -39,7 +64,7 @@ export default function AppLayout() {
           <Rodape />
         </div>
       </div>
-      {pathname !== '/assistente' && <BotaoIA />}
+      <AreaAssistente />
       <ScrollRestoration />
     </div>
   )

@@ -13,6 +13,8 @@ export interface ParamsCandidatos extends FiltrosRegiao, ParamsPaginacao {
   periodo_comparacao?: Periodo
 }
 
+export type ConfiancaEvidencia = 'ALTA' | 'MEDIA' | 'BAIXA' | 'INDETERMINADA'
+
 export interface Candidato {
   id_uc: string
   municipio: string
@@ -26,6 +28,8 @@ export interface Candidato {
   energia_estimada: Indicador
   /** De 0 a 100. */
   score: number
+  /** Score não é probabilidade de fraude; a energia estimada não é energia comprovada. */
+  confianca_evidencia: ConfiancaEvidencia
   /** Desabilitar a seleção de UCs com ordem ativa. */
   ordem_ativa: boolean
   id_ordem_ativa: number | null

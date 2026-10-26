@@ -33,18 +33,14 @@ export interface KpiInadimplencia extends Kpi {
   variacao_pontos_percentuais: Indicador
 }
 
-/** DEC e FEC. A meta é ilustrativa, não um limite regulatório. */
-export interface KpiContinuidade extends Kpi {
-  meta: Indicador
-}
-
 export interface IndicadoresDashboard {
   receita_faturada: Kpi
   energia_faturada: Kpi
   ucs_ativas: Kpi
   inadimplencia: KpiInadimplencia
-  dec_medio: KpiContinuidade
-  fec_medio: KpiContinuidade
+  /** null com filtro de bairro, classe ou alimentador: a continuidade só é agregada por alimentador e município. */
+  dec_medio: Kpi
+  fec_medio: Kpi
 }
 
 /** Um dos 48 pontos mensais (jul/2022 a jun/2026). */
@@ -54,13 +50,16 @@ export interface PontoSerie {
   energia: Indicador
 }
 
-/** receita_comparacao + efeito_preco + efeito_volume + bandeira_mix = receita_atual. */
+/**
+ * Decomposição da receita de energia (sem tributos), como em gold.agg_preco_volume:
+ * receita_energia_comparacao + efeito_preco + efeito_volume = receita_energia_atual, sem resíduo.
+ * Fora de P1 × P2 ou com filtro de alimentador, todos os valores vêm null.
+ */
 export interface PonteReceita {
-  receita_comparacao: Indicador
+  receita_energia_comparacao: Indicador
   efeito_preco: Indicador
   efeito_volume: Indicador
-  bandeira_mix: Indicador
-  receita_atual: Indicador
+  receita_energia_atual: Indicador
   reajuste_percentual: Indicador
 }
 
@@ -79,8 +78,8 @@ export interface ItemBreadcrumb {
 export interface LinhaDrill {
   nivel: NivelDrill
   nome: string
-  receita_atual: Indicador
-  receita_comparacao: Indicador
+  receita_energia_atual: Indicador
+  receita_energia_comparacao: Indicador
   energia_atual: Indicador
   energia_comparacao: Indicador
   variacao_energia_percentual: Indicador

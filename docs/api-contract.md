@@ -1,6 +1,6 @@
 # Contrato da API — V-Energy — V2 (proposta para revisão; alinhada à Gold em 23/10)
 
-Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
+Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL, e `GET /dashboard` e `GET /inspecoes/candidatos` leem o banco; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
 
 **A Gold é a fonte de verdade.** Quando este contrato e a Gold divergem, quem se adapta é a API: o contrato e o código mudam, os dados não. As adaptações estão na seção 16; tabelas, colunas e regras da Gold estão no *Contrato de dados Gold → API* (v2).
 
@@ -27,7 +27,8 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
-| POST /ia | pergunta; contexto opcional com períodos/filtros |
+| POST /ia | pergunta |
+| GET /filtros | sem parâmetros |
 | POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
 
 Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não está disponível no mock operacional e retorna erro explícito se enviada. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
@@ -54,9 +55,11 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 409 | ORDEM_ATIVA_EXISTENTE | UC já tem ordem ABERTA ou EM_CAMPO |
 | 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
 | 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
+| 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
+| 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
 
-`AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`; falhas 503 de fonte/agente serão usadas na integração real. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
+`AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
 
 ## 3. GET /dashboard — Telas 1 e 2
 
@@ -83,7 +86,7 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
 ```
 
-Na integração, a API lê os efeitos pré-calculados em `gold.agg_preco_volume`, que só existe para P1 × P2 (`2022-07/2023-06` × `2025-07/2026-06`). Para outras janelas, `ponte_receita` e `drill_down` retornam 422 `CENARIO_STUB_INDISPONIVEL` com mensagem explicando a limitação. O cálculo de distribuição do mock não é a implementação B3b.
+A API lê os efeitos pré-calculados em `gold.agg_preco_volume` e só os soma; não refaz a decomposição. A tabela existe para P1 × P2 (`periodo_atual=2025-07/2026-06`, `periodo_comparacao=2022-07/2023-06`) e por município, bairro e classe. Fora disso — outras janelas ou filtro de alimentador — `ponte_receita` vem com todos os valores null e `drill_down` com a lista vazia, e `metadados.observacoes` diz o motivo; os KPIs e a série seguem calculados normalmente.
 
 ## 4. GET /unidades — busca da Tela 3
 
@@ -241,15 +244,7 @@ Content-Type: application/json
 
 ```json
 {
-  "pergunta": "Qual foi a receita no período?",
-  "contexto": {
-    "periodo_atual": "2025-07/2026-06",
-    "periodo_comparacao": "2022-07/2023-06",
-    "municipio": null,
-    "bairro": null,
-    "classe": null,
-    "alimentador": null
-  }
+  "pergunta": "Qual foi a receita no período?"
 }
 ```
 
@@ -262,11 +257,16 @@ Cenários demonstrativos:
 
 | Pergunta | Status / resposta completa |
 | --- | --- |
-| Qual foi a receita no período? + contexto do exemplo | ok — exemplo acima |
+| Qual foi a receita no período? | ok — exemplo acima |
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 
-Outras perguntas retornam nao_sei no stub. Não há agente, parser SQL de segurança ou execução de comandos. A demonstração de bloqueio não substitui as proteções da integração real. Nome `gold_receita_demo` e SQL são ilustrativos; validar os nomes reais com Equipe 3.
+A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
+
+- `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
+- `real`: a pergunta vai para o agente, que gera e executa a consulta somente leitura na Gold.
+
+Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. Chaves e endereço do agente ficam só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos; validar os nomes reais com a Equipe 3.
 
 ## 10. POST /ia/insight — Telas 2 e 3
 
@@ -339,7 +339,11 @@ Content-Type: application/json
 
 Resposta separada do chat: `titulo`, `texto`, `numeros_utilizados[]` (nome, rótulo, valor, unidade, período), gerado_em e metadados com atualização da Gold.
 
-Receita usa **seis números**: receita de energia atual, receita de energia base, variação do volume, reajuste, efeito-preço e efeito-volume (os mesmos da `ponte_receita`). Os números enviados são opcionais no stub; se presentes, precisam corresponder aos seis do cenário. Na integração, validar contra a Gold, não confiar em valores arbitrários do navegador.
+Receita usa **seis números**: receita de energia atual, receita de energia base, variação do volume, reajuste, efeito-preço e efeito-volume (os mesmos da `ponte_receita` e dos KPIs do `GET /dashboard`, lidos da Gold). Os números enviados são opcionais; se presentes, precisam corresponder aos da Gold para o recorte (senão 422 `DADOS_INVALIDOS`). A API nunca confia em valores do navegador nem do módulo de IA: os números da resposta são sempre os da Gold.
+
+**Insight da receita (B5).** Só existe para `periodo_atual=2025-07/2026-06` × `periodo_comparacao=2022-07/2023-06`, sem `alimentador` e em recorte com decomposição na Gold; fora disso, 422 `DECOMPOSICAO_INDISPONIVEL`. Nomes de município e bairro vão como estão no banco (a Gold usa maiúsculas, ex.: `RECIFE`, `BOA VISTA`). O texto vem do módulo da Equipe 3 (`IA_MODO=real`, `IA_INSIGHT_URL`, `IA_TIMEOUT_S`) ou de um texto por regra (`IA_MODO=mock`). **Diferente do chat, falha do módulo não vira 503:** fora do ar, lento além do `IA_TIMEOUT_S`, erro HTTP ou resposta fora de `{titulo, texto}` devolvem 200 com um texto alternativo montado por regra sobre os mesmos números, e `metadados.observacoes` ganha uma linha começando por `Texto alternativo:`. O front usa esse prefixo para não rotular o texto como gerado por IA.
+
+Formato assumido para o módulo da Equipe 3 (a confirmar até 29/10): `POST IA_INSIGHT_URL` com `{contexto, filtros, numeros_utilizados[]}` e `Authorization: Bearer IA_API_KEY`, resposta `{titulo, texto}`.
 
 Para UC360:
 
@@ -359,6 +363,27 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 | variacao_percentual | Variação sobre o ano anterior | % | último mês |
 
 `indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
+
+## 10.1 GET /filtros — opções dos filtros de região
+
+```http
+GET /filtros
+```
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/filtros.json)**
+
+```json
+{
+  "municipios": ["CAMARAGIBE", "JABOATÃO DOS GUARARAPES", "OLINDA", "PAULISTA", "RECIFE"],
+  "bairros": [{ "municipio": "RECIFE", "bairro": "BOA VISTA" }],
+  "classes": ["COMERCIAL", "INDUSTRIAL", "PODER PUBLICO", "RESIDENCIAL", "RURAL"],
+  "alimentadores": [{ "alimentador": "ALM-REC-001", "municipio": "RECIFE" }],
+  "metadados": { "dados_ficticios": true, "gold_atualizada_em": null, "observacoes": [] }
+}
+```
+
+- Valores distintos do cadastro de UCs (`gold.dim_uc`), em ordem alfabética e **exatamente como estão na Gold** (maiúsculas: `RECIFE`, `BOA VISTA`). É o valor a enviar nos parâmetros `municipio`, `bairro`, `classe` e `alimentador` das outras rotas.
+- Bairro e alimentador vêm com o município: o mesmo nome de bairro existe em vários municípios (CENTRO aparece em 8). O front filtra as listas pelo município escolhido, sem nova requisição.
 
 ## 11. GET /health
 
@@ -423,7 +448,7 @@ A Gold não muda para atender o portal. Onde este contrato divergia dela, a API 
 | KPIs com filtro | `agg_kpis_mensal` é só global | Sem filtro, lê `agg_kpis_mensal`; com filtro, agrega `fato_uc_mes` + `dim_uc` com as mesmas regras, e DEC/FEC por `agg_dec_fec_mensal` |
 | UCs ativas | `fato_alimentador_mes.ucs_atendidas`: UCs ligadas até o fim de cada mês | Mesma regra: UCs ligadas até o fim do último mês da janela; com filtro de bairro ou classe, contadas na `dim_uc` pela `data_ligacao` |
 | Energia | `consumo_kwh_valido` no `fato_uc_mes`, somado igual em `agg_kpis_mensal` e `agg_receita_mensal` | KPI de energia e série somam `consumo_kwh_valido` |
-| Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2 | Seção 3: sem `bandeira_mix`; outras janelas recebem 422 |
+| Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2, por município × bairro × classe | Seção 3: soma os efeitos da Gold; outras janelas ou filtro de alimentador recebem ponte null e drill-down vazio, com KPIs e série normais |
 | Conta alta | `flag_conta_alta`: consumo > 20% acima do mesmo mês do ano anterior | Seção 5: veredito pela flag; média de 12 meses e alerta de leitura estimada calculados pela API |
 | Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
 | Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json`; `confianca_evidencia` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao`, converte `motivos_json` em `motivos[]` e repassa `confianca_evidencia` |

@@ -274,6 +274,16 @@ with TestClient(app) as client:
     assert r.json()['metadados']['dados_ficticios'] is False
     r = client.get('/dashboard', params={'periodo_atual':'2025-07/2026-06','periodo_comparacao':'2022-07/2023-06'})
     assert r.status_code == 200
+    data = r.json()
+    assert data['metadados']['dados_ficticios'] is False
+    assert data['metadados']['gold_atualizada_em'] is not None
+    assert data['ponte_receita']['receita_energia_atual']['valor'] is not None
+    assert data['drill_down']['total'] == 1
+    r = client.get('/filtros')
+    assert r.status_code == 200
+    assert r.json()['municipios'] == ['SYNTHETIC']
+    assert r.json()['metadados']['dados_ficticios'] is False
+    assert r.json()['metadados']['gold_atualizada_em'] is not None
 """
     result = subprocess.run([sys.executable, '-c', check], env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

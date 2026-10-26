@@ -6,6 +6,11 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
 
 O fluxo de carga real é CSV → PostgreSQL, sem banco intermediário; use `GOLD_SOURCE=real`. O seed permanece somente para desenvolvimento em banco separado. A documentação técnica e o guia operacional são distribuídos separadamente pela equipe no Drive, junto das orientações de acesso aos dados privados.
 
+O pacote de entrega contém **14 CSVs + `_manifesto.csv`**. O importador não recebe
+arquivos `.db`. Um backup PostgreSQL custom (assinatura `PGDMP`) é um formato
+separado, restaurado com `pg_restore`; a extensão recomendada é `.dump`. Não é
+SQLite e não substitui o pacote CSV na rotina de importação.
+
 ### Pré-requisitos
 
 - Docker com Docker Compose
@@ -24,6 +29,18 @@ docker compose exec api python -m app.db.init_portal  # apenas na instalação i
 docker compose exec api python -m app.db.importar_gold_postgres
 docker compose exec api python -m app.db.verificar_gold --csv-dir data/gold
 ```
+
+Se o banco ainda tiver as tabelas provisórias do seed, a carga bloqueia a mudança
+de contrato. Depois de conferir o diagnóstico, `--migrate-legacy` habilita a
+adequação transacional das tabelas conhecidas `tb_fila_perdas`,
+`tb_fila_perdas_auditoria` e `agg_preco_volume`. Os demais contratos divergentes
+exigem revisão manual. Não execute o seed sobre o banco real.
+
+Com `GOLD_SOURCE=real`, o dashboard (incluindo ponte e drill-down), os filtros e a
+fila consultam a Gold importada. O insight de receita utiliza os mesmos números;
+o modo do gerador de texto é controlado separadamente por `IA_MODO`. As respostas
+informam a origem real e a data de exportação do manifesto. As rotas ainda
+simuladas de outras frentes continuam sendo responsabilidade de seus módulos.
 
 Documentação da API em http://localhost:8000/docs. O código em `app/` é montado no container: ao salvar, a API recarrega sozinha.
 
@@ -52,7 +69,6 @@ docker compose exec -e TEST_DATABASE_URL=postgresql+psycopg://USUARIO:SENHA@post
 Troque `USUARIO` e `SENHA` pelos valores do `.env`. Sem essa variável, esses testes são ignorados e o
 restante da suíte roda normalmente.
 
-
 ## Frontend
 
 React + TypeScript (Vite) + Tailwind CSS, com a identidade visual FILO (tokens em `frontend/src/index.css`, espelhando as variáveis do Figma).
@@ -74,10 +90,10 @@ O portal abre em http://localhost:5173.
 
 ### Variáveis de ambiente (`frontend/.env`)
 
-| Variável         | Padrão                  | Uso                                                              |
-| ---------------- | ----------------------- | ---------------------------------------------------------------- |
-| `VITE_API_URL`   | `http://localhost:8000` | URL base da API FastAPI                                          |
-| `VITE_USE_MOCKS` | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend  |
+| Variável             | Padrão                  | Uso                                                                   |
+| -------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `VITE_API_URL`       | `http://localhost:8000` | URL base da API FastAPI                                               |
+| `VITE_USE_MOCKS`     | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend       |
 | `VITE_MOCK_DELAY_MS` | `350`                   | Atraso artificial dos mocks (ms), para ver os estados de carregamento |
 
 ### Scripts
@@ -104,5 +120,34 @@ O front fala com a API só por `src/services`. Cada função devolve tipos de `s
 const { dados, erro, carregando, recarregar } = useConsulta(
   (sinal) => buscarDashboard({ periodo_atual, periodo_comparacao }, sinal),
   [periodo_atual, periodo_comparacao],
-)
+);
 ```
+
+### Autenticação no cliente HTTP
+
+Com `VITE_USE_MOCKS=false`, o cliente HTTP (`services/http.ts`) é o único lugar que envia `Authorization: Bearer <token>`, lendo o token de `auth/tokenStorage.ts` (`get`, `set`, `clear`, chave `venergy_token`). Login e cadastro não levam token. Um 401 em qualquer outra rota limpa o token e chama o gancho registrado por `aoNaoAutorizado(fn)` (em `auth/naoAutorizado.ts`); sem gancho, o navegador vai para `/login?destino=...`. O 401 de credenciais inválidas no login não derruba a sessão. A tela de login só deve aceitar `destino` quando for um caminho do próprio portal (começa com `/` e não com `//`).
+
+### Tela 2: diagnóstico da receita (`/receita`)
+
+Filtros na URL (`periodo_atual`, `periodo_comparacao`, `municipio`, `bairro`, `classe`, `page`). O nível do drill-down segue os filtros (sem município lista municípios; com município, bairros; com bairro, classes) e o breadcrumb remove os filtros descendentes. A ponte decompõe a **receita de energia, sem tributos** (base → efeito-preço → efeito-volume → atual), por isso não coincide com a receita faturada do painel. O bloco "Análise da IA" chama `POST /ia/insight` com os seis números da ponte; se a IA falhar, só esse bloco mostra o erro. Fora de P1 × P2 ou com filtro de alimentador, a API devolve a ponte com valores `null` e o drill-down vazio, com o motivo em `metadados.observacoes`; a tela mostra o motivo no lugar do gráfico. Os nomes de município e bairro seguem como estão no banco (a Gold usa maiúsculas, ex.: `BOA VISTA`) ao montar a URL e a consulta; só o rótulo exibido é ajustado (`formatarNome`). Na integração (F-int), as listas de `data/filtros.mock.ts` precisam trazer esses mesmos valores. O gráfico (`components/graficos/Cascata.tsx`) é SVG próprio, sem biblioteca, com tooltip por barra, legenda e visão em tabela.
+
+### Componentes comuns e filtros
+
+Em `src/components/ui`: `Button`, `Card`, `Input`, `Select`, `Modal`, `Tabela` (ordenação local ou no servidor, com paginação), `Paginacao`, `Badge`, `Skeleton`, `ErrorState`, `EmptyState` e `SeloFicticio` (rótulo "Dado fictício" para telas com mock). Para ver todos funcionando: `npm run dev` e abra `/dev/componentes` (a rota não existe no build de produção).
+
+Os filtros ficam na URL, com os mesmos nomes dos parâmetros da API, então recarregar a página, voltar no navegador ou compartilhar o link preservam o estado. A tela monta a barra com os filtros que usa e lê os valores com o mesmo conjunto:
+
+```tsx
+const CAMPOS = ['periodo_atual', 'periodo_comparacao', 'municipio', 'bairro'] as const
+const PADROES = { periodo_atual: '2025-07/2026-06', periodo_comparacao: '2022-07/2023-06' }
+
+const { filtros } = useFiltrosUrl(CAMPOS, PADROES)
+const { dados, erro, carregando, recarregar } = useConsulta(
+  (sinal) => buscarDashboard({ ...PADROES, ...filtros }, sinal),
+  [filtros],
+)
+
+<BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
+```
+
+`bairro` só habilita depois do município, e trocar o município limpa o bairro. Os domínios dos filtros (`opcoes`) vêm de `src/data/filtros.mock.ts`: o contrato ainda não tem rota para listá-los.

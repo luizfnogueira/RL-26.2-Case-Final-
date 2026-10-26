@@ -1,0 +1,123 @@
+{
+  "municipios": [
+    "CAMARAGIBE",
+    "JABOATÃO DOS GUARARAPES",
+    "OLINDA",
+    "PAULISTA",
+    "RECIFE"
+  ],
+  "bairros": [
+    {
+      "municipio": "CAMARAGIBE",
+      "bairro": "ALDEIA"
+    },
+    {
+      "municipio": "CAMARAGIBE",
+      "bairro": "TIMBI"
+    },
+    {
+      "municipio": "JABOATÃO DOS GUARARAPES",
+      "bairro": "CANDEIAS"
+    },
+    {
+      "municipio": "JABOATÃO DOS GUARARAPES",
+      "bairro": "PIEDADE"
+    },
+    {
+      "municipio": "JABOATÃO DOS GUARARAPES",
+      "bairro": "PRAZERES"
+    },
+    {
+      "municipio": "OLINDA",
+      "bairro": "BAIRRO NOVO"
+    },
+    {
+      "municipio": "OLINDA",
+      "bairro": "CASA CAIADA"
+    },
+    {
+      "municipio": "OLINDA",
+      "bairro": "RIO DOCE"
+    },
+    {
+      "municipio": "PAULISTA",
+      "bairro": "JANGA"
+    },
+    {
+      "municipio": "PAULISTA",
+      "bairro": "PAU AMARELO"
+    },
+    {
+      "municipio": "RECIFE",
+      "bairro": "AFOGADOS"
+    },
+    {
+      "municipio": "RECIFE",
+      "bairro": "BOA VIAGEM"
+    },
+    {
+      "municipio": "RECIFE",
+      "bairro": "BOA VISTA"
+    },
+    {
+      "municipio": "RECIFE",
+      "bairro": "CASA AMARELA"
+    },
+    {
+      "municipio": "RECIFE",
+      "bairro": "VÁRZEA"
+    }
+  ],
+  "classes": [
+    "COMERCIAL",
+    "INDUSTRIAL",
+    "PODER PUBLICO",
+    "RESIDENCIAL",
+    "RURAL"
+  ],
+  "alimentadores": [
+    {
+      "alimentador": "ALM-CAM-001",
+      "municipio": "CAMARAGIBE"
+    },
+    {
+      "alimentador": "ALM-JAB-001",
+      "municipio": "JABOATÃO DOS GUARARAPES"
+    },
+    {
+      "alimentador": "ALM-JAB-002",
+      "municipio": "JABOATÃO DOS GUARARAPES"
+    },
+    {
+      "alimentador": "ALM-OLI-001",
+      "municipio": "OLINDA"
+    },
+    {
+      "alimentador": "ALM-OLI-002",
+      "municipio": "OLINDA"
+    },
+    {
+      "alimentador": "ALM-PAU-001",
+      "municipio": "PAULISTA"
+    },
+    {
+      "alimentador": "ALM-REC-001",
+      "municipio": "RECIFE"
+    },
+    {
+      "alimentador": "ALM-REC-002",
+      "municipio": "RECIFE"
+    },
+    {
+      "alimentador": "ALM-REC-003",
+      "municipio": "RECIFE"
+    }
+  ],
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": null,
+    "observacoes": [
+      "Dados fictícios do seed, com os nomes como estão na Gold."
+    ]
+  }
+}

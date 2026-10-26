@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import GOLD_SOURCE
 if GOLD_SOURCE == 'real':
-    from app.models.gold_real import AggDecFecMensal as DecFecAlimentadorMes, FatoUCMes as Fatura, FatoUCMes as Leitura, DimUC as UnidadeConsumidora
+    from app.models.gold_real import AggPrecoVolume, AggDecFecMensal as DecFecAlimentadorMes, FatoUCMes as Fatura, FatoUCMes as Leitura, DimUC as UnidadeConsumidora
 else:
-    from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura
+    from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura, AggPrecoVolume
 
 ENERGIA = Leitura.consumo_kwh_valido if GOLD_SOURCE == 'real' else Leitura.consumo_kwh
 UCS = DecFecAlimentadorMes.ucs_atendidas if GOLD_SOURCE == 'real' else DecFecAlimentadorMes.ucs_total
@@ -119,3 +119,11 @@ def serie_energia(db: Session, inicio: str, fim: str, filtros: dict) -> list[tup
         if valor is not None:
             consulta = consulta.where(getattr(UnidadeConsumidora, campo) == valor)
     return [tuple(linha) for linha in db.execute(consulta).all()]
+
+def linhas_preco_volume(db: Session, filtros: dict) -> list[AggPrecoVolume]:
+    """Recortes da gold.agg_preco_volume que batem com os filtros de município, bairro e classe."""
+    consulta = select(AggPrecoVolume)
+    for campo, valor in filtros.items():
+        if valor is not None:
+            consulta = consulta.where(getattr(AggPrecoVolume, campo) == valor)
+    return list(db.scalars(consulta).all())

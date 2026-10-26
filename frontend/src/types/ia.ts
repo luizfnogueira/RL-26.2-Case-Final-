@@ -3,10 +3,10 @@ import type { ContextoEnvio, IndicadorNomeado, Metadados } from './comum'
 /** `nao_sei` e `bloqueado` são respostas válidas (HTTP 200), não erros de transporte. */
 export type StatusIA = 'ok' | 'nao_sei' | 'bloqueado'
 
+/** Entrada do POST /ia: só a pergunta, como na Arquitetura V1. */
 export interface PerguntaIA {
   /** De 1 a 2000 caracteres. */
   pergunta: string
-  contexto?: ContextoEnvio | null
 }
 
 export type CelulaIA = string | number | boolean | null
@@ -38,6 +38,12 @@ export interface PedidoInsight {
   /** Opcional no stub; na integração real a API valida contra a Gold. */
   indicadores?: IndicadorNomeado[]
 }
+
+/**
+ * Quando o módulo de IA falha, a API devolve 200 com um texto por regra e uma observação que
+ * começa por este prefixo (contrato, seção 10). Nesse caso o texto não é "gerado por IA".
+ */
+export const PREFIXO_TEXTO_ALTERNATIVO = 'Texto alternativo:'
 
 export interface RespostaInsight {
   titulo: string

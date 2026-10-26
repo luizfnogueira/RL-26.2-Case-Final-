@@ -16,3 +16,5 @@ FilaPerdas = model('FilaPerdas', 'tb_fila_perdas')
 FilaPerdasAuditoria = model('FilaPerdasAuditoria', 'tb_fila_perdas_auditoria')
 FatoUCMes = model('FatoUCMes', 'fato_uc_mes')
 AggDecFecMensal = model('AggDecFecMensal', 'agg_dec_fec_mensal')
+
+AggPrecoVolume = model('AggPrecoVolume', 'agg_preco_volume')

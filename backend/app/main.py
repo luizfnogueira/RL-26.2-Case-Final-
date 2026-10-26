@@ -6,7 +6,7 @@ from app.core.config import CORS_ORIGINS
 from app.core.errors import register_error_handlers
 from app.core.exceptions import AppException
 
-from app.routers import dashboard, ia, inspecoes, operacao, unidades
+from app.routers import dashboard, filtros, ia, inspecoes, operacao, unidades
 
 app = FastAPI(
     title="V-Energy Grid 360 API",
@@ -14,12 +14,14 @@ app = FastAPI(
     description=(
         "API do case V-Energy — contrato V2 (docs/api-contract.md). As ordens de inspeção "
         "(GET/POST/PATCH /inspecoes) persistem no schema portal; a fila de candidatos lê a Gold/seed "
-        "e as ordens ativas do portal; as demais rotas ainda usam exemplos fictícios do P1."
+        "e as ordens ativas do portal. Dashboard, filtros e números do insight de receita "
+        "usam a fonte selecionada por GOLD_SOURCE; unidades e operação ainda têm respostas simuladas."
     ),
 )
 register_error_handlers(app)
 
-for router in (dashboard.router, unidades.router, inspecoes.router, operacao.router, ia.router):
+for router in (dashboard.router, filtros.router, unidades.router, inspecoes.router, operacao.router,
+               ia.router):
     app.include_router(router)
 
 app.add_middleware(

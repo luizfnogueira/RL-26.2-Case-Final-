@@ -15,7 +15,7 @@ LOG = logging.getLogger(__name__)
 
 
 def prepare(conn, migrate_legacy=False):
-    """Apenas Gold. Migracao aditiva opt-in das duas tabelas provisorias da fila."""
+    """Apenas Gold. Migracao opt-in dos contratos conhecidos do seed."""
     conn.execute(text('CREATE SCHEMA IF NOT EXISTS gold'))
     # Dependencias externas nao podem propagar efeitos de uma recarga ao portal.
     if conn.execute(text("""
@@ -41,7 +41,7 @@ def prepare(conn, migrate_legacy=False):
         current = {c['name']: c for c in inspector.get_columns(name, schema='gold')}
         target = TABLES[name]
         missing = set(COLUMNS[name]) - set(current)
-        legacy = name in {'tb_fila_perdas', 'tb_fila_perdas_auditoria'} and missing
+        legacy = name in {'tb_fila_perdas', 'tb_fila_perdas_auditoria', 'agg_preco_volume'} and missing
         if missing and not (legacy and migrate_legacy):
             raise GoldError(f'{name}: migracao necessaria; consulte a documentacao tecnica compartilhada pela equipe')
         if legacy and migrate_legacy:

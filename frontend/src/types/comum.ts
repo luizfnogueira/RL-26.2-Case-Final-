@@ -91,7 +91,8 @@ export type CodigoErro =
   | 'CENARIO_STUB_INDISPONIVEL'
   | 'RECURSO_NAO_ENCONTRADO'
   | 'DADOS_INDISPONIVEIS'
-  | 'IA_INDISPONIVEL'
+  /** 503 do POST /ia: agente fora do ar, lento além do timeout ou com resposta fora do contrato. */
+  | 'AGENTE_INDISPONIVEL'
   | 'ERRO_INTERNO'
   /** Gerado no front: a API não respondeu (rede, CORS, servidor fora do ar). */
   | 'REDE_INDISPONIVEL'

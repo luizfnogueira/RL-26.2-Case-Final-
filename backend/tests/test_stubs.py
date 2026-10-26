@@ -4,7 +4,6 @@ import pytest
 
 from app.db.session import get_db
 from app.main import app
-from app.services import dashboard_service
 from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, exemplo
 
 client = TestClient(app)
@@ -12,10 +11,8 @@ PERIODOS = {'periodo_atual': PA, 'periodo_comparacao': PC}
 
 
 @pytest.fixture(autouse=True)
-def dashboard_sem_banco(monkeypatch):
-    # KPIs e série reais são testados em test_dashboard.py; aqui só a ponte e o drill-down simulados
-    monkeypatch.setattr(dashboard_service, 'montar_indicadores', lambda db, f: exemplo('dashboard')['indicadores'])
-    monkeypatch.setattr(dashboard_service, 'montar_serie', lambda db, f: exemplo('dashboard')['serie_historica'])
+def sem_banco():
+    # GET /dashboard lê o banco e é testado em test_dashboard.py; aqui só a validação de entrada
     app.dependency_overrides[get_db] = lambda: None
     yield
     app.dependency_overrides.pop(get_db, None)
@@ -30,10 +27,6 @@ def get(url: str, **params) -> dict:
 def erro(response, status: int, codigo: str) -> None:
     assert response.status_code == status, response.text
     assert response.json()['codigo'] == codigo
-
-
-def soma_ponte(ponte: dict) -> float:
-    return sum(ponte[c]['valor'] for c in ('receita_energia_comparacao', 'efeito_preco', 'efeito_volume'))
 
 
 class TestPeriodos:
@@ -55,56 +48,9 @@ class TestPeriodos:
 
 
 class TestDashboard:
-    def test_consolidado_igual_ao_fixture(self):
-        dados, fixture = get('/dashboard', **PERIODOS), exemplo('dashboard')
-        for campo in ('filtros', 'ponte_receita', 'drill_down'):
-            assert dados[campo] == fixture[campo]
-        assert dados['metadados']['dados_ficticios'] is True
-
-    def test_estrutura_do_consolidado(self):
-        dados = get('/dashboard', **PERIODOS)
-        assert set(dados['indicadores']) == {'receita_faturada', 'energia_faturada', 'ucs_ativas',
-                                             'inadimplencia', 'dec_medio', 'fec_medio'}
-        serie = dados['serie_historica']
-        assert len(serie) == 48 and serie[0]['mes'] == '2022-07' and serie[-1]['mes'] == '2026-06'
-        ponte = dados['ponte_receita']
-        assert soma_ponte(ponte) == pytest.approx(ponte['receita_energia_atual']['valor'])
-        assert 'bandeira_mix' not in ponte
-        # A ponte é da receita de energia (sem tributos), menor que a receita faturada total.
-        assert ponte['receita_energia_atual']['valor'] < dados['indicadores']['receita_faturada']['atual']['valor']
-        anual = sum(p['receita']['valor'] for p in serie[-12:])
-        assert anual == pytest.approx(dados['indicadores']['receita_faturada']['atual']['valor'])
-
-    @pytest.mark.parametrize('filtros', [
-        {'nivel': 'bairro', 'municipio': 'Recife'},
-        {'nivel': 'classe', 'municipio': 'Recife', 'bairro': 'Boa Vista'},
-        {'classe': 'Comercial'},
-        {'alimentador': 'ALM-DEMO-004'},
-    ])
-    def test_recortes_mantem_somas(self, filtros):
-        dados = get('/dashboard', **PERIODOS, **filtros)
-        ponte, drill = dados['ponte_receita'], dados['drill_down']
-        assert soma_ponte(ponte) == pytest.approx(ponte['receita_energia_atual']['valor'])
-        assert sum(l['receita_energia_atual']['valor'] for l in drill['items']) == pytest.approx(
-            ponte['receita_energia_atual']['valor'], abs=0.05)
-        assert sum(l['efeito_volume']['valor'] for l in drill['items']) == pytest.approx(
-            ponte['efeito_volume']['valor'], abs=0.05)
-
-    def test_drill_ordenado_e_com_breadcrumb(self):
-        drill = get('/dashboard', **PERIODOS, nivel='classe', municipio='Recife', bairro='Boa Vista')['drill_down']
-        quedas = [l['queda_kwh']['valor'] for l in drill['items']]
-        assert quedas == sorted(quedas, reverse=True)
-        assert [b['nivel'] for b in drill['breadcrumb']] == ['consolidado', 'municipio', 'bairro']
-        assert drill['items'][0]['filtros']['bairro'] == 'Boa Vista'
-
     @pytest.mark.parametrize('filtros', [{'nivel': 'bairro'}, {'nivel': 'classe', 'municipio': 'Recife'}])
     def test_nivel_exige_filtros_ascendentes(self, filtros):
         erro(client.get('/dashboard', params={**PERIODOS, **filtros}), 422, 'DADOS_INVALIDOS')
-
-    def test_recorte_fora_do_mock_usa_ponte_consolidada(self):
-        dados = get('/dashboard', **PERIODOS, municipio='Caruaru')
-        assert dados['filtros']['municipio'] == 'Caruaru'
-        assert dados['ponte_receita'] == exemplo('dashboard')['ponte_receita']
 
 
 class TestUnidades:
@@ -181,7 +127,6 @@ class TestIA:
     @pytest.mark.parametrize('pergunta, status', [
         ('Qual a previsão de lucro em 2030?', 'nao_sei'),
         ('DROP TABLE clientes', 'bloqueado'),
-        ('Qual foi a receita no período?', 'nao_sei'),
     ])
     def test_cenarios(self, pergunta, status):
         response = client.post('/ia', json={'pergunta': pergunta})
@@ -193,24 +138,8 @@ class TestIA:
 
 
 class TestInsight:
-    def test_receita_igual_ao_fixture(self):
-        response = client.post('/ia/insight', json=exemplo('pedido_insight'))
-        assert response.json() == exemplo('resposta_insight')
-        assert len(response.json()['numeros_utilizados']) == 6
-
-    def test_receita_sem_indicadores_e_com_recorte(self):
-        pedido = {**exemplo('pedido_insight'), 'indicadores': []}
-        assert client.post('/ia/insight', json=pedido).json() == exemplo('resposta_insight')
-        pedido['filtros'] = {**pedido['filtros'], 'municipio': 'Recife'}
-        dados = client.post('/ia/insight', json=pedido).json()
-        assert dados['texto'].startswith('Em Recife')
-        dashboard = get('/dashboard', **PERIODOS, municipio='Recife')
-        assert dados['numeros_utilizados'][0]['valor'] == dashboard['ponte_receita']['receita_energia_atual']['valor']
-
-    def test_receita_com_indicador_divergente(self):
-        pedido = exemplo('pedido_insight')
-        pedido['indicadores'][0]['valor'] = 1
-        erro(client.post('/ia/insight', json=pedido), 422, 'DADOS_INVALIDOS')
+    # O insight da receita lê a ponte real (banco) desde a B5: ver tests/test_insight.py.
+    # Aqui ficam o resumo da unidade (ainda stub) e a validação de entrada.
 
     def test_unidade(self):
         response = client.post('/ia/insight', json=exemplo('pedido_insight_unidade'))

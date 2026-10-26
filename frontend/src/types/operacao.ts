@@ -9,7 +9,8 @@ import type {
 } from './comum'
 
 export type NivelRegional = 'municipio' | 'bairro'
-export type OrdenarPor = 'dec' | 'fec'
+/** `chi` ordena pelas horas de interrupção (consumidor-hora interrompido). */
+export type OrdenarPor = 'dec' | 'fec' | 'chi'
 
 /** Query de GET /operacao. O filtro `classe` não existe no mock operacional (retorna erro). */
 export interface ParamsOperacao extends FiltrosRegiao, ParamsPaginacao {
@@ -24,6 +25,9 @@ export interface PontoOperacao {
   mes: Mes
   dec: Indicador
   fec: Indicador
+  /** Sem os dias críticos (expurgo do PRODIST). */
+  dec_sem_dia_critico: Indicador
+  fec_sem_dia_critico: Indicador
 }
 
 /** Série mensal de DEC e FEC de um alimentador. Não é truncada pela paginação. */
@@ -40,7 +44,11 @@ export interface RankingAlimentador {
   ucs_atendidas: number
   dec: Indicador
   fec: Indicador
+  dec_sem_dia_critico: Indicador
+  fec_sem_dia_critico: Indicador
   interrupcoes: Indicador
+  /** CHI: horas sem energia somadas nas UCs. */
+  horas_interrupcao: Indicador
 }
 
 export interface RankingRegional {
@@ -50,7 +58,10 @@ export interface RankingRegional {
   bairro: string | null
   dec: Indicador
   fec: Indicador
+  dec_sem_dia_critico: Indicador
+  fec_sem_dia_critico: Indicador
   interrupcoes: Indicador
+  horas_interrupcao: Indicador
 }
 
 export type RankingAlimentadores = Pagina<RankingAlimentador>

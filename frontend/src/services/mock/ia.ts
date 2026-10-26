@@ -35,18 +35,6 @@ function numero(valor: number, casas = 1): string {
   })
 }
 
-/** Contexto com todas as chaves, na ordem do contrato, e null onde não foi informado. */
-function contextoCompleto(bruto: Registro): Registro {
-  return {
-    periodo_atual: bruto.periodo_atual,
-    periodo_comparacao: bruto.periodo_comparacao ?? null,
-    municipio: bruto.municipio ?? null,
-    bairro: bruto.bairro ?? null,
-    classe: bruto.classe ?? null,
-    alimentador: bruto.alimentador ?? null,
-  }
-}
-
 // ---------- POST /ia ----------
 
 /** Respostas extras do mock do front (não fazem parte dos fixtures do contrato), montadas com os mesmos dados fictícios. */
@@ -104,18 +92,17 @@ async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
     const milhoes = (v: number | null) => numero((v ?? 0) / 1_000_000)
     return montar({
       resposta:
-        `A receita faturada passou de R$ ${milhoes(p.receita_comparacao.valor)} milhões para R$ ${milhoes(p.receita_atual.valor)} milhões. ` +
+        `A receita de energia passou de R$ ${milhoes(p.receita_energia_comparacao.valor)} milhões para R$ ${milhoes(p.receita_energia_atual.valor)} milhões. ` +
         `O reajuste de ${numero(p.reajuste_percentual.valor ?? 0)}% explica R$ ${milhoes(p.efeito_preco.valor)} milhões; a queda de volume retirou R$ ${milhoes(Math.abs(p.efeito_volume.valor ?? 0))} milhões.`,
       sql: 'SELECT efeito, valor_brl FROM gold_receita_demo ORDER BY ordem',
       tabelas: ['gold_receita_demo'],
       dados: {
         colunas: ['efeito', 'valor_brl'],
         linhas: [
-          ['Receita base', p.receita_comparacao.valor],
+          ['Receita de energia base', p.receita_energia_comparacao.valor],
           ['Efeito-preço', p.efeito_preco.valor],
           ['Efeito-volume', p.efeito_volume.valor],
-          ['Bandeira / mix', p.bandeira_mix.valor],
-          ['Receita atual', p.receita_atual.valor],
+          ['Receita de energia atual', p.receita_energia_atual.valor],
         ],
       },
     })
@@ -128,22 +115,14 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
   if (typeof bruta !== 'string' || bruta.trim().length < 1 || bruta.length > 2000) {
     throw invalido('pergunta deve ter de 1 a 2000 caracteres.')
   }
-  let contexto: Registro | null = null
-  if (corpo.contexto) {
-    const c = corpo.contexto as Registro
-    const atual = periodo(c, 'periodo_atual', true)
-    compararPeriodos(atual, periodo(c, 'periodo_comparacao', false))
-    regiao(c)
-    contexto = contextoCompleto(c)
-  }
+  // Como a API (extra='forbid'): o corpo é só {pergunta}
+  const extras = Object.keys(corpo).filter((campo) => campo !== 'pergunta')
+  if (extras.length > 0) throw invalido(`Campo não permitido: ${extras.join(', ')}.`)
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
   if (pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta))
     return fixtures.respostaIaBloqueado()
-  const esperado = (await fixtures.perguntaIa()).contexto
-  if (pergunta === PERGUNTA_OK && JSON.stringify(contexto) === JSON.stringify(esperado)) {
-    return fixtures.respostaIa()
-  }
+  if (pergunta === PERGUNTA_OK) return fixtures.respostaIa()
   return (await respostaExtra(normalizar(bruta))) ?? fixtures.respostaIaNaoSei()
 }
 
@@ -191,14 +170,22 @@ async function insightReceita(corpo: Registro, filtros: Registro): Promise<Respo
     throw invalido('Insight de receita exige periodo_comparacao.')
   const dashboard = await montarDashboard(filtros)
   const p = dashboard.ponte_receita
+  // Como a API real: sem decomposição na Gold (ex.: filtro de alimentador) não há insight da receita.
+  if (p.efeito_preco.valor === null || p.efeito_volume.valor === null) {
+    throw erroApi(
+      422,
+      'DECOMPOSICAO_INDISPONIVEL',
+      'A Gold não tem decomposição de preço e volume para este recorte.',
+    )
+  }
   const nome = (
     n: string,
     rotulo: string,
-    ind: IndicadorNomeado | typeof p.receita_atual,
+    ind: IndicadorNomeado | typeof p.receita_energia_atual,
   ): IndicadorNomeado => ({ nome: n, rotulo, ...ind })
   const numeros = [
-    nome('receita_atual', 'Receita atual', p.receita_atual),
-    nome('receita_comparacao', 'Receita base', p.receita_comparacao),
+    nome('receita_energia_atual', 'Receita de energia atual', p.receita_energia_atual),
+    nome('receita_energia_comparacao', 'Receita de energia base', p.receita_energia_comparacao),
     nome('variacao_volume', 'Volume', dashboard.indicadores.energia_faturada.variacao_percentual),
     nome('reajuste', 'Reajuste', p.reajuste_percentual),
     nome('efeito_preco', 'Efeito-preço', p.efeito_preco),
@@ -210,7 +197,7 @@ async function insightReceita(corpo: Registro, filtros: Registro): Promise<Respo
     .map((c) => texto(filtros, c))
     .filter(Boolean)
   let textoInsight =
-    `${regional.length ? `Em ${regional.join(' / ')}` : 'No consolidado'}, a receita passou de ${brl(v.receita_comparacao)} para ${brl(v.receita_atual)}. ` +
+    `${regional.length ? `Em ${regional.join(' / ')}` : 'No consolidado'}, a receita de energia passou de ${brl(v.receita_energia_comparacao)} para ${brl(v.receita_energia_atual)}. ` +
     `O reajuste de ${pct(v.reajuste, false)} gerou um efeito-preço de ${brl(v.efeito_preco)}, ` +
     `enquanto o volume faturado variou ${pct(v.variacao_volume)} e respondeu por um efeito-volume de ${brl(v.efeito_volume)}.`
   if (v.efeito_preco > 0 && v.efeito_volume < 0)

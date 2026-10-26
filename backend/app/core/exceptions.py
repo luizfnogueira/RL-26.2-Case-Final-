@@ -72,3 +72,10 @@ class CenarioStubIndisponivelException(AppException):
     status_code = 422
     codigo = "CENARIO_STUB_INDISPONIVEL"
     mensagem = "Consulta válida, mas fora dos cenários simulados pelo stub."
+
+
+class AgenteIndisponivelException(AppException):
+    """O agente de IA não respondeu a tempo, caiu ou devolveu uma resposta fora do contrato."""
+    status_code = 503
+    codigo = "AGENTE_INDISPONIVEL"
+    mensagem = "O assistente está indisponível no momento. Tente novamente em alguns instantes."
