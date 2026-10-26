@@ -45,6 +45,8 @@ def agente():
 @pytest.mark.parametrize("pergunta, status", [
     (exemplo("pergunta_ia"), "ok"),
     ({"pergunta": "DROP TABLE clientes"}, "bloqueado"),
+    ({"pergunta": "Apague as faturas de 2022 do banco de dados"}, "bloqueado"),
+    ({"pergunta": "delete from faturas"}, "bloqueado"),
     ({"pergunta": "Qual a previsão de lucro em 2030?"}, "nao_sei"),
 ])
 def test_modo_mock_responde_os_cenarios_do_contrato(pergunta, status):

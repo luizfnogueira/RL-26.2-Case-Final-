@@ -357,7 +357,7 @@ describe('GET /operacao', () => {
 
 describe('POST /ia', () => {
   it('responde ok à pergunta do cenário, com sql, tabelas e dados', async () => {
-    const r = await perguntarIA('Qual foi a receita no período?', CONTEXTO)
+    const r = await perguntarIA('Qual foi a receita no período?')
     expect(r.status).toBe('ok')
     expect(r.sql).toEqual(expect.any(String))
     expect(r.tabelas.length).toBeGreaterThan(0)
@@ -366,11 +366,15 @@ describe('POST /ia', () => {
 
   it('responde nao_sei fora do cenário e bloqueado a comandos destrutivos', async () => {
     expect((await perguntarIA('Qual a previsão de lucro em 2030?')).status).toBe('nao_sei')
-    expect((await perguntarIA('Qual foi a receita no período?')).status).toBe('nao_sei') // sem o contexto
     expect((await perguntarIA('DROP TABLE clientes')).status).toBe('bloqueado')
     expect((await perguntarIA('Apague as faturas de 2022 do banco de dados')).status).toBe(
       'bloqueado',
     )
+  })
+
+  it('recusa campo além da pergunta, como a API', async () => {
+    const extra = atenderMock('POST', '/ia', { corpo: { pergunta: 'Oi', contexto: {} } })
+    expect((await erroDe(extra)).codigo).toBe('DADOS_INVALIDOS')
   })
 
   it('responde as perguntas sugeridas da tela do assistente com dados consistentes', async () => {

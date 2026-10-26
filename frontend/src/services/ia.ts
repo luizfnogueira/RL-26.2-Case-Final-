@@ -1,4 +1,3 @@
-import type { ContextoEnvio } from '@/types/comum'
 import type { PedidoInsight, RespostaIA, RespostaInsight } from '@/types/ia'
 import { requisitar } from './http'
 
@@ -6,12 +5,8 @@ import { requisitar } from './http'
  * POST /ia: pergunta em português ao agente (somente leitura). As respostas `nao_sei` e
  * `bloqueado` chegam como sucesso (HTTP 200) e devem ser tratadas na interface.
  */
-export function perguntarIA(
-  pergunta: string,
-  contexto?: ContextoEnvio | null,
-  sinal?: AbortSignal,
-): Promise<RespostaIA> {
-  return requisitar<RespostaIA>('POST', '/ia', { corpo: { pergunta, contexto }, sinal })
+export function perguntarIA(pergunta: string, sinal?: AbortSignal): Promise<RespostaIA> {
+  return requisitar<RespostaIA>('POST', '/ia', { corpo: { pergunta }, sinal })
 }
 
 /** POST /ia/insight: análise automática da Tela 2 (receita) e resumo da Tela 3 (unidade). */

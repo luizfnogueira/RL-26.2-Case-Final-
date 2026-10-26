@@ -3,10 +3,10 @@ import type { ContextoEnvio, IndicadorNomeado, Metadados } from './comum'
 /** `nao_sei` e `bloqueado` são respostas válidas (HTTP 200), não erros de transporte. */
 export type StatusIA = 'ok' | 'nao_sei' | 'bloqueado'
 
+/** Entrada do POST /ia: só a pergunta, como na Arquitetura V1. */
 export interface PerguntaIA {
   /** De 1 a 2000 caracteres. */
   pergunta: string
-  contexto?: ContextoEnvio | null
 }
 
 export type CelulaIA = string | number | boolean | null

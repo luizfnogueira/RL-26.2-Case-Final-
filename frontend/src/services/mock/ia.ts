@@ -35,18 +35,6 @@ function numero(valor: number, casas = 1): string {
   })
 }
 
-/** Contexto com todas as chaves, na ordem do contrato, e null onde não foi informado. */
-function contextoCompleto(bruto: Registro): Registro {
-  return {
-    periodo_atual: bruto.periodo_atual,
-    periodo_comparacao: bruto.periodo_comparacao ?? null,
-    municipio: bruto.municipio ?? null,
-    bairro: bruto.bairro ?? null,
-    classe: bruto.classe ?? null,
-    alimentador: bruto.alimentador ?? null,
-  }
-}
-
 // ---------- POST /ia ----------
 
 /** Respostas extras do mock do front (não fazem parte dos fixtures do contrato), montadas com os mesmos dados fictícios. */
@@ -127,22 +115,14 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
   if (typeof bruta !== 'string' || bruta.trim().length < 1 || bruta.length > 2000) {
     throw invalido('pergunta deve ter de 1 a 2000 caracteres.')
   }
-  let contexto: Registro | null = null
-  if (corpo.contexto) {
-    const c = corpo.contexto as Registro
-    const atual = periodo(c, 'periodo_atual', true)
-    compararPeriodos(atual, periodo(c, 'periodo_comparacao', false))
-    regiao(c)
-    contexto = contextoCompleto(c)
-  }
+  // Como a API (extra='forbid'): o corpo é só {pergunta}
+  const extras = Object.keys(corpo).filter((campo) => campo !== 'pergunta')
+  if (extras.length > 0) throw invalido(`Campo não permitido: ${extras.join(', ')}.`)
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
   if (pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta))
     return fixtures.respostaIaBloqueado()
-  const esperado = (await fixtures.perguntaIa()).contexto
-  if (pergunta === PERGUNTA_OK && JSON.stringify(contexto) === JSON.stringify(esperado)) {
-    return fixtures.respostaIa()
-  }
+  if (pergunta === PERGUNTA_OK) return fixtures.respostaIa()
   return (await respostaExtra(normalizar(bruta))) ?? fixtures.respostaIaNaoSei()
 }
 
