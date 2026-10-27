@@ -1,21 +1,19 @@
-"""Agente Gerador Text-to-SQL (Candidate Generator — CG do CHESS) com PydanticAI (GENAI-9, 10, 13, 14).
+"""Agente Gerador Text-to-SQL (Candidate Generator — CG do CHESS) com PydanticAI (GENAI-9, 10, 13, 14, 17, 23, 24, 31).
 
-Implementa:
-- Montagem de instruções com regras críticas no início e no fim do contexto (mitigação de lost-in-the-middle).
-- Regra mandatória contra consumo negativo (sempre filtrar `flag_consumo_negativo = FALSE` e
-  `consumo_kwh_valido >= 0`, salvo pedido explícito do usuário sobre erro de medidor / consumo negativo).
-- Três ferramentas sob controle de UsageLimits(request_limit=6):
-  1. `consultar_gold(sql)` — valida e executa a query; levanta ModelRetry até 2x em erro de SQL ou
-     ausência de filtro de consumo negativo; encerra sem retry em SQLBloqueado.
-  2. `valores_distintos(tabela, coluna)` — Information Retriever (IR do CHESS) restrito a colunas categóricas.
-  3. `descrever_tabela(tabela)` — consulta de schema sob demanda.
-- `@agente.output_validator` (GENAI-10): confere marcadores `{v1}`, números contra os dados, premissas falsas
-  e ausência de consumo negativo; tenta ModelRetry 1x e converte para `nao_sei` se persistir.
-- Suporte a `message_history` para perguntas de follow-up (GENAI-13) e apresentação `texto` vs `tabela` (GENAI-14).
+Implementa o pipeline completo sob responsabilidade de Théo:
+1. Cache de respostas repetidas (GENAI-24), invalidado por `gold_atualizada_em`.
+2. Schema Selector por skills (SS do CHESS — GENAI-23) e alternância com `catalogo_inteiro`.
+3. Candidate Generator (CG do CHESS — GENAI-9): plano estruturado, 3 ferramentas, UsageLimits(request_limit=6),
+   auto-correção via ModelRetry e proteção rigorosa contra consumo negativo (`flag_consumo_negativo = FALSE`).
+4. Validador determinístico de saída e marcadores pt-BR (`@agente.output_validator` — GENAI-10).
+5. Suporte a `message_history` para perguntas de follow-up (GENAI-13) e decisão `texto` vs `tabela` (GENAI-14).
+6. Self-consistency seletiva por votação no resultado de execução (CHASE-SQL simplificado — GENAI-31).
+7. Telemetria completa extraída de `result.usage()` e `result.all_messages()` (GENAI-17).
 """
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -27,6 +25,8 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
 
+from app.ai.cache import buscar_resposta_em_cache, salvar_resposta_em_cache
+from app.ai.chase import executar_votacao_chase_sql, precisa_disparar_self_consistency
 from app.ai.contratos import (
     DepsAgente,
     ErroConsulta,
@@ -46,6 +46,7 @@ from app.ai.resposta import (
     substituir_marcadores_pt_br,
     validar_fidelidade_saida,
 )
+from app.ai.roteador import ModoSchema, montar_contexto_schema
 from app.ai.telemetria import construir_telemetria, montar_detalhes_tecnicos
 from app.db.gold_contract import COLUMNS
 
@@ -134,7 +135,7 @@ def montar_contexto_instrucoes(deps: DepsAgente) -> str:
 
     texto_skills = deps.contexto_skills or carregar_texto_skills(deps.skills_ativas)
     if texto_skills:
-        partes.append(f"=== CONHECIMENTO DO DOMÍNIO (SKILLS ATIVAS) ===\n{texto_skills}")
+        partes.append(f"=== CONHECIMENTO DO DOMÍNIO (SKILLS E SCHEMA SELECIONADOS) ===\n{texto_skills}")
 
     if deps.entidades_resolvidas:
         partes.append(
@@ -241,13 +242,7 @@ def valores_distintos_padrao(tabela: str, coluna: str) -> list[str]:
 
 
 def converter_historico_para_mensagens(historico: list[TrocaHistorico | dict[str, Any]] | None) -> list[ModelMessage]:
-    """Converte as até 3 últimas trocas em pares user/model do PydanticAI (GENAI-13).
-
-    Cada troca gera:
-    - ModelRequest (user): pergunta interpretada completa do turno anterior.
-    - ModelResponse (model): resumo de até 300 caracteres + SQL executado + filtros resolvidos.
-    Nunca inclui linhas brutas de dados, mantendo o histórico compacto (~600 tokens máx).
-    """
+    """Converte as até 3 últimas trocas em pares user/model do PydanticAI (GENAI-13)."""
     if not historico:
         return []
 
@@ -349,11 +344,7 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
 
     @agente.output_validator
     def _validar_saida(ctx: RunContext[DepsAgente], saida: RespostaAgente) -> RespostaAgente:
-        """Valida marcadores, números e regras de domínio (GENAI-10.2).
-
-        Na 1ª falha dispara `ModelRetry`; se repetir na 2ª tentativa, converte de forma segura
-        para `status='nao_sei'`, garantindo taxa de invenção 0%.
-        """
+        """Valida marcadores, números e regras de domínio (GENAI-10.2)."""
         try:
             return validar_fidelidade_saida(ctx.deps, saida)
         except ViolacaoFidelidadeSaida as exc:
@@ -382,38 +373,35 @@ def formatar_marcadores_no_texto(texto: str, marcadores: dict[str, str | int | f
     return substituir_marcadores_pt_br(texto, marcadores)
 
 
-def responder(
+def _executar_uma_vez(
     pergunta: str,
     *,
-    historico: list[TrocaHistorico | dict[str, Any]] | None = None,
-    conversa_id: str | None = None,
-    modelo: Model | None = None,
-    executar_sql_fn: Any | None = None,
-    valores_distintos_fn: Any | None = None,
-    descrever_tabela_fn: Any | None = None,
-    skills_ativas: list[str] | None = None,
-    entidades_resolvidas: dict[str, Any] | None = None,
-    gold_atualizada_em: datetime | str | None = None,
+    msgs_historico: list[ModelMessage],
+    skills_selecionadas: list[str],
+    contexto_skills: str,
+    consumo_neg_explicito: bool,
+    entidades_resolvidas: dict[str, Any],
+    modelo: Model | None,
+    executar_sql_fn: Any | None,
+    valores_distintos_fn: Any | None,
+    descrever_tabela_fn: Any | None,
+    gold_atualizada_em: datetime | str | None,
+    conversa_id: str | None,
+    etapas_base_ms: dict[str, int],
+    inicio_total: float,
 ) -> dict[str, Any]:
-    """Função principal do agente do Théo: recebe a pergunta e devolve o dicionário compatível com RespostaIA."""
-    inicio_total = time.perf_counter()
-    etapas_ms: dict[str, int] = {}
-
-    t0 = time.perf_counter()
-    consumo_neg_explicito = detectar_pedido_consumo_negativo_explicito(pergunta)
-    skills = skills_ativas or ["receita"]
+    """Executa um passe completo do Candidate Generator (CG) + Validação + Telemetria."""
+    etapas_ms = dict(etapas_base_ms)
     deps = DepsAgente(
         pergunta_original=pergunta,
-        skills_ativas=skills,
-        contexto_skills=carregar_texto_skills(skills),
-        entidades_resolvidas=entidades_resolvidas or {},
+        skills_ativas=skills_selecionadas,
+        contexto_skills=contexto_skills,
+        entidades_resolvidas=entidades_resolvidas,
         consumo_negativo_solicitado=consumo_neg_explicito,
         executar_sql_fn=executar_sql_fn,
         valores_distintos_fn=valores_distintos_fn,
         descrever_tabela_fn=descrever_tabela_fn,
     )
-    msgs_historico = converter_historico_para_mensagens(historico)
-    etapas_ms["preparacao_ms"] = int((time.perf_counter() - t0) * 1000)
 
     t_agente = time.perf_counter()
     agente = construir_agente_sql(modelo=modelo)
@@ -428,7 +416,6 @@ def responder(
     t_val = time.perf_counter()
     saida: RespostaAgente = resultado_run.output
 
-    # Se houve bloqueio determinístico na ferramenta consultar_gold, força status="bloqueado"
     if deps.bloqueio:
         saida = saida.model_copy(
             update={
@@ -506,3 +493,115 @@ def responder(
     if conversa_id is not None:
         payload["conversa_id"] = conversa_id
     return payload
+
+
+def responder(
+    pergunta: str,
+    *,
+    historico: list[TrocaHistorico | dict[str, Any]] | None = None,
+    conversa_id: str | None = None,
+    modelo: Model | None = None,
+    executar_sql_fn: Any | None = None,
+    valores_distintos_fn: Any | None = None,
+    descrever_tabela_fn: Any | None = None,
+    skills_ativas: list[str] | None = None,
+    entidades_resolvidas: dict[str, Any] | None = None,
+    gold_atualizada_em: datetime | str | None = None,
+    modo_schema: ModoSchema | None = None,
+    usar_cache: bool | None = None,
+    usar_self_consistency: bool | None = None,
+) -> dict[str, Any]:
+    """Função principal do agente do Théo: recebe a pergunta e devolve o dicionário compatível com RespostaIA."""
+    inicio_total = time.perf_counter()
+    etapas_ms: dict[str, int] = {}
+
+    tem_historico = bool(historico)
+    if usar_cache is not None:
+        cache_habilitado = usar_cache
+    elif modelo is not None or executar_sql_fn is not None:
+        # Quando um modelo ou executor customizado é injetado (ex.: FunctionModel em testes),
+        # só usa cache se usar_cache=True for passado explicitamente.
+        cache_habilitado = False
+    else:
+        cache_habilitado = os.getenv("AI_CACHE_ENABLED", "1").strip() != "0"
+
+    # 1. Cache de respostas repetidas (GENAI-24) — apenas para perguntas sem histórico
+    if cache_habilitado and not tem_historico:
+        em_cache = buscar_resposta_em_cache(
+            pergunta,
+            gold_atualizada_em=gold_atualizada_em,
+            tem_historico=False,
+        )
+        if em_cache is not None:
+            if conversa_id is not None:
+                em_cache["conversa_id"] = conversa_id
+            return em_cache
+
+    # 2. Seleção de schema por skills — SS do CHESS (GENAI-23)
+    t_ss = time.perf_counter()
+    consumo_neg_explicito = detectar_pedido_consumo_negativo_explicito(pergunta)
+    skills_selecionadas, contexto_skills = montar_contexto_schema(
+        pergunta,
+        skills_forcadas=skills_ativas,
+        modo=modo_schema,
+    )
+    msgs_historico = converter_historico_para_mensagens(historico)
+    etapas_ms["ss_ms"] = int((time.perf_counter() - t_ss) * 1000)
+
+    # 3. Candidate Generator (CG do CHESS — GENAI-9, 10, 13, 14, 17)
+    resposta_inicial = _executar_uma_vez(
+        pergunta,
+        msgs_historico=msgs_historico,
+        skills_selecionadas=skills_selecionadas,
+        contexto_skills=contexto_skills,
+        consumo_neg_explicito=consumo_neg_explicito,
+        entidades_resolvidas=entidades_resolvidas or {},
+        modelo=modelo,
+        executar_sql_fn=executar_sql_fn,
+        valores_distintos_fn=valores_distintos_fn,
+        descrever_tabela_fn=descrever_tabela_fn,
+        gold_atualizada_em=gold_atualizada_em,
+        conversa_id=conversa_id,
+        etapas_base_ms=etapas_ms,
+        inicio_total=inicio_total,
+    )
+
+    # 4. Self-consistency seletiva — CHASE-SQL simplificado (GENAI-31, desligado por padrão)
+    sc_habilitado = (
+        usar_self_consistency
+        if usar_self_consistency is not None
+        else (os.getenv("AI_SELF_CONSISTENCY", "0").strip() == "1")
+    )
+    resposta_final = resposta_inicial
+    if sc_habilitado and precisa_disparar_self_consistency(resposta_inicial):
+        resposta_final = executar_votacao_chase_sql(
+            resposta_inicial,
+            lambda _idx: _executar_uma_vez(
+                pergunta,
+                msgs_historico=msgs_historico,
+                skills_selecionadas=skills_selecionadas,
+                contexto_skills=contexto_skills,
+                consumo_neg_explicito=consumo_neg_explicito,
+                entidades_resolvidas=entidades_resolvidas or {},
+                modelo=modelo,
+                executar_sql_fn=executar_sql_fn,
+                valores_distintos_fn=valores_distintos_fn,
+                descrever_tabela_fn=descrever_tabela_fn,
+                gold_atualizada_em=gold_atualizada_em,
+                conversa_id=conversa_id,
+                etapas_base_ms=etapas_ms,
+                inicio_total=inicio_total,
+            ),
+            n_extras=2,
+        )
+
+    # 5. Salvar no cache quando `ok` e sem histórico (GENAI-24)
+    if cache_habilitado and not tem_historico and resposta_final.get("status") == "ok":
+        salvar_resposta_em_cache(
+            pergunta,
+            resposta_final,
+            gold_atualizada_em=gold_atualizada_em,
+            tem_historico=False,
+        )
+
+    return resposta_final
