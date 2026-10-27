@@ -1,6 +1,6 @@
 # Contrato da API — V-Energy — V2 (proposta para revisão; alinhada à Gold em 23/10)
 
-Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) já persistem no PostgreSQL, e `GET /dashboard` e `GET /inspecoes/candidatos` leem o banco; as demais rotas ainda usam os exemplos do P1. Gold/agente não estão implementados nesta entrega.
+Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) persistem no PostgreSQL. Dashboard, filtros, fila de candidatos e números do insight de receita usam a fonte selecionada por `GOLD_SOURCE`: `seed` para desenvolvimento ou `real` para a Gold importada. Unidades e operação ainda usam respostas simuladas. A geração de texto da IA é configurada separadamente por `IA_MODO`.
 
 **A Gold é a fonte de verdade.** Quando este contrato e a Gold divergem, quem se adapta é a API: o contrato e o código mudam, os dados não. As adaptações estão na seção 16; tabelas, colunas e regras da Gold estão no *Contrato de dados Gold → API* (v2).
 
@@ -129,6 +129,24 @@ Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_
 
 ## 7. Ordens — Telas 4 e 5
 
+### Regra da fila com Gold real
+
+Com `GOLD_SOURCE=real`, `GET /inspecoes/candidatos` exige tanto
+`status_triagem=ELEGIVEL` quanto `acao_recomendada=INSPECAO_PRIORITARIA`.
+O total de candidatos, as UCs priorizadas e o potencial de recuperação do resumo
+consideram esse recorte, antes da paginação.
+
+Casos de `VALIDACAO_DOCUMENTAL` permanecem na Gold, mas não aparecem na fila de
+inspeção nem podem gerar ordem de campo pelo `POST /inspecoes`. O backend aplica
+esse bloqueio mesmo quando a chamada é feita diretamente, sem passar pela tela.
+Não há endpoint ou tela de tratamento documental definido nesta entrega.
+
+Esse comportamento foi alinhado com o responsável pela interface da fila em
+27/10/2026, sem incompatibilidade com o fluxo visual existente. O modo `seed`
+mantém o comportamento de desenvolvimento.
+
+### Ciclo das ordens
+
 Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadores de transporte em `schemas/inspecoes.py`. As regras de ciclo não mudam; a persistência usa as tabelas `portal.ordens_inspecao` e `portal.ordens_historico`.
 
 - Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
@@ -151,6 +169,17 @@ GET /inspecoes?page=1&page_size=20
 ### POST /inspecoes
 
 Obrigatórios: id_uc e equipe_responsavel. data_prevista opcional no modelo do Gabriel; a modal pode exigir antes do envio. Demais campos opcionais. Servidor gera ID, datas, status e histórico.
+
+Com `GOLD_SOURCE=real`, uma UC marcada como `VALIDACAO_DOCUMENTAL` em
+`gold.tb_fila_perdas` retorna **422 `DADOS_INVALIDOS`**, sem criar ordem nem
+histórico. A interface deve exibir a mensagem retornada pela API:
+
+```json
+{
+  "codigo": "DADOS_INVALIDOS",
+  "mensagem": "UC requer validacao documental antes de gerar inspecao."
+}
+```
 
 ```http
 POST /inspecoes
