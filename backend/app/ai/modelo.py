@@ -159,9 +159,8 @@ def obter_model_settings(
     except ValueError as exc:
         raise ConfiguracaoLLMError("LLM_TIMEOUT_S deve ser numérico.") from exc
 
-    max_tokens = 2048 if perfil == "sql" else 1024
-
     if provedor_resolvido in {"google", "google-gla"}:
+        max_tokens = 2048 if perfil == "sql" else 1024
         thinking_budget = 256 if perfil == "sql" else 0
         budget_env = _ler_env(f"LLM_THINKING_BUDGET_{perfil.upper()}") or _ler_env("LLM_THINKING_BUDGET")
         if budget_env:
@@ -180,10 +179,17 @@ def obter_model_settings(
             settings["google_thinking_config"] = {"thinking_budget": thinking_budget}
         return GoogleModelSettings(**settings)
 
+    # Em provedores OpenAI/OpenRouter (como Nemotron), tokens de raciocínio contam dentro de max_tokens.
+    # Usamos max_tokens=4096 e limitamos reasoning.max_tokens=256 (GENAI-1.3: raciocínio baixo e latência < 30s).
+    max_tokens_or = 4096 if perfil == "sql" else 1536
+    esforco = _ler_env("LLM_REASONING_EFFORT", "low" if perfil == "sql" else "minimal")
+    reasoning_max = 256 if perfil == "sql" else 64
     return OpenAIChatModelSettings(
         temperature=temperatura,
-        max_tokens=max_tokens,
+        max_tokens=max_tokens_or,
         timeout=timeout_s,
+        openai_reasoning_effort=esforco,  # type: ignore[typeddict-item]
+        extra_body={"reasoning": {"effort": esforco, "max_tokens": reasoning_max}},
     )
 
 
