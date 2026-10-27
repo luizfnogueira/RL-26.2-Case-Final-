@@ -18,3 +18,5 @@ FatoUCMes = model('FatoUCMes', 'fato_uc_mes')
 AggDecFecMensal = model('AggDecFecMensal', 'agg_dec_fec_mensal')
 
 AggPrecoVolume = model('AggPrecoVolume', 'agg_preco_volume')
+AggReceitaMensal = model('AggReceitaMensal', 'agg_receita_mensal')
+DimMes = model('DimMes', 'dim_mes')

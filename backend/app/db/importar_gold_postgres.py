@@ -70,6 +70,11 @@ def prepare(conn, migrate_legacy=False):
     for name in ORDER:
         for c in set(references(name)) | (set(COLUMNS[name]) & {'municipio', 'bairro', 'classe'}):
             conn.execute(text(f'CREATE INDEX IF NOT EXISTS "ix_gold_{name}_{c}" ON gold."{name}" ("{c}")'))
+    # Valor em aberto do dashboard: só as faturas EM ABERTO (~8% da fato_uc_mes), por mês.
+    conn.execute(text(
+        'CREATE INDEX IF NOT EXISTS "ix_gold_fato_uc_mes_em_aberto" ON gold."fato_uc_mes" ("mes_referencia") '
+        "WHERE status = 'EM ABERTO'"
+    ))
 
 
 def check_stage(conn, counts):

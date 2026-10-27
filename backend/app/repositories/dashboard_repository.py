@@ -8,13 +8,49 @@ from sqlalchemy.orm import Session
 from app.core.config import GOLD_SOURCE
 if GOLD_SOURCE == 'real':
     from app.models.gold_real import AggPrecoVolume, AggDecFecMensal as DecFecAlimentadorMes, FatoUCMes as Fatura, FatoUCMes as Leitura, DimUC as UnidadeConsumidora
+    from app.models.gold_real import AggReceitaMensal, DimMes
 else:
     from app.models.gold import DecFecAlimentadorMes, Fatura, UnidadeConsumidora, Leitura, AggPrecoVolume
+    AggReceitaMensal = DimMes = None  # o seed não tem as tabelas agregadas da Gold
 
 ENERGIA = Leitura.consumo_kwh_valido if GOLD_SOURCE == 'real' else Leitura.consumo_kwh
 UCS = DecFecAlimentadorMes.ucs_atendidas if GOLD_SOURCE == 'real' else DecFecAlimentadorMes.ucs_total
 
+
+def _usa_agregada(filtros: dict) -> bool:
+    """Gold real sem filtro de alimentador: receita e kWh já vêm somados por mês × município × bairro × classe.
+
+    A agg_receita_mensal tem 53 mil linhas contra 2,15 milhões da fato_uc_mes, com os mesmos totais
+    (receita_total = Σ valor_total; consumo_kwh = Σ consumo_kwh_valido). Ela não tem alimentador.
+    """
+    return GOLD_SOURCE == 'real' and filtros.get('alimentador') is None
+
+
+def _filtrar_agregada(consulta, filtros: dict):
+    for campo, valor in filtros.items():
+        if valor is not None:
+            consulta = consulta.where(getattr(AggReceitaMensal, campo) == valor)
+    return consulta
+
+
+def _somar_agregada(db: Session, coluna, inicio: str, fim: str, filtros: dict) -> Decimal:
+    consulta = select(func.sum(coluna)).where(AggReceitaMensal.mes_referencia.between(inicio, fim))
+    return db.execute(_filtrar_agregada(consulta, filtros)).scalar_one()
+
+
+def _serie_agregada(db: Session, coluna, inicio: str, fim: str, filtros: dict) -> list[tuple[str, Decimal]]:
+    consulta = (
+        select(AggReceitaMensal.mes_referencia, func.sum(coluna))
+        .where(AggReceitaMensal.mes_referencia.between(inicio, fim))
+        .group_by(AggReceitaMensal.mes_referencia)
+        .order_by(AggReceitaMensal.mes_referencia)
+    )
+    return [tuple(linha) for linha in db.execute(_filtrar_agregada(consulta, filtros)).all()]
+
+
 def somar_receita(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
+    if _usa_agregada(filtros):
+        return _somar_agregada(db, AggReceitaMensal.receita_total, inicio, fim, filtros)
     consulta = (
         select((func.sum(Fatura.valor_total) if GOLD_SOURCE == 'real' else func.coalesce(func.sum(Fatura.valor_total), 0)))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Fatura.id_uc)
@@ -26,6 +62,8 @@ def somar_receita(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
     return db.execute(consulta).scalar_one()
 
 def somar_energia(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
+    if _usa_agregada(filtros):
+        return _somar_agregada(db, AggReceitaMensal.consumo_kwh, inicio, fim, filtros)
     consulta = (
         select(func.sum(ENERGIA) if GOLD_SOURCE == 'real' else func.coalesce(func.sum(ENERGIA), 0))
         .join(UnidadeConsumidora, Leitura.id_uc == UnidadeConsumidora.id_uc)
@@ -90,11 +128,15 @@ def somar_continuidade(db: Session, inicio: str, fim: str, municipio: str | None
     return dec, fec
 
 def meses_da_base(db: Session) -> list[str]:
-    """Calendário da base (papel da gold.dim_mes): todos os meses com fatura, sem filtro de região."""
+    """Calendário da base: a gold.dim_mes na Gold real; no seed, os meses com fatura, sem filtro de região."""
+    if GOLD_SOURCE == 'real':
+        return list(db.scalars(select(DimMes.mes_referencia).order_by(DimMes.mes_referencia)).all())
     consulta = select(Fatura.mes_referencia).distinct().order_by(Fatura.mes_referencia)
     return list(db.scalars(consulta).all())
 
 def serie_receita(db: Session, inicio: str, fim: str, filtros: dict) -> list[tuple[str, Decimal]]:
+    if _usa_agregada(filtros):
+        return _serie_agregada(db, AggReceitaMensal.receita_total, inicio, fim, filtros)
     consulta = (
         select(Fatura.mes_referencia, func.sum(Fatura.valor_total))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Fatura.id_uc)
@@ -108,6 +150,8 @@ def serie_receita(db: Session, inicio: str, fim: str, filtros: dict) -> list[tup
     return [tuple(linha) for linha in db.execute(consulta).all()]
 
 def serie_energia(db: Session, inicio: str, fim: str, filtros: dict) -> list[tuple[str, Decimal]]:
+    if _usa_agregada(filtros):
+        return _serie_agregada(db, AggReceitaMensal.consumo_kwh, inicio, fim, filtros)
     consulta = (
         select(Leitura.mes_referencia, func.sum(ENERGIA))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Leitura.id_uc)
