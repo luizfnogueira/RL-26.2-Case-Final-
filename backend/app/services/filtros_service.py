@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.repositories import filtros_repository
+from app.repositories.gold_metadata import metadados_gold
 
 
 def montar_filtros(db: Session) -> dict:
@@ -16,9 +17,5 @@ def montar_filtros(db: Session) -> dict:
             {"alimentador": alimentador, "municipio": municipio}
             for alimentador, municipio in filtros_repository.listar_alimentadores(db)
         ],
-        "metadados": {
-            "dados_ficticios": True,
-            "gold_atualizada_em": None,
-            "observacoes": ["Dados fictícios do seed, com os nomes como estão na Gold."],
-        },
+        "metadados": metadados_gold(db, "dim_uc", "Dados fictícios do seed, com os nomes como estão na Gold."),
     }

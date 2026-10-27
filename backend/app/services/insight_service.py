@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core import config
 from app.core.exceptions import AgenteIndisponivelException, AppException
 from app.repositories import dashboard_repository
+from app.repositories.gold_metadata import metadados_gold
 from app.schemas.common import limites
 from app.schemas.dashboard import FiltrosDashboard
 from app.schemas.ia import PedidoInsight
@@ -188,8 +189,10 @@ def obter_gerador_insight() -> GeradorInsight:
 
 # ---------- caso de uso ----------
 
-def _metadados(*observacoes: str) -> dict:
-    return {"dados_ficticios": True, "gold_atualizada_em": None, "observacoes": [OBSERVACAO_BASE, *observacoes]}
+def _metadados(db, *observacoes: str) -> dict:
+    metadata = metadados_gold(db, "agg_preco_volume", OBSERVACAO_BASE)
+    metadata["observacoes"].extend(observacoes)
+    return metadata
 
 
 def gerar_insight_receita(db: Session, dados: PedidoInsight, gerador: GeradorInsight) -> dict:
@@ -214,5 +217,5 @@ def gerar_insight_receita(db: Session, dados: PedidoInsight, gerador: GeradorIns
         "texto": texto.texto,
         "numeros_utilizados": numeros,
         "gerado_em": datetime.now().astimezone(),
-        "metadados": _metadados(*observacoes),
+        "metadados": _metadados(db, *observacoes),
     }

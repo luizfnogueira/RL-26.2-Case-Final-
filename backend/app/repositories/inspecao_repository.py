@@ -8,7 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import OrdemAtivaExistenteException
-from app.models.gold import UnidadeConsumidora
+from app.models.gold_source import UnidadeConsumidora
+from app.core.config import GOLD_SOURCE
 from app.models.portal import NOME_INDICE_ORDEM_ATIVA, OrdemHistorico, OrdemInspecao
 from app.schemas.common import limites
 from app.schemas.inspecao import (
@@ -160,6 +161,14 @@ class SqlAlchemyOrdemInspecaoRepository:
 
     def existe_uc(self, id_uc: str) -> bool:
         return self.db.get(UnidadeConsumidora, id_uc.strip()) is not None
+
+    def validar_acao(self, id_uc: str) -> None:
+        if GOLD_SOURCE == 'real':
+            from app.models.gold_real import FilaPerdas
+            from app.core.exceptions import AppException
+            acao = self.db.scalar(select(FilaPerdas.acao_recomendada).where(FilaPerdas.id_uc == id_uc))
+            if acao == 'VALIDACAO_DOCUMENTAL':
+                raise AppException('UC requer validacao documental antes de gerar inspecao.', codigo='DADOS_INVALIDOS', status_code=422)
 
     def obter_por_id(self, id_ordem: int) -> Optional[OrdemInspecaoResponse]:
         modelo = self.db.get(OrdemInspecao, id_ordem)

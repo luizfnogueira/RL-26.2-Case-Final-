@@ -1,7 +1,7 @@
 from sqlalchemy import distinct, select
 from sqlalchemy.orm import Session
 
-from app.models.gold import UnidadeConsumidora
+from app.models.gold_source import UnidadeConsumidora
 
 
 def listar_municipios(db: Session) -> list[str]:

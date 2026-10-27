@@ -4,6 +4,13 @@
 
 Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do portal no schema `portal`; a recarga da Gold nunca toca no `portal`.
 
+O fluxo de carga real é CSV → PostgreSQL, sem banco intermediário; use `GOLD_SOURCE=real`. O seed permanece somente para desenvolvimento em banco separado. A documentação técnica e o guia operacional são distribuídos separadamente pela equipe no Drive, junto das orientações de acesso aos dados privados.
+
+O pacote de entrega contém **14 CSVs + `_manifesto.csv`**. O importador não recebe
+arquivos `.db`. Um backup PostgreSQL custom (assinatura `PGDMP`) é um formato
+separado, restaurado com `pg_restore`; a extensão recomendada é `.dump`. Não é
+SQLite e não substitui o pacote CSV na rotina de importação.
+
 ### Pré-requisitos
 
 - Docker com Docker Compose
@@ -11,14 +18,53 @@ Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do 
   - Ubuntu/Debian: `sudo apt install docker.io docker-compose-v2 && sudo usermod -aG docker $USER` (saia e entre de novo na sessão)
   - Windows e macOS: Docker Desktop em docs.docker.com/get-docker
 
-### Instalação e execução
+### Desenvolvimento com dados fictícios (sem CSVs privados)
+
+O `.env.example` usa `GOLD_SOURCE=seed` por padrão. Este caminho permite
+desenvolver sem acesso ao pacote privado. Use um banco separado da Gold real.
+
+```bash
+cd backend
+cp .env.example .env                              # defina POSTGRES_PASSWORD
+docker compose up -d --build --wait
+docker compose exec api python -m app.db.init_portal
+docker compose exec api python -m app.db.seed
+```
+
+Após a carga do seed, `/dashboard` e `/filtros` usam os dados fictícios.
+
+### Execução com a Gold real
+
+Use um banco dedicado e coloque os 14 CSVs e `_manifesto.csv` privados em
+`backend/data/gold`. No `.env`, configure explicitamente `GOLD_SOURCE=real`.
+Conclua a importação antes de consultar os endpoints.
 
 ```bash
 cd backend
 cp .env.example .env                              # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
+# Edite .env e altere GOLD_SOURCE para real antes de subir a API.
 docker compose up -d --build --wait               # sobe o PostgreSQL e a API e espera ficarem prontos
-docker compose exec api python -m app.db.seed     # carrega os dados fictícios da Gold
+# Coloque os 14 CSVs e _manifesto.csv privados em backend/data/gold.
+docker compose exec api python -m app.db.init_portal  # apenas na instalação inicial
+docker compose exec api python -m app.db.importar_gold_postgres
+docker compose exec api python -m app.db.verificar_gold --csv-dir data/gold
 ```
+
+Se o `.env` já existe, edite-o sem sobrescrever suas credenciais. Após mudar
+`GOLD_SOURCE`, execute `docker compose up -d --force-recreate api` para aplicar
+a configuração; apenas reiniciar o processo não atualiza o ambiente do container.
+
+Se o banco ainda tiver as tabelas provisórias do seed, a carga bloqueia a mudança
+de contrato. Depois de conferir o diagnóstico, `--migrate-legacy` habilita a
+adequação transacional das tabelas conhecidas `tb_fila_perdas`,
+`tb_fila_perdas_auditoria` e `agg_preco_volume`. Os demais contratos divergentes
+exigem revisão manual. Não execute o seed sobre o banco real.
+
+Com `GOLD_SOURCE=real`, o dashboard (incluindo ponte e drill-down), os filtros e a
+fila consultam a Gold importada. O insight de receita utiliza os mesmos números;
+o modo do gerador de texto é controlado separadamente por `IA_MODO`. As respostas
+informam a origem real e a data de exportação do manifesto. As rotas ainda
+simuladas de outras frentes continuam sendo responsabilidade de seus módulos.
 
 Documentação da API em http://localhost:8000/docs. O código em `app/` é montado no container: ao salvar, a API recarrega sozinha.
 
@@ -28,7 +74,6 @@ Comandos úteis:
 
 - logs da API: `docker compose logs -f api`
 - parar: `docker compose stop` (os dados ficam no volume)
-- apagar tudo e recomeçar: `docker compose down -v`
 - após mudar o `requirements.txt`: `docker compose up -d --build --wait`
 
 ### Testes

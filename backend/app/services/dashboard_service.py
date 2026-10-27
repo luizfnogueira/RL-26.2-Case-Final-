@@ -4,7 +4,8 @@ from app.repositories import dashboard_repository
 from app.services.stubs import indicador, paginar
 from app.schemas.common import limites
 from app.schemas.dashboard import FiltrosDashboard
-from app.models.gold import AggPrecoVolume
+from app.repositories.dashboard_repository import AggPrecoVolume
+from app.repositories.gold_metadata import metadados_gold
 from sqlalchemy.orm import Session
 
 
@@ -62,8 +63,8 @@ def montar_indicadores(db: Session, filtros: FiltrosDashboard) -> dict:
     aberto_atual = dashboard_repository.somar_inadimplencia(db, inicio_atual, fim_atual, regiao)
     aberto_comparacao = dashboard_repository.somar_inadimplencia(db, inicio_comparacao, fim_comparacao, regiao)
     
-    pct_atual = round(aberto_atual / receita_atual * 100, 4) if receita_atual else None
-    pct_comparacao = round(aberto_comparacao / receita_comparacao * 100, 4) if receita_comparacao else None
+    pct_atual = round(aberto_atual / receita_atual * 100, 4) if receita_atual and aberto_atual is not None else None
+    pct_comparacao = round(aberto_comparacao / receita_comparacao * 100, 4) if receita_comparacao and aberto_comparacao is not None else None
     pontos_percentuais = (
         None if pct_atual is None or pct_comparacao is None else round(pct_atual - pct_comparacao, 4))
 
@@ -244,7 +245,8 @@ def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
 
 def montar_dashboard(db: Session, filtros: FiltrosDashboard) -> dict:
     """KPIs e série calculados no banco; ponte e drill-down lidos da decomposição da Gold."""
-    observacoes = ["Dados fictícios do seed, com as regras da Gold."]
+    metadados = metadados_gold(db, "agg_preco_volume", "Dados fictícios do seed, com as regras da Gold.")
+    observacoes = metadados["observacoes"]
     if motivo := sem_decomposicao(filtros):
         # Fora da decomposição da Gold: ponte e drill-down ausentes; KPIs e série seguem calculados
         linhas = []
@@ -259,8 +261,8 @@ def montar_dashboard(db: Session, filtros: FiltrosDashboard) -> dict:
         "ponte_receita": montar_ponte(linhas, filtros),
         "drill_down": montar_drill(linhas, filtros),
         "metadados": {
-            "dados_ficticios": True,
-            "gold_atualizada_em": None,
+            "dados_ficticios": metadados["dados_ficticios"],
+            "gold_atualizada_em": metadados["gold_atualizada_em"],
             "observacoes": observacoes,
         },
     }

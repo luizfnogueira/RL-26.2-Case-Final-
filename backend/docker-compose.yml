@@ -33,6 +33,7 @@ services:
       # Código montado no container: alterações recarregam a API sem rebuild.
       - ./app:/app/app
       - ./tests:/app/tests
+      - ./data/gold:/app/data/gold
     depends_on:
       postgres:
         condition: service_healthy

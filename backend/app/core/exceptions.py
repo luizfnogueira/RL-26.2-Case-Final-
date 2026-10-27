@@ -79,4 +79,3 @@ class AgenteIndisponivelException(AppException):
     status_code = 503
     codigo = "AGENTE_INDISPONIVEL"
     mensagem = "O assistente está indisponível no momento. Tente novamente em alguns instantes."
-    
