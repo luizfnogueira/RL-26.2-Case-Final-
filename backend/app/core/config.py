@@ -26,6 +26,12 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg://vgrid:vgrid@localhost:5432/vgrid360",
 )
 
+# Usuário somente leitura do assistente de IA (GENAI-5). Se DATABASE_URL_AGENTE ficar vazio,
+# a conexão reaproveita host e banco do DATABASE_URL com este usuário e senha.
+AGENTE_DB_USER = os.getenv("AGENTE_DB_USER", "vgrid_agente")
+AGENTE_DB_PASSWORD = os.getenv("AGENTE_DB_PASSWORD", "")
+DATABASE_URL_AGENTE = os.getenv("DATABASE_URL_AGENTE", "")
+
 # Assistente de IA (POST /ia). mock = respostas simuladas, sem chamar o agente da Equipe 3.
 IA_MODO = os.getenv("IA_MODO", "mock")
 if IA_MODO not in ("mock", "real"):
