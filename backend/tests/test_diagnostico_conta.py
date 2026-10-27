@@ -3,11 +3,12 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.unidade_service import MesConsumo, diagnosticar_conta, media_12_meses
+from app.services.unidade_service import MesConsumo, diagnosticar_conta, media_12_meses, somar_meses
 
 PERIODO = '2025-07/2026-06'
-JANELA = [f'{2025 + (6 + i) // 12}-{(6 + i) % 12 + 1:02d}' for i in range(12)]      # 2025-07 … 2026-06
-ANTERIORES = [f'{int(m[:4]) - 1}{m[4:]}' for m in JANELA]                         # 2024-07 … 2025-06
+JANELA = [somar_meses('2025-07', i) for i in range(12)]          # 2025-07 … 2026-06
+ANTERIORES = [somar_meses(m, -12) for m in JANELA]               # 2024-07 … 2025-06
+BASE_MEDIA = '2025-06/2026-05'                                   # 12 meses antes de 2026-06, sem ele
 
 
 def _mes(mes, consumo, anterior=None, tipo='REAL', troca=False, flag=None):
@@ -30,14 +31,24 @@ def historico(ultimo=412, ano_anterior=298, base=300, tipo='REAL', tipo_anterior
     return meses
 
 
+def test_somar_meses_atravessa_o_ano():
+    assert somar_meses('2026-06', -12) == '2025-06'
+    assert somar_meses('2026-01', -1) == '2025-12'
+    assert somar_meses('2025-12', 1) == '2026-01'
+
+
 def test_conta_alta_com_consumo_acima_da_media_explica_a_conta():
     d = diagnosticar_conta(historico(), PERIODO)
 
+    assert d['periodo_referencia'] == '2026-06'
     assert d['conta_alta'] is True
     assert d['veredito'].startswith('Consumo subiu')
+    assert 'média dos meses anteriores (12 meses)' in d['veredito']
     assert d['ultimo_mes'] == {'valor': 412.0, 'unidade': 'kWh', 'periodo_referencia': '2026-06'}
     assert d['mesmo_mes_ano_anterior'] == {'valor': 298.0, 'unidade': 'kWh', 'periodo_referencia': '2025-06'}
-    assert d['media_12_meses'] == {'valor': 309.33, 'unidade': 'kWh', 'periodo_referencia': PERIODO}
+    # (298 + 11 × 300) / 12: jun/2025 a mai/2026, sem o próprio jun/2026
+    assert d['media_12_meses'] == {'valor': 299.83, 'unidade': 'kWh', 'periodo_referencia': BASE_MEDIA}
+    assert d['meses_media'] == 12
     assert d['variacao_percentual'] == {'valor': 38.26, 'unidade': '%', 'periodo_referencia': '2026-06'}
     assert d['leitura_estimada'] is False and d['alerta'] is None
 
@@ -73,33 +84,59 @@ def test_sem_ano_anterior_fica_nulo_e_usa_so_a_media():
     assert d['conta_alta'] is None
     assert d['mesmo_mes_ano_anterior']['valor'] is None
     assert d['variacao_percentual']['valor'] is None
+    assert d['meses_media'] == 11                                # jun/2025 sem consumo fica fora
     assert d['veredito'].startswith('Sem o mesmo mês do ano anterior')
-    assert 'acima da média' in d['veredito']
+    assert 'acima da média dos meses anteriores (11 meses)' in d['veredito']
 
 
 def test_ultimo_mes_sem_consumo_valido_nao_avalia_a_conta():
     d = diagnosticar_conta(historico(ultimo=0), PERIODO)
     assert d['conta_alta'] is None and d['variacao_percentual']['valor'] is None
     assert d['veredito'].startswith('Sem consumo válido em 2026-06')
-    assert d['media_12_meses']['valor'] == 300.0                  # o mês com 0 fica fora da média
+    assert d['media_12_meses']['valor'] == 299.83
 
 
-def test_uc_sem_nenhum_mes_devolve_tudo_nulo():
-    d = diagnosticar_conta([], PERIODO)
-    assert d['conta_alta'] is None
+def test_ultimo_mes_com_dado_e_o_mes_analisado_quando_a_janela_passa_do_fim_da_base():
+    d = diagnosticar_conta(historico(), '2026-01/2026-12')
+    assert d['periodo_referencia'] == '2026-06'
+    assert d['ultimo_mes'] == {'valor': 412.0, 'unidade': 'kWh', 'periodo_referencia': '2026-06'}
+    assert d['mesmo_mes_ano_anterior']['periodo_referencia'] == '2025-06'
+    # A média não segue a janela: são os mesmos 12 meses anteriores a jun/2026.
+    assert d['media_12_meses'] == {'valor': 299.83, 'unidade': 'kWh', 'periodo_referencia': BASE_MEDIA}
+    assert d['veredito'].startswith('Consumo subiu: 2026-06')
+
+
+@pytest.mark.parametrize('meses', [[], historico()], ids=['uc_sem_meses', 'janela_sem_dados'])
+def test_janela_sem_dado_da_uc_devolve_veredito_e_mes_nulos(meses):
+    d = diagnosticar_conta(meses, '2030-01/2030-12')
+    assert d['periodo_referencia'] is None and d['veredito'] is None and d['conta_alta'] is None
     assert all(d[c]['valor'] is None for c in
                ('ultimo_mes', 'mesmo_mes_ano_anterior', 'media_12_meses', 'variacao_percentual'))
+    assert d['ultimo_mes']['periodo_referencia'] == '2030-12'
+    assert d['meses_media'] == 0
     assert d['leitura_estimada'] is False and d['alerta'] is None
 
 
 @pytest.mark.parametrize('ruido', [None, 0, -5])
 def test_media_ignora_meses_nulos_e_nao_positivos(ruido):
-    meses = [_mes(m, 300) for m in JANELA[:-1]] + [_mes(JANELA[-1], ruido)]
-    assert media_12_meses(meses, PERIODO) == 300.0
+    anteriores = [somar_meses('2026-06', -i) for i in range(1, 13)]
+    meses = [_mes(m, 300) for m in anteriores[1:]] + [_mes(anteriores[0], ruido)]
+    assert media_12_meses(meses, '2026-06') == (300.0, 11)
 
 
-def test_media_considera_so_a_janela():
-    assert media_12_meses(historico(base=300, ultimo=300) + [_mes('2023-01', 9000)], PERIODO) == 300.0
+def test_media_usa_so_os_12_meses_anteriores_sem_o_mes_analisado():
+    anteriores = [_mes(somar_meses('2026-06', -i), 300) for i in range(1, 13)]
+    fora = [_mes('2025-05', 9000), _mes('2026-06', 9000)]       # 13 meses antes e o próprio mês
+    assert media_12_meses(anteriores + fora, '2026-06') == (300.0, 12)
+
+
+def test_uc_recente_usa_os_meses_que_existem():
+    meses = [_mes(m, 300) for m in JANELA[6:-1]] + [_mes('2026-06', 500)]   # ligada em jan/2026
+    d = diagnosticar_conta(meses, PERIODO)
+    assert d['media_12_meses'] == {'valor': 300.0, 'unidade': 'kWh', 'periodo_referencia': BASE_MEDIA}
+    assert d['meses_media'] == 5
+    assert d['conta_alta'] is None
+    assert 'acima da média dos meses anteriores (5 meses)' in d['veredito']
 
 
 def test_leitura_estimada_no_ultimo_mes():
