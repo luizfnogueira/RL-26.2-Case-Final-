@@ -1,4 +1,4 @@
-"""Agente Gerador Text-to-SQL (Candidate Generator — CG do CHESS) com PydanticAI (GENAI-9, 13, 14).
+"""Agente Gerador Text-to-SQL (Candidate Generator — CG do CHESS) com PydanticAI (GENAI-9, 10, 13, 14).
 
 Implementa:
 - Montagem de instruções com regras críticas no início e no fim do contexto (mitigação de lost-in-the-middle).
@@ -9,6 +9,9 @@ Implementa:
      ausência de filtro de consumo negativo; encerra sem retry em SQLBloqueado.
   2. `valores_distintos(tabela, coluna)` — Information Retriever (IR do CHESS) restrito a colunas categóricas.
   3. `descrever_tabela(tabela)` — consulta de schema sob demanda.
+- `@agente.output_validator` (GENAI-10): confere marcadores `{v1}`, números contra os dados, premissas falsas
+  e ausência de consumo negativo; tenta ModelRetry 1x e converte para `nao_sei` se persistir.
+- Suporte a `message_history` para perguntas de follow-up (GENAI-13) e apresentação `texto` vs `tabela` (GENAI-14).
 """
 
 from __future__ import annotations
@@ -35,6 +38,14 @@ from app.ai.contratos import (
     TrocaHistorico,
 )
 from app.ai.modelo import criar_modelo, obter_model_settings, obter_nome_modelo, obter_provedor_configurado
+from app.ai.resposta import (
+    ViolacaoFidelidadeSaida,
+    complementar_texto_para_tabela,
+    decidir_modo_apresentacao,
+    enriquecer_avisos_e_premissas,
+    substituir_marcadores_pt_br,
+    validar_fidelidade_saida,
+)
 from app.ai.telemetria import construir_telemetria, montar_detalhes_tecnicos
 from app.db.gold_contract import COLUMNS
 
@@ -69,13 +80,19 @@ REGRAS_CRITICAS_TOPO = """
      * Em `fato_uc_mes`, use SEMPRE `consumo_kwh_valido` e inclua no `WHERE`: `flag_consumo_negativo = FALSE AND consumo_kwh_valido IS NOT NULL AND consumo_kwh_valido >= 0` (e `consumo_kwh_valido > 0` ao buscar o menor consumo positivo de uma UC ativa).
      * Em `uc_consumo_comparativo`, inclua no `WHERE`: `consumo_kwh >= 0`.
    - EXCEÇÃO ÚNICA: Só consulte `flag_consumo_negativo = TRUE` ou `consumo_kwh < 0` se o usuário pedir EXPLICITAMENTE os casos em que o medidor deu erro / gerou consumo negativo.
-3. ZERO INVENÇÃO DE NÚMEROS:
+3. ZERO INVENÇÃO DE NÚMEROS E MARCADORES `{v1}` (GENAI-10):
    - Sempre chame a ferramenta `consultar_gold` antes de responder com números.
-   - No campo `texto`, referencie os números retornados pelo banco usando marcadores `{v1}`, `{v2}` e preencha o dicionário `marcadores` com os valores exatos das células (ex.: `{"v1": 169680000.0, "v2": -2.09}`).
+   - No campo `texto`, referencie os números retornados pelo banco usando marcadores `{v1}`, `{v2}` e preencha o dicionário `marcadores` com os valores exatos das células retornadas (ex.: `{"v1": 169680000.0, "v2": -2.09}`).
+   - Não escreva números soltos fora dos marcadores que não estejam nos dados da consulta.
    - Se a consulta retornar vazio, se o período for fora de jul/2022 a jun/2026 ou se a pergunta for fora do escopo da V-Energy, devolva `status="nao_sei"` explicando o motivo.
-4. CORREÇÃO DE PREMISSA FALSA:
-   - Se a pergunta contiver uma premissa contrária aos dados (ex.: "Quanto a receita comercial cresceu em Jaboatão?", quando na verdade caiu 2,09% de P1 para P2), corrija a premissa de forma clara no texto usando os números reais da consulta.
-5. DADOS PESSOAIS PROTEGIDOS:
+4. CORREÇÃO DE PREMISSA FALSA (GENAI-10.4):
+   - Se a pergunta contiver uma premissa contrária aos dados (ex.: "Quanto a receita comercial cresceu em Jaboatão?", quando na verdade caiu 2,09% de P1 para P2), corrija a premissa de forma explícita no texto informando que houve queda/redução.
+5. CONTINUAÇÃO DE CONVERSA / FOLLOW-UP (GENAI-13):
+   - Quando houver histórico na conversa (ex.: usuário pergunta "E só comercial?", "E em Olinda?", "E no ano anterior?"), herde da troca anterior os filtros não repetidos (métrica, município, bairro, classe ou período), registre essa herança em `premissas` e escreva a `pergunta_interpretada` completa e autossuficiente.
+6. ALIASES SQL E TABELAS (GENAI-14):
+   - Use aliases legíveis e com unidade nas colunas do SQL (ex.: `receita_energia_brl`, `consumo_valido_kwh`, `dec_horas_uc`, `variacao_pct`).
+   - Quando o resultado for um ranking ou lista (várias linhas), mencione no texto o período, a unidade e o destaque do 1º lugar.
+7. DADOS PESSOAIS PROTEGIDOS:
    - O agente não tem acesso a `cpf_cnpj`, `nome_titular` ou endereço detalhado. Se pedirem titular ou CPF, recuse com `status="bloqueado"`.
 """.strip()
 
@@ -84,6 +101,7 @@ REGRAS_CRITICAS_RODAPE = """
 - Preencha primeiro o `plano` (`PlanoConsulta`) com tabelas, colunas, filtros, agregação, ordenação, limite e período.
 - Se consultar `fato_uc_mes` ou `uc_consumo_comparativo` para consumo normal (especialmente `MIN`, menor consumo, média ou ranking), garanta `flag_consumo_negativo = FALSE` e `consumo_kwh_valido >= 0` (ou `> 0` para menor consumo de UC ativa). NUNCA mostre consumo negativo salvo pedido explícito de erro de medidor!
 - Cite sempre o período (ex.: P1 = jul/2022 a jun/2023; P2 = jul/2025 a jun/2026), a unidade (R$, kWh, %, h/UC) e a métrica (ex.: receita de energia sem tributos vs. receita faturada com tributos).
+- Todos os números citados no `texto` devem estar declarados em `marcadores` (`{v1}`, `{v2}`) e bater com o resultado de `consultar_gold`.
 """.strip()
 
 
@@ -223,7 +241,13 @@ def valores_distintos_padrao(tabela: str, coluna: str) -> list[str]:
 
 
 def converter_historico_para_mensagens(historico: list[TrocaHistorico | dict[str, Any]] | None) -> list[ModelMessage]:
-    """Converte as até 3 últimas trocas em pares user/model do PydanticAI (GENAI-13)."""
+    """Converte as até 3 últimas trocas em pares user/model do PydanticAI (GENAI-13).
+
+    Cada troca gera:
+    - ModelRequest (user): pergunta interpretada completa do turno anterior.
+    - ModelResponse (model): resumo de até 300 caracteres + SQL executado + filtros resolvidos.
+    Nunca inclui linhas brutas de dados, mantendo o histórico compacto (~600 tokens máx).
+    """
     if not historico:
         return []
 
@@ -232,23 +256,19 @@ def converter_historico_para_mensagens(historico: list[TrocaHistorico | dict[str
     for item in ultimas:
         troca = item if isinstance(item, TrocaHistorico) else TrocaHistorico.model_validate(item)
         mensagens.append(ModelRequest(parts=[UserPromptPart(content=troca.pergunta_interpretada)]))
-        resumo_curto = (troca.resposta_resumo or "")[:300]
-        bloco_modelo = f"Resumo: {resumo_curto}"
+        resumo_curto = (troca.resposta_resumo or "").strip()[:300]
+        partes_modelo = [f"Resumo: {resumo_curto}"]
+        if troca.filtros:
+            partes_modelo.append(f"Filtros ativos: {troca.filtros}")
         if troca.sql_executado:
-            bloco_modelo += f"\nSQL executado: {troca.sql_executado}"
-        mensagens.append(ModelResponse(parts=[TextPart(content=bloco_modelo)]))
+            partes_modelo.append(f"SQL executado: {troca.sql_executado}")
+        mensagens.append(ModelResponse(parts=[TextPart(content="\n".join(partes_modelo))]))
     return mensagens
 
 
 def decidir_apresentacao(status: str, resultado: ResultadoConsulta | None) -> ModoApresentacao:
-    """Decide deterministicamente se a resposta vai como 'texto' ou 'tabela' (GENAI-14)."""
-    if status != "ok" or resultado is None or resultado.bloqueado:
-        return "texto"
-    if resultado.n_linhas > 1:
-        return "tabela"
-    if resultado.n_linhas == 1 and len(resultado.colunas) > 2:
-        return "tabela"
-    return "texto"
+    """Alias para `decidir_modo_apresentacao` (GENAI-14)."""
+    return decidir_modo_apresentacao(status, resultado)
 
 
 def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, RespostaAgente]:
@@ -288,7 +308,9 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
             indices_consumo = [
                 idx
                 for idx, col in enumerate(resultado.colunas)
-                if "consumo" in col.lower() or "menor_consumo" in col.lower()
+                if "consumo" in col.lower()
+                and "variacao" not in col.lower()
+                and "queda" not in col.lower()
             ]
             for linha in resultado.linhas:
                 for idx in indices_consumo:
@@ -325,22 +347,39 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
         fn = ctx.deps.descrever_tabela_fn or descrever_tabela_padrao
         return fn(tabela)
 
+    @agente.output_validator
+    def _validar_saida(ctx: RunContext[DepsAgente], saida: RespostaAgente) -> RespostaAgente:
+        """Valida marcadores, números e regras de domínio (GENAI-10.2).
+
+        Na 1ª falha dispara `ModelRetry`; se repetir na 2ª tentativa, converte de forma segura
+        para `status='nao_sei'`, garantindo taxa de invenção 0%.
+        """
+        try:
+            return validar_fidelidade_saida(ctx.deps, saida)
+        except ViolacaoFidelidadeSaida as exc:
+            ctx.deps.tentativas_validacao_saida += 1
+            if ctx.deps.tentativas_validacao_saida <= 1:
+                raise ModelRetry(str(exc)) from exc
+            return saida.model_copy(
+                update={
+                    "status": "nao_sei",
+                    "sql": None,
+                    "marcadores": {},
+                    "texto": (
+                        "Não foi possível confirmar os números da resposta com precisão suficiente "
+                        "a partir dos dados consultados na camada Gold."
+                    ),
+                    "justificativa": f"Validação de fidelidade reprovada após retry: {exc}",
+                    "confianca": "baixa",
+                }
+            )
+
     return agente
 
 
 def formatar_marcadores_no_texto(texto: str, marcadores: dict[str, str | int | float]) -> str:
-    """Substitui marcadores `{v1}`, `{v2}` no texto caso o modelo os tenha deixado em formato de template."""
-    if not marcadores or not texto:
-        return texto
-    texto_final = texto
-    for chave, valor in marcadores.items():
-        placeholder = "{" + str(chave).strip("{}") + "}"
-        if isinstance(valor, float):
-            valor_fmt = f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        else:
-            valor_fmt = str(valor)
-        texto_final = texto_final.replace(placeholder, valor_fmt)
-    return texto_final
+    """Substitui marcadores `{v1}`, `{v2}` com formatação pt-BR (GENAI-10.1)."""
+    return substituir_marcadores_pt_br(texto, marcadores)
 
 
 def responder(
@@ -354,6 +393,7 @@ def responder(
     descrever_tabela_fn: Any | None = None,
     skills_ativas: list[str] | None = None,
     entidades_resolvidas: dict[str, Any] | None = None,
+    gold_atualizada_em: datetime | str | None = None,
 ) -> dict[str, Any]:
     """Função principal do agente do Théo: recebe a pergunta e devolve o dicionário compatível com RespostaIA."""
     inicio_total = time.perf_counter()
@@ -385,6 +425,7 @@ def responder(
     )
     etapas_ms["agente_ms"] = int((time.perf_counter() - t_agente) * 1000)
 
+    t_val = time.perf_counter()
     saida: RespostaAgente = resultado_run.output
 
     # Se houve bloqueio determinístico na ferramenta consultar_gold, força status="bloqueado"
@@ -397,12 +438,24 @@ def responder(
             }
         )
 
-    sql_final = saida.sql or deps.ultimo_sql
+    sql_final = deps.ultimo_sql or saida.sql
     if saida.status == "ok" and sql_final != saida.sql:
         saida = saida.model_copy(update={"sql": sql_final})
 
-    texto_renderizado = formatar_marcadores_no_texto(saida.texto, saida.marcadores)
     ultimo_res = deps.ultimo_resultado
+    apresentacao = decidir_modo_apresentacao(saida.status, ultimo_res)
+    texto_renderizado = substituir_marcadores_pt_br(saida.texto, saida.marcadores)
+    periodo_plano = saida.plano.periodo if saida.plano else None
+    texto_renderizado = complementar_texto_para_tabela(
+        texto_renderizado,
+        apresentacao,
+        ultimo_res,
+        periodo=periodo_plano,
+    )
+
+    observacoes = enriquecer_avisos_e_premissas(saida, sql_final, ultimo_res)
+    saida = saida.model_copy(update={"premissas": observacoes})
+    etapas_ms["validacao_ms"] = int((time.perf_counter() - t_val) * 1000)
 
     if saida.status == "ok" and ultimo_res and not ultimo_res.bloqueado:
         colunas_resp = list(ultimo_res.colunas)
@@ -418,7 +471,6 @@ def responder(
         tabelas_resp = []
         n_linhas_real = 0
 
-    apresentacao = decidir_apresentacao(saida.status, ultimo_res)
     latencia_total_ms = int((time.perf_counter() - inicio_total) * 1000)
 
     telemetria = construir_telemetria(
@@ -429,6 +481,7 @@ def responder(
         provedor_nome=obter_provedor_configurado(),
         latencia_total_ms=latencia_total_ms,
         etapas_ms=etapas_ms,
+        numeros_conferidos=(saida.status == "ok" and deps.tentativas_validacao_saida <= 1),
     )
     detalhes = montar_detalhes_tecnicos(saida, telemetria, n_linhas=n_linhas_real)
 
@@ -444,8 +497,8 @@ def responder(
         "gerado_em": datetime.now(timezone.utc),
         "metadados": {
             "dados_ficticios": False,
-            "gold_atualizada_em": None,
-            "observacoes": list(saida.premissas),
+            "gold_atualizada_em": gold_atualizada_em,
+            "observacoes": observacoes,
         },
         "apresentacao": apresentacao,
         "detalhes_tecnicos": detalhes,
