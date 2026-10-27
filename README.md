@@ -18,17 +18,41 @@ SQLite e não substitui o pacote CSV na rotina de importação.
   - Ubuntu/Debian: `sudo apt install docker.io docker-compose-v2 && sudo usermod -aG docker $USER` (saia e entre de novo na sessão)
   - Windows e macOS: Docker Desktop em docs.docker.com/get-docker
 
-### Instalação e execução
+### Desenvolvimento com dados fictícios (sem CSVs privados)
+
+O `.env.example` usa `GOLD_SOURCE=seed` por padrão. Este caminho permite
+desenvolver sem acesso ao pacote privado. Use um banco separado da Gold real.
+
+```bash
+cd backend
+cp .env.example .env                              # defina POSTGRES_PASSWORD
+docker compose up -d --build --wait
+docker compose exec api python -m app.db.init_portal
+docker compose exec api python -m app.db.seed
+```
+
+Após a carga do seed, `/dashboard` e `/filtros` usam os dados fictícios.
+
+### Execução com a Gold real
+
+Use um banco dedicado e coloque os 14 CSVs e `_manifesto.csv` privados em
+`backend/data/gold`. No `.env`, configure explicitamente `GOLD_SOURCE=real`.
+Conclua a importação antes de consultar os endpoints.
 
 ```bash
 cd backend
 cp .env.example .env                              # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
+# Edite .env e altere GOLD_SOURCE para real antes de subir a API.
 docker compose up -d --build --wait               # sobe o PostgreSQL e a API e espera ficarem prontos
 # Coloque os 14 CSVs e _manifesto.csv privados em backend/data/gold.
 docker compose exec api python -m app.db.init_portal  # apenas na instalação inicial
 docker compose exec api python -m app.db.importar_gold_postgres
 docker compose exec api python -m app.db.verificar_gold --csv-dir data/gold
 ```
+
+Se o `.env` já existe, edite-o sem sobrescrever suas credenciais. Após mudar
+`GOLD_SOURCE`, execute `docker compose up -d --force-recreate api` para aplicar
+a configuração; apenas reiniciar o processo não atualiza o ambiente do container.
 
 Se o banco ainda tiver as tabelas provisórias do seed, a carga bloqueia a mudança
 de contrato. Depois de conferir o diagnóstico, `--migrate-legacy` habilita a

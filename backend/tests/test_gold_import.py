@@ -256,17 +256,21 @@ def test_pg_legacy_migration_is_explicit(package, pg):
     assert import_gold(pg, package, migrate_legacy=True)['tb_fila_perdas'] == 1
 
 
-def test_pg_api_real_source_and_documental_guard(package, pg):
+@pytest.mark.parametrize('status, valor_em_aberto', [('PAGO', 0), ('EM ABERTO', 12.30)])
+def test_pg_api_real_source_and_documental_guard(package, pg, status, valor_em_aberto):
     from app.db.base import PortalBase
     from app.models import portal  # noqa
     with pg.begin() as conn:
         conn.execute(text('CREATE SCHEMA portal'))
         PortalBase.metadata.create_all(conn)
+    change(package, 'fato_uc_mes', 'status', status)
     import_gold(pg, package)
-    env = dict(os.environ, GOLD_SOURCE='real', DATABASE_URL=pg.url.render_as_string(hide_password=False))
+    env = dict(os.environ, GOLD_SOURCE='real', DATABASE_URL=pg.url.render_as_string(hide_password=False),
+               EXPECTED_OPEN_VALUE=str(valor_em_aberto))
     check = """
 from fastapi.testclient import TestClient
 from app.main import app
+import os
 with TestClient(app) as client:
     r = client.get('/inspecoes/candidatos', params={'periodo_atual':'2025-07/2026-06'})
     assert r.status_code == 200
@@ -275,6 +279,7 @@ with TestClient(app) as client:
     r = client.get('/dashboard', params={'periodo_atual':'2025-07/2026-06','periodo_comparacao':'2022-07/2023-06'})
     assert r.status_code == 200
     data = r.json()
+    assert data['indicadores']['inadimplencia']['atual']['valor'] == float(os.environ['EXPECTED_OPEN_VALUE'])
     assert data['metadados']['dados_ficticios'] is False
     assert data['metadados']['gold_atualizada_em'] is not None
     assert data['ponte_receita']['receita_energia_atual']['valor'] is not None

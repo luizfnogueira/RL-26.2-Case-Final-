@@ -50,7 +50,7 @@ def contar_ucs_ativas(db: Session, inicio: str, fim: str, filtros: dict) -> int:
 
 def somar_inadimplencia(db: Session, inicio: str, fim: str, filtros: dict) -> Decimal:
     consulta = (
-        select((func.sum(Fatura.valor_total) if GOLD_SOURCE == 'real' else func.coalesce(func.sum(Fatura.valor_total), 0)))
+        select(func.coalesce(func.sum(Fatura.valor_total), 0))
         .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == Fatura.id_uc)
         .where(
             Fatura.mes_referencia.between(inicio, fim),
