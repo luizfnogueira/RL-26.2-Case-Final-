@@ -61,6 +61,10 @@ class TestUnidades:
         assert [u['id_uc'] for u in get('/unidades', busca='comércio')['items']] == ['UC-DEMO-002', 'UC-DEMO-006']
         assert get('/unidades', busca='inexistente')['items'] == []
 
+    @pytest.mark.parametrize('busca', ['UC', '  ab  ', 'x' * 101])
+    def test_busca_fora_de_3_a_100_caracteres(self, busca):
+        erro(client.get('/unidades', params={'busca': busca}), 422, 'DADOS_INVALIDOS')
+
     def test_paginacao(self):
         dados = get('/unidades', page=3, page_size=3)
         assert dados['total'] == 8 and len(dados['items']) == 2
@@ -73,7 +77,13 @@ class TestUnidades:
 
     def test_detalhe_inexistente(self):
         erro(client.get('/unidades/UC-DEMO-002'), 404, 'UC_INEXISTENTE')
-        erro(client.get('/unidades/UC-DEMO-001', params={'periodo_atual': '2026-06'}), 422,
+
+    @pytest.mark.parametrize('periodo', ['2026-06', '2026-01/2026-06', '2024-07/2026-06'])
+    def test_detalhe_exige_janela_de_12_meses(self, periodo):
+        erro(client.get('/unidades/UC-DEMO-001', params={'periodo_atual': periodo}), 422, 'DADOS_INVALIDOS')
+
+    def test_detalhe_outra_janela_de_12_meses_fora_do_stub(self):
+        erro(client.get('/unidades/UC-DEMO-001', params={'periodo_atual': '2024-07/2025-06'}), 422,
              'CENARIO_STUB_INDISPONIVEL')
 
 

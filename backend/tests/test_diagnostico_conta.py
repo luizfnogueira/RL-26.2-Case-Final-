@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.services.stubs import exemplo
 from app.services.unidade_service import MesConsumo, diagnosticar_conta, media_12_meses, somar_meses
 
 PERIODO = '2025-07/2026-06'
@@ -29,6 +30,17 @@ def historico(ultimo=412, ano_anterior=298, base=300, tipo='REAL', tipo_anterior
     meses += [_mes(m, base, base) for m in JANELA[:-1]]
     meses.append(_mes(JANELA[-1], ultimo, ano_anterior, tipo=tipo, troca=troca, flag=flag))
     return meses
+
+
+def test_exemplo_do_contrato_segue_a_regra():
+    """O diagnóstico do unidade.json é o que a função calcula sobre o consumo do próprio exemplo."""
+    unidade = exemplo('unidade')
+    meses = []
+    for c in unidade['consumo']:
+        atual, anterior = c['atual']['valor'], c['ano_anterior']['valor']
+        meses.append(_mes(c['mes'], atual, Decimal(str(anterior)), tipo=c['tipo_leitura']))
+        meses.append(_mes(c['ano_anterior']['periodo_referencia'], anterior))
+    assert diagnosticar_conta(meses, unidade['periodo_referencia']) == unidade['diagnostico_conta']
 
 
 def test_somar_meses_atravessa_o_ano():

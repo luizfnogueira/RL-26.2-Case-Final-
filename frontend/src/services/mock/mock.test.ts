@@ -132,6 +132,20 @@ describe('GET /unidades', () => {
     expect(nenhuma).toMatchObject({ items: [], total: 0 })
   })
 
+  it('exige busca de 3 a 100 caracteres', async () => {
+    for (const busca of ['UC', '  ab  ', 'x'.repeat(101)]) {
+      const erro = await erroDe(buscarUnidades({ busca }))
+      expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
+    }
+  })
+
+  it('exige janela de 12 meses na visão 360', async () => {
+    for (const periodo_atual of ['2026-06', '2026-01/2026-06', '2024-07/2026-06']) {
+      const erro = await erroDe(buscarUnidade('UC-DEMO-001', { periodo_atual }))
+      expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
+    }
+  })
+
   it('só UC-DEMO-001 tem visão 360; outras UCs dão 404', async () => {
     const uc = await buscarUnidade('UC-DEMO-001', { periodo_atual: ATUAL })
     expect(uc.consumo).toHaveLength(12)

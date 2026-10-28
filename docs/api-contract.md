@@ -22,8 +22,8 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | Rota | Query ou corpo |
 | --- | --- |
 | GET /dashboard | Ambos os períodos obrigatórios; município, bairro, classe, alimentador; `nivel=municipio|bairro|classe`, page, page_size |
-| GET /unidades | busca (ID ou titular, 1–100 caracteres); município, bairro, classe, alimentador; page, page_size |
-| GET /unidades/{id} | periodo_atual opcional; no mock o padrão é 2025-07/2026-06 |
+| GET /unidades | busca (ID ou titular, 3–100 caracteres); município, bairro, classe, alimentador; page, page_size |
+| GET /unidades/{id} | periodo_atual opcional, sempre de 12 meses; sem ele, os 12 meses até o último mês da Gold |
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
@@ -96,7 +96,7 @@ GET /unidades?busca=UC-DEMO&page=1&page_size=20
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/unidades.json)**
 
-Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular; ordenação por ID. Sem correspondência: lista vazia.
+Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular, de 3 a 100 caracteres (fora disso, 422 `DADOS_INVALIDOS`), sem diferenciar maiúsculas; ordenação por ID. Sem correspondência: lista vazia. Fonte: `gold.dim_uc`.
 
 ## 5. GET /unidades/{id} — Tela 3
 
@@ -106,14 +106,22 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/unidade.json)**
 
-- Fontes na Gold: cadastro, medidor ativo e GD da `dim_uc`; faturas, última leitura e `tipo_leitura` do `fato_uc_mes`; consumo comparativo da `uc_consumo_comparativo`; interrupções da `uc_interrupcoes`; chamados da `uc_atendimentos`.
-- Cadastro, CPF/CNPJ mascarado e telefone anulável (não há telefone na fonte bruta inspecionada). `cep` e `data_ligacao` também são anuláveis.
-- `consumo`: 12 pares de mês atual/mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura` (`REAL`, `ESTIMADA`, `MEDIA`, `AUTENTICADA` ou `NAO REALIZADA`). O ano anterior é null quando a UC não tem leitura naquele mês.
-- `diagnostico_conta`: conta_alta (bool/null), veredito, último mês, mesmo mês do ano anterior, média de 12 meses, variação percentual, leitura_estimada e alerta. `conta_alta` vem de `gold.uc_consumo_comparativo.flag_conta_alta`: consumo do último mês **mais de 20% acima** do mesmo mês do ano anterior; null quando não há ano anterior ou algum dos consumos é ≤ 0. A média de 12 meses e o alerta de leitura estimada são calculados pela API a partir do `fato_uc_mes`.
-- Faturas abertas e pagas (valores em BRL), medidor ativo (id, modelo, tipo, data de instalação e última leitura), GD, interrupções recentes e chamados com nota e `tempo_atendimento_h`. Exemplo tem 1 fatura aberta e 1 paga; a UI conta o que recebeu.
-- Média mensal injetada de GD não é geração medida no período. O exemplo é um caso fictício que segue a regra da Gold.
+- **Janela:** `periodo_atual` tem sempre 12 meses (outra duração: 422 `DADOS_INVALIDOS`). Sem ele, a API usa os 12 meses que terminam no último `mes_referencia` da `gold.dim_mes`; o valor não é fixo no código, e a tela acompanha cada recarga da Gold. A janela usada volta em `periodo_referencia`. Janela sem dados da UC devolve 200 com valores null; o 404 fica para UC inexistente.
+- Fontes na Gold: cadastro, medidor ativo e GD da `dim_uc`; faturas, última leitura e troca de medidor do `fato_uc_mes`; consumo, ano anterior, variação, `tipo_leitura` e conta alta da `uc_consumo_comparativo` (consumo = `consumo_kwh_valido`); interrupções da `uc_interrupcoes`; chamados da `uc_atendimentos`.
+- **Nulos medidos na Gold (27/10):** só são anuláveis `telefone` (não há fonte), `cep` (1.350 UCs), `data_ligacao` (90), `data_pagamento` (toda fatura `EM ABERTO`) e `nota_satisfacao` (9.566 chamados). Os demais campos do cadastro, medidor, faturas, interrupções e chamados não têm nulo e são obrigatórios. CPF/CNPJ vem mascarado. Nomes de município, bairro e classe vêm em maiúsculas, como na Gold.
+- `consumo`: os 12 meses da janela, cada um com o mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura` (`REAL`, `ESTIMADA`, `MEDIA`, `AUTENTICADA` ou `NAO REALIZADA`). Valores ausentes são null, nunca 0: o ano anterior não existe nos 12 primeiros meses da UC, e o consumo é null nos 30 meses com leitura negativa não recuperada (`consumo_kwh_valido`), que o diagnóstico trata como “sem consumo válido”.
+- `diagnostico_conta` analisa **um mês**: o último da janela com dado da UC, devolvido em `periodo_referencia` (null, com `veredito` null, se a janela não tem dados). Assim uma janela que passa do fim da base, como 2026-01/2026-12, ainda é avaliada sobre jun/2026.
+  - **Ano anterior** (`conta_alta`, `mesmo_mes_ano_anterior`, `variacao_percentual`): lidos de `gold.uc_consumo_comparativo`, sem recalcular. `flag_conta_alta` = consumo **mais de 20% acima** do mesmo mês do ano anterior; null quando não há ano anterior ou algum dos consumos é ≤ 0.
+  - **Média** (`media_12_meses`, `meses_media`): calculada pela API sobre os **12 meses anteriores ao mês analisado, sem incluí-lo** e independente da janela (ex.: jun/2026 → 2025-06/2026-05), só com consumo > 0. Com menos de 12 meses válidos, usa os que existem; `meses_media` diz quantos entraram (0 a 12) e a média é null com 0.
+  - **Veredito** (texto, regra da API): cruza as duas comparações com o mesmo limiar de 20%. Ano anterior e média acima → o consumo subiu e explica a conta; só o ano anterior → o consumo vem subindo ao longo do ano; só a média → efeito sazonal; nenhum → consumo estável, e uma conta maior vem de tarifa, bandeira ou tributos. Sem ano anterior, usa só a média. Mês sem consumo válido não é avaliado.
+  - **Alerta** (`leitura_estimada`, `alerta`): o alerta não muda o veredito, só diz quanto confiar nele. `leitura_estimada` é true quando o mês analisado **ou** o mesmo mês do ano anterior tem leitura `ESTIMADA`. `alerta` junta uma frase para cada caso: leitura estimada no mês analisado, leitura estimada no ano anterior (comparação fraca) e **primeira leitura após troca de medidor** (`fato_uc_mes.flag_primeira_leitura_pos_troca`) em qualquer dos dois meses. Sem nenhum caso, null.
+- `faturas_abertas`: **todas** as faturas `EM ABERTO` da UC, de qualquer mês. São o estado atual do cliente, não um recorte de período. `faturas_pagas`: as `PAGA` com `mes_referencia` dentro da janela. `status` e `bandeira_tarifaria` seguem os domínios da Gold (`PAGA`/`EM ABERTO`; `VERDE`, `AMARELA`, `VERMELHA P1`, `VERMELHA P2`).
+- `interrupcoes_recentes`: até 10, as mais recentes da janela, sem oscilação (`flag_sem_interrupcao`: a energia não falta) e sem ocorrências anteriores à ligação (`flag_antes_ligacao`). `total_interrupcoes`: todas as da janela com as mesmas regras, em `interrupcoes`. As flags da Gold não aparecem cruas na resposta.
+- `chamados`: todos os da UC (no máximo 20 por UC na base), com nota (null quando não preenchida, nunca 0) e `tempo_atendimento_h`.
+- Medidor ativo (id, modelo, tipo, data de instalação e última leitura). `geracao_distribuida` é null **inteiro** para UC sem GD (os quatro `gd_*` da `dim_uc` são nulos exatamente nas 41.490 UCs sem painel); quando existe, potência, modalidade, data de conexão e média injetada vêm todos preenchidos. Média mensal injetada de GD não é geração medida no período.
+- O exemplo é um caso fictício que segue as regras acima: o diagnóstico do `unidade.json` é o que a API calcula sobre o consumo do próprio exemplo (`test_diagnostico_conta.py`).
 
-No mock, somente UC-DEMO-001 tem a visão detalhada. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
+No mock (`GOLD_SOURCE=seed`), somente UC-DEMO-001 tem a visão detalhada e só a janela 2025-07/2026-06 é simulada; a leitura real usa `GOLD_SOURCE=real`. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
 
 ## 6. GET /inspecoes/candidatos — Tela 4
 
@@ -386,10 +394,10 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 
 | nome | rótulo | unidade | período de referência |
 | --- | --- | --- | --- |
-| ultimo_mes | Último mês | kWh | último mês (ex.: 2026-06) |
+| ultimo_mes | Último mês | kWh | mês analisado (ex.: 2026-06) |
 | mesmo_mes_ano_anterior | Mesmo mês do ano anterior | kWh | mesmo mês, ano anterior (ex.: 2025-06) |
-| media_12_meses | Média de 12 meses | kWh | janela de 12 meses (ex.: 2025-07/2026-06) |
-| variacao_percentual | Variação sobre o ano anterior | % | último mês |
+| media_12_meses | Média de 12 meses | kWh | 12 meses anteriores ao mês analisado (ex.: 2025-06/2026-05) |
+| variacao_percentual | Variação sobre o ano anterior | % | mês analisado |
 
 `indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
 
@@ -429,6 +437,8 @@ GET /health
 Esta V2 altera o contrato: `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens inteiros, campos das ordens/resultados no modelo do Gabriel; dashboard com seis KPIs, série e ponte; IA e insight com respostas distintas.
 
 Alinhamento com a Gold (23/10), que muda formatos para o front: `ponte_receita` passa a ter `receita_energia_comparacao`, `efeito_preco`, `efeito_volume`, `receita_energia_atual` e `reajuste_percentual` (sai `bandeira_mix`); as linhas do `drill_down` trocam `receita_atual`/`receita_comparacao` por `receita_energia_atual`/`receita_energia_comparacao`; chamados perdem `historico` e ganham `tempo_atendimento_h`; o insight da receita usa `receita_energia_atual`/`receita_energia_comparacao`.
+
+Visão 360 (V1a, 27/10), que muda formatos para o front: `diagnostico_conta` ganha `periodo_referencia` (mês analisado) e `meses_media`, `veredito` passa a ser anulável e `media_12_meses` passa a ser a média dos 12 meses anteriores ao mês analisado; a resposta ganha `total_interrupcoes`; pelos nulos medidos na Gold, passam a ser obrigatórios `latitude`/`longitude`, `data_encerramento`/`duracao_min` das interrupções e `subassunto`/`data_fechamento`/`tempo_atendimento_h` dos chamados, e a GD é null inteira para UC sem painel; `status` das faturas usa `EM ABERTO`/`PAGA`, e bandeira, município, bairro e classe vêm em maiúsculas, como na Gold; a busca exige 3 caracteres e `periodo_atual` da unidade, 12 meses.
 
 Contrato, schemas, routers e fixtures do backend estão na mesma versão (V2). `backend/tests/test_stubs.py` compara a resposta de cada rota com o fixture vinculado neste documento; se um mudar sem o outro, o teste falha. Gheyson gera `types/` e mocks a partir desses fixtures (F3).
 
@@ -478,7 +488,9 @@ A Gold não muda para atender o portal. Onde este contrato divergia dela, a API 
 | UCs ativas | `fato_alimentador_mes.ucs_atendidas`: UCs ligadas até o fim de cada mês | Mesma regra: UCs ligadas até o fim do último mês da janela; com filtro de bairro ou classe, contadas na `dim_uc` pela `data_ligacao` |
 | Energia | `consumo_kwh_valido` no `fato_uc_mes`, somado igual em `agg_kpis_mensal` e `agg_receita_mensal` | KPI de energia e série somam `consumo_kwh_valido` |
 | Ponte da receita | Só receita de energia, preço + volume sem resíduo, só P1 × P2, por município × bairro × classe | Seção 3: soma os efeitos da Gold; outras janelas ou filtro de alimentador recebem ponte null e drill-down vazio, com KPIs e série normais |
-| Conta alta | `flag_conta_alta`: consumo > 20% acima do mesmo mês do ano anterior | Seção 5: veredito pela flag; média de 12 meses e alerta de leitura estimada calculados pela API |
+| Conta alta | `flag_conta_alta` e `variacao_pct`: consumo > 20% acima do mesmo mês do ano anterior | Seção 5: lidos sem recalcular; a API calcula a média dos 12 meses anteriores ao mês analisado, o veredito que cruza as duas comparações e o alerta (leitura estimada e troca de medidor) |
+| Faturas | `status` `PAGA`/`EM ABERTO`; bandeira em maiúsculas | Seção 5: mesmos domínios; abertas sem filtro de período, pagas dentro da janela |
+| Interrupções | Todas as ocorrências da UC, com `flag_sem_interrupcao` e `flag_antes_ligacao` | Seção 5: a API exclui oscilação e ocorrências anteriores à ligação; até 10 recentes e o total da janela |
 | Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
 | Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json`; `confianca_evidencia` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao`, converte `motivos_json` em `motivos[]` e repassa `confianca_evidencia` |
 | Medidor | `dim_uc` traz só o medidor ativo: id, tipo, modelo e data de instalação | Seção 5: medidor com esses campos e a última leitura do `fato_uc_mes` |
