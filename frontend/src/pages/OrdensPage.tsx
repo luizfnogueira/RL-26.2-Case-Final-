@@ -7,7 +7,7 @@ import {
   Truck,
   XCircle,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
@@ -22,15 +22,23 @@ import ErrorState from '@/components/ui/ErrorState'
 import Paginacao from '@/components/ui/Paginacao'
 import SeloFicticio from '@/components/ui/SeloFicticio'
 import Skeleton from '@/components/ui/Skeleton'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
+import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { listarInspecoes } from '@/services'
-import type { CampoFiltro } from '@/types/filtros'
+import type { CampoFiltro, OpcoesFiltros } from '@/types/filtros'
 import type { Ordem, StatusOrdem } from '@/types/inspecoes'
+import { formatarAtualizacao } from '@/utils/datas'
+import { mesesRecentes } from '@/utils/periodos'
 
-const CAMPOS: readonly CampoFiltro[] = ['municipio', 'bairro', 'classe']
+const CAMPOS: readonly CampoFiltro[] = [
+  'periodo_atual',
+  'municipio',
+  'bairro',
+  'classe',
+  'alimentador',
+]
 const LINHAS_POR_PAGINA = 10
 
 const STATUS_CONFIG: Record<
@@ -58,13 +66,7 @@ type AcoesOrdemProps = {
   aoVerDetalhes: (ordem: Ordem) => void
 }
 
-function AcoesOrdem({
-  ordem,
-  aoIniciar,
-  aoConcluir,
-  aoCancelar,
-  aoVerDetalhes,
-}: AcoesOrdemProps) {
+function AcoesOrdem({ ordem, aoIniciar, aoConcluir, aoCancelar, aoVerDetalhes }: AcoesOrdemProps) {
   const [aberto, setAberto] = useState(false)
   const [posicao, setPosicao] = useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
@@ -119,9 +121,7 @@ function AcoesOrdem({
       const abaixo = retangulo.bottom + margem
       const acima = retangulo.top - alturaMenu - margem
       const abrirAcima = window.innerHeight - abaixo < alturaMenu && acima >= margem
-      const top = abrirAcima
-        ? acima
-        : Math.min(abaixo, window.innerHeight - alturaMenu - margem)
+      const top = abrirAcima ? acima : Math.min(abaixo, window.innerHeight - alturaMenu - margem)
       const left = Math.max(
         margem,
         Math.min(
@@ -216,8 +216,18 @@ function AcoesOrdem({
 }
 
 export default function OrdensPage() {
+  const opcoesFiltros = useOpcoesFiltros()
   const { filtros, limpar } = useFiltrosUrl(CAMPOS)
-  const { municipio, bairro, classe } = filtros
+  const { periodo_atual: periodoAtual, municipio, bairro, classe, alimentador } = filtros
+  // Em ordens, `periodo_atual` é o mês de criação, não uma janela analítica da Gold:
+  // os atalhos de cenário do dashboard não encontrariam nenhuma ordem criada agora.
+  // Um período vindo de link antigo continua visível mesmo fora dos últimos 12 meses.
+  const opcoesBarra = useMemo<OpcoesFiltros>(() => {
+    const meses = mesesRecentes(12)
+    const periodos =
+      periodoAtual && !meses.includes(periodoAtual) ? [periodoAtual, ...meses] : meses
+    return { ...opcoesFiltros.opcoes, periodos }
+  }, [opcoesFiltros.opcoes, periodoAtual])
   const [params, setParams] = useSearchParams()
 
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '', 10) || 1)
@@ -244,9 +254,11 @@ export default function OrdensPage() {
     (sinal) =>
       listarInspecoes(
         {
+          periodo_atual: periodoAtual,
           municipio,
           bairro,
           classe,
+          alimentador,
           status: statusFiltro,
           id_uc: ucFiltro || undefined,
           page,
@@ -254,7 +266,7 @@ export default function OrdensPage() {
         },
         sinal,
       ),
-    [municipio, bairro, classe, statusFiltro, ucFiltro, page],
+    [periodoAtual, municipio, bairro, classe, alimentador, statusFiltro, ucFiltro, page],
   )
 
   useEffect(() => {
@@ -330,14 +342,10 @@ export default function OrdensPage() {
     CONCLUIDA: 0,
     CANCELADA: 0,
   }
-  const totalGeral =
-    contagem.ABERTA + contagem.EM_CAMPO + contagem.CONCLUIDA + contagem.CANCELADA
+  const totalGeral = contagem.ABERTA + contagem.EM_CAMPO + contagem.CONCLUIDA + contagem.CANCELADA
 
   return (
-    <Pagina
-      titulo="Ordens de inspeção"
-      subtitulo="Gestão do ciclo completo da fiscalização"
-    >
+    <Pagina titulo="Ordens de inspeção" subtitulo="Gestão do ciclo completo da fiscalização">
       <div className="relative">
         {toast && (
           <div
@@ -357,10 +365,20 @@ export default function OrdensPage() {
         <div className="overflow-hidden rounded-[18px] border border-[#dfeaf0] bg-[#edf3f5] shadow-card">
           <BarraDeFiltros
             campos={CAMPOS}
-            opcoes={OPCOES_FILTROS_MOCK}
+            opcoes={opcoesBarra}
             mostrarLimparSempre
             className="rounded-none border-b border-[#dfeaf0] bg-[#edf3f5] p-4 shadow-none"
           />
+
+          {opcoesFiltros.erro && (
+            <p
+              role="status"
+              className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-[12px] text-amber-900"
+            >
+              Não foi possível carregar as opções de filtro da Gold. As ordens continuam
+              disponíveis, mas os filtros de região ficam sem valores.
+            </p>
+          )}
 
           {ordensConsulta.erro && !dados ? (
             <ErrorState
@@ -440,6 +458,11 @@ export default function OrdensPage() {
                     <p className="text-[12px] text-[#68737b]">
                       Acompanhe o status, despache equipes e registre laudos de vistoria
                     </p>
+                    {dados?.metadados.gold_atualizada_em && (
+                      <p className="text-[12px] text-[#68737b]">
+                        Gold atualizada em {formatarAtualizacao(dados.metadados.gold_atualizada_em)}
+                      </p>
+                    )}
                     {atualizando && (
                       <p role="status" className="mt-1 text-[12px] text-teal-profundo">
                         Atualizando ordens…

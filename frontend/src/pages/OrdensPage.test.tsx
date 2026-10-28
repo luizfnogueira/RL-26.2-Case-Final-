@@ -1,17 +1,21 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import inspecoesFixture from '@/data/mocks/inspecoes.json'
+import unidadesFixture from '@/data/mocks/unidades.json'
 import {
+  buscarFiltros,
   cancelarInspecao,
   concluirInspecao,
   iniciarCampo,
   listarInspecoes,
 } from '@/services'
+import type { OpcoesFiltrosApi } from '@/types/filtros'
 import type { Ordens, ParamsInspecoes } from '@/types/inspecoes'
 import OrdensPage from './OrdensPage'
 
 const mocks = vi.hoisted(() => ({
+  buscarFiltros: vi.fn(),
   listarInspecoes: vi.fn(),
   iniciarCampo: vi.fn(),
   concluirInspecao: vi.fn(),
@@ -24,6 +28,35 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/services', () => mocks)
+
+function opcoesDoCadastro(): OpcoesFiltrosApi {
+  const cadastro = unidadesFixture
+  return {
+    municipios: [...new Set(cadastro.items.map((uc) => uc.municipio))],
+    bairros: [
+      ...new Map(
+        cadastro.items.map((uc) => [
+          `${uc.municipio}|${uc.bairro}`,
+          { municipio: uc.municipio, bairro: uc.bairro },
+        ]),
+      ).values(),
+    ],
+    classes: [...new Set(cadastro.items.map((uc) => uc.classe))],
+    alimentadores: [
+      ...new Map(
+        cadastro.items.map((uc) => [
+          uc.alimentador,
+          { alimentador: uc.alimentador, municipio: uc.municipio },
+        ]),
+      ).values(),
+    ],
+    metadados: cadastro.metadados,
+  }
+}
+
+beforeEach(() => {
+  vi.mocked(buscarFiltros).mockResolvedValue(opcoesDoCadastro())
+})
 
 afterEach(() => {
   cleanup()
@@ -117,6 +150,75 @@ describe('OrdensPage', () => {
         expect.anything(),
       )
     })
+  })
+
+  it('envia à API o período de criação e o alimentador escolhidos', async () => {
+    const fixture = inspecoesFixture as unknown as Ordens
+    vi.mocked(listarInspecoes).mockResolvedValue(fixture)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/ordens']}>
+        <OrdensPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-002')
+    const seletorPeriodo = screen.getByRole('combobox', {
+      name: 'Período atual',
+    }) as HTMLSelectElement
+    // As opções são meses de criação (o mês corrente e os 11 anteriores), não as janelas
+    // analíticas do dashboard: o valor é lido da própria lista para o teste não depender do relógio.
+    const mesCriacao = [...seletorPeriodo.options].map((opcao) => opcao.value).find(Boolean) ?? ''
+    expect(mesCriacao).not.toBe('')
+    fireEvent.change(seletorPeriodo, {
+      target: { value: mesCriacao },
+    })
+
+    await waitFor(() =>
+      expect(listarInspecoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({ periodo_atual: mesCriacao }),
+        expect.anything(),
+      ),
+    )
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Município' }), {
+      target: { value: 'RECIFE' },
+    })
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Alimentador' }), {
+      target: { value: 'ALM-DEMO-001' },
+    })
+
+    await waitFor(() =>
+      expect(listarInspecoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          periodo_atual: mesCriacao,
+          municipio: 'RECIFE',
+          alimentador: 'ALM-DEMO-001',
+        }),
+        expect.anything(),
+      ),
+    )
+  })
+
+  it('mantém no filtro um período vindo de link antigo, mesmo fora dos últimos 12 meses', async () => {
+    vi.mocked(listarInspecoes).mockResolvedValue(inspecoesFixture as unknown as Ordens)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/ordens?periodo_atual=2025-07%2F2026-06']}>
+        <OrdensPage />
+      </MemoryRouter>,
+    )
+
+    const seletor = (await screen.findByRole('combobox', {
+      name: 'Período atual',
+    })) as HTMLSelectElement
+    expect(seletor.value).toBe('2025-07/2026-06')
+    await waitFor(() =>
+      expect(listarInspecoes).toHaveBeenLastCalledWith(
+        expect.objectContaining({ periodo_atual: '2025-07/2026-06' }),
+        expect.anything(),
+      ),
+    )
   })
 
   it('abre modal e despacha ordem para campo', async () => {

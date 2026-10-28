@@ -353,10 +353,11 @@ describe('ReceitaPage (com mocks)', () => {
   })
 
   it('abre já filtrada quando a URL traz município e bairro (recarregar mantém)', async () => {
-    abrir('/receita?municipio=Olinda&bairro=Rio+Doce')
+    // O filtro usa o valor da Gold (maiúsculas); o texto do insight vem formatado, como na API.
+    abrir('/receita?municipio=OLINDA&bairro=RIO+DOCE')
     expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
-    expect((screen.getByLabelText('Município') as HTMLSelectElement).value).toBe('Olinda')
-    expect((screen.getByLabelText('Bairro') as HTMLSelectElement).value).toBe('Rio Doce')
+    expect((screen.getByLabelText('Município') as HTMLSelectElement).value).toBe('OLINDA')
+    expect((screen.getByLabelText('Bairro') as HTMLSelectElement).value).toBe('RIO DOCE')
     expect(await screen.findByText(/Em Olinda \/ Rio Doce/)).toBeTruthy()
   })
 

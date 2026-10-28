@@ -1,20 +1,30 @@
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, StringConstraints
+from pydantic import AwareDatetime, Field, StringConstraints, model_validator
 
-from app.schemas.common import FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema
+from app.schemas.common import (
+    FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema, duracao,
+)
 
 # Domínio de tipo_leitura na Silver/Gold (silver_medicao)
 TipoLeitura = Literal['REAL', 'ESTIMADA', 'MEDIA', 'AUTENTICADA', 'NAO REALIZADA']
+MESES_JANELA = 12
 
 
 class FiltrosUnidades(FiltrosRegiao, Paginacao):
-    busca: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
+    busca: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=100)] | None = None
 
 
 class FiltroUnidade(Schema):
+    # Sem período, a API usa os 12 meses que terminam no último mês da Gold.
     periodo_atual: Periodo | None = None
+
+    @model_validator(mode='after')
+    def validar_janela(self):
+        if self.periodo_atual is not None and duracao(self.periodo_atual) != MESES_JANELA:
+            raise ValueError(f'periodo_atual deve ter {MESES_JANELA} meses')
+        return self
 
 
 class Unidade(Schema):
@@ -40,23 +50,25 @@ class Cadastro(Unidade):
     cep: str | None
     subgrupo_tarifario: str
     data_ligacao: date | None
-    latitude: float | None
-    longitude: float | None
+    latitude: float
+    longitude: float
 
 
 class ConsumoMes(Schema):
     mes: Mes
     atual: Indicador
     ano_anterior: Indicador
-    tipo_leitura: TipoLeitura
+    tipo_leitura: TipoLeitura | None          # mês da janela sem dado da UC: null, o mês não some
 
 
 class DiagnosticoConta(Schema):
+    periodo_referencia: Mes | None            # mês analisado: o último da janela com dado da UC
     conta_alta: bool | None
-    veredito: str
+    veredito: str | None
     ultimo_mes: Indicador
     mesmo_mes_ano_anterior: Indicador
-    media_12_meses: Indicador
+    media_12_meses: Indicador                 # 12 meses anteriores ao mês analisado, sem incluí-lo
+    meses_media: int = Field(ge=0, le=12)
     variacao_percentual: Indicador
     leitura_estimada: bool
     alerta: str | None
@@ -102,19 +114,19 @@ class Interrupcao(Schema):
     tipo: str
     causa: str
     data_abertura: AwareDatetime
-    data_encerramento: AwareDatetime | None
-    duracao_min: float | None
+    data_encerramento: AwareDatetime
+    duracao_min: float
 
 
 class Chamado(Schema):
     protocolo: str
     canal: str
     assunto: str
-    subassunto: str | None
+    subassunto: str
     data_abertura: AwareDatetime
-    data_fechamento: AwareDatetime | None
-    nota_satisfacao: float | None
-    tempo_atendimento_h: float | None
+    data_fechamento: AwareDatetime
+    nota_satisfacao: float | None             # não preenchida: null, nunca 0
+    tempo_atendimento_h: float
 
 
 class Unidade360(Schema):
@@ -125,7 +137,8 @@ class Unidade360(Schema):
     faturas_abertas: list[Fatura]
     faturas_pagas: list[Fatura]
     medidor: Medidor | None
-    geracao_distribuida: GeracaoDistribuida | None
-    interrupcoes_recentes: list[Interrupcao]
+    geracao_distribuida: GeracaoDistribuida | None   # bloco inteiro null para UC sem GD
+    interrupcoes_recentes: list[Interrupcao]   # até 10, as mais recentes da janela
+    total_interrupcoes: Indicador              # todas as da janela, sem oscilação e sem anteriores à ligação
     chamados: list[Chamado]
     metadados: Metadados

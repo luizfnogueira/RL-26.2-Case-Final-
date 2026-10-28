@@ -3,9 +3,9 @@
   "cadastro": {
     "id_uc": "UC-DEMO-001",
     "nome_titular": "Titular de exemplo 001",
-    "municipio": "Recife",
-    "bairro": "Boa Vista",
-    "classe": "Residencial",
+    "municipio": "RECIFE",
+    "bairro": "BOA VISTA",
+    "classe": "RESIDENCIAL",
     "alimentador": "ALM-DEMO-001",
     "status": "ATIVA",
     "cpf_cnpj_mascarado": "***.456.789-**",
@@ -16,8 +16,8 @@
     "cep": "00000-000",
     "subgrupo_tarifario": "B1",
     "data_ligacao": "2018-03-12",
-    "latitude": null,
-    "longitude": null
+    "latitude": -8.0589,
+    "longitude": -34.8853
   },
   "consumo": [
     {
@@ -190,25 +190,27 @@
     }
   ],
   "diagnostico_conta": {
+    "periodo_referencia": "2026-06",
     "conta_alta": true,
-    "veredito": "Conta alta: o consumo do último mês ficou mais de 20% acima do mesmo mês do ano anterior (regra da Gold, flag_conta_alta).",
+    "veredito": "Consumo subiu: 2026-06 ficou mais de 20% acima do mesmo mês do ano anterior e da média dos meses anteriores (12 meses). O aumento do consumo explica a conta mais alta.",
     "ultimo_mes": {
-      "valor": 412,
+      "valor": 412.0,
       "unidade": "kWh",
       "periodo_referencia": "2026-06"
     },
     "mesmo_mes_ano_anterior": {
-      "valor": 298,
+      "valor": 298.0,
       "unidade": "kWh",
       "periodo_referencia": "2025-06"
     },
     "media_12_meses": {
-      "valor": 332.33,
+      "valor": 322.83,
       "unidade": "kWh",
-      "periodo_referencia": "2025-07/2026-06"
+      "periodo_referencia": "2025-06/2026-05"
     },
+    "meses_media": 12,
     "variacao_percentual": {
-      "valor": 38.255,
+      "valor": 38.26,
       "unidade": "%",
       "periodo_referencia": "2026-06"
     },
@@ -222,11 +224,11 @@
       "valor_energia": 370.8,
       "tributos": 115.2,
       "valor_total": 486.0,
-      "bandeira_tarifaria": "Amarela",
+      "bandeira_tarifaria": "AMARELA",
       "data_emissao": "2026-07-01",
       "data_vencimento": "2026-07-12",
       "data_pagamento": null,
-      "status": "ABERTA"
+      "status": "EM ABERTO"
     }
   ],
   "faturas_pagas": [
@@ -236,7 +238,7 @@
       "valor_energia": 270.9,
       "tributos": 84.1,
       "valor_total": 355.0,
-      "bandeira_tarifaria": "Verde",
+      "bandeira_tarifaria": "VERDE",
       "data_emissao": "2026-06-01",
       "data_vencimento": "2026-06-12",
       "data_pagamento": "2026-06-10",
@@ -284,6 +286,11 @@
       "duracao_min": 45.0
     }
   ],
+  "total_interrupcoes": {
+    "valor": 2,
+    "unidade": "interrupcoes",
+    "periodo_referencia": "2025-07/2026-06"
+  },
   "chamados": [
     {
       "protocolo": "AT-DEMO-001",
