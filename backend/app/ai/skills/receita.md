@@ -145,3 +145,17 @@ WHERE mes_referencia = '2026-06'
 ORDER BY consumo_kwh ASC
 LIMIT 20;
 ```
+
+### Exemplo 5: Por que a conta de luz / receita aumentou? (Decomposição efeito-preço vs. efeito-volume)
+**Pergunta:** Por que a conta de luz aumentou?
+```sql
+SELECT
+    ROUND(SUM(receita_energia_p1), 2) AS receita_energia_p1_brl,
+    ROUND(SUM(receita_energia_p2), 2) AS receita_energia_p2_brl,
+    ROUND(SUM(variacao_receita), 2) AS variacao_receita_brl,
+    ROUND(((SUM(receita_energia_p2) - SUM(receita_energia_p1)) / NULLIF(SUM(receita_energia_p1), 0)) * 100, 2) AS variacao_pct,
+    ROUND(SUM(efeito_preco), 2) AS efeito_preco_brl,
+    ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
+FROM agg_preco_volume
+LIMIT 1;
+```

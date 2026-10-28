@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai import Agent, ModelRetry, RunContext, UsageLimitExceeded
+from pydantic_ai import Agent, ModelRetry, RunContext, UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
@@ -412,7 +412,7 @@ def _executar_uma_vez(
             message_history=msgs_historico,
             usage_limits=UsageLimits(request_limit=10),
         )
-    except UsageLimitExceeded:
+    except (UsageLimitExceeded, UnexpectedModelBehavior):
         payload_limite: dict[str, Any] = {
             "resposta": "Não consegui chegar a uma resposta confiável para essa pergunta. Tente reformular ou ser mais específico.",
             "sql": None,

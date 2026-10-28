@@ -117,6 +117,22 @@ def extrair_numeros_do_resultado(resultado: ResultadoConsulta | None) -> list[fl
                         numeros.append(val)
                 except ValueError:
                     pass
+    # Inclui diferenças e variações percentuais derivadas entre pares da mesma linha (ex.: P2 vs P1)
+    for linha in resultado.linhas[:10]:
+        vals_linha = [
+            float(c) for c in linha
+            if isinstance(c, (int, float, Decimal)) and not isinstance(c, bool) and math.isfinite(float(c))
+        ]
+        for i in range(len(vals_linha)):
+            for j in range(len(vals_linha)):
+                if i != j:
+                    dif = vals_linha[j] - vals_linha[i]
+                    numeros.append(dif)
+                    if abs(dif) >= 1_000_000:
+                        numeros.append(dif / 1_000_000.0)
+                    if abs(vals_linha[i]) > 1e-9:
+                        numeros.append((dif / vals_linha[i]) * 100.0)
+                        numeros.append((vals_linha[j] / vals_linha[i]) * 100.0)
     # Inclui também o total de linhas retornadas como número válido de contagem
     numeros.append(float(resultado.n_linhas))
     numeros.append(float(len(resultado.linhas)))
@@ -184,6 +200,12 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
         raise ViolacaoFidelidadeSaida(
             "A consulta retornou 0 linhas. Quando o resultado é vazio, retorne `status='nao_sei'` "
             "explicando que não foram encontrados registros para o filtro/período informado."
+        )
+
+    # 0. Conferência de texto não vazio
+    if not (saida.texto or '').strip() or len((saida.texto or '').strip()) < 10:
+        raise ViolacaoFidelidadeSaida(
+            'O campo 	exto está vazio ou curto demais. Escreva uma resposta completa em português explicando os números retornados pela consulta.'
         )
 
     # 1. Conferência do SQL executado vs declarado

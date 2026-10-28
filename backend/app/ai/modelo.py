@@ -180,16 +180,22 @@ def obter_model_settings(
         return GoogleModelSettings(**settings)
 
     # Em provedores OpenAI/OpenRouter (como Nemotron), tokens de raciocínio contam dentro de max_tokens.
-    # O OpenRouter aceita só um controle de raciocínio por chamada: usamos o nível (effort), não o limite de tokens.
+    # O OpenRouter não aceita combinar `openai_reasoning_effort` com `max_tokens`/`enabled` na mesma chamada.
+    # Por padrão, desabilitamos o raciocínio verboso (`enabled: False`) para responder rápido sem estourar max_tokens.
     max_tokens_or = 4096 if perfil == "sql" else 1536
-    esforco = _ler_env("LLM_REASONING_EFFORT", "low" if perfil == "sql" else "minimal")
-    reasoning_max = 256 if perfil == "sql" else 64
+    esforco = _ler_env("LLM_REASONING_EFFORT")
+    if esforco:
+        return OpenAIChatModelSettings(
+            temperature=temperatura,
+            max_tokens=max_tokens_or,
+            timeout=timeout_s,
+            extra_body={"reasoning": {"effort": esforco}},
+        )
     return OpenAIChatModelSettings(
         temperature=temperatura,
         max_tokens=max_tokens_or,
         timeout=timeout_s,
-        openai_reasoning_effort=esforco,  # type: ignore[typeddict-item]
-        extra_body={"reasoning": {"effort": esforco}},
+        extra_body={"reasoning": {"max_tokens": 256 if perfil == "sql" else 64}},
     )
 
 
@@ -240,4 +246,3 @@ def extrair_uso_run(resultado: Any) -> Any:
     """Extrai o objeto RunUsage de um AgentRunResult de forma compatível entre versões do PydanticAI."""
     uso_attr = getattr(resultado, "usage", None)
     return uso_attr() if callable(uso_attr) else uso_attr
-
