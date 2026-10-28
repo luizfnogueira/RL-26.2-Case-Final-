@@ -30,6 +30,7 @@ REGEX_NUMERO_SOLTO = re.compile(r"(?<![a-zA-Z0-9_{])[-−]?\d+(?:[.,]\d+)?(?![a-
 
 # Números estruturais/contextuais permitidos fora de marcadores (anos da base, P1/P2, limites regulatórios citados)
 NUMEROS_CONTEXTUAIS_PERMITIDOS = {
+    0.0,
     1.0,
     2.0,
     3.0,
@@ -206,6 +207,9 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
     numeros_banco = extrair_numeros_do_resultado(ultimo_res)
     textos_banco = extrair_textos_do_resultado(ultimo_res)
     numeros_pergunta = _extrair_numeros_da_pergunta(deps.pergunta_original)
+    
+    # Limites que o próprio SQL executado usa (ex.: > 0, < -30) estão no "Como cheguei nisso"; não são invenção.
+    numeros_pergunta |= _extrair_numeros_da_pergunta(deps.ultimo_sql or "")
 
     # 3. Conferência dos valores dentro de `saida.marcadores` contra os dados retornados
     for m_key, m_val in (saida.marcadores or {}).items():

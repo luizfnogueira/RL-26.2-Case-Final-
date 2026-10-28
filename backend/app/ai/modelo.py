@@ -180,7 +180,7 @@ def obter_model_settings(
         return GoogleModelSettings(**settings)
 
     # Em provedores OpenAI/OpenRouter (como Nemotron), tokens de raciocínio contam dentro de max_tokens.
-    # Usamos max_tokens=4096 e limitamos reasoning.max_tokens=256 (GENAI-1.3: raciocínio baixo e latência < 30s).
+    # O OpenRouter aceita só um controle de raciocínio por chamada: usamos o nível (effort), não o limite de tokens.
     max_tokens_or = 4096 if perfil == "sql" else 1536
     esforco = _ler_env("LLM_REASONING_EFFORT", "low" if perfil == "sql" else "minimal")
     reasoning_max = 256 if perfil == "sql" else 64
@@ -189,7 +189,7 @@ def obter_model_settings(
         max_tokens=max_tokens_or,
         timeout=timeout_s,
         openai_reasoning_effort=esforco,  # type: ignore[typeddict-item]
-        extra_body={"reasoning": {"effort": esforco, "max_tokens": reasoning_max}},
+        extra_body={"reasoning": {"effort": esforco}},
     )
 
 

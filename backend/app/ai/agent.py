@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai import Agent, ModelRetry, RunContext, UsageLimitExceeded
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
@@ -405,12 +405,31 @@ def _executar_uma_vez(
 
     t_agente = time.perf_counter()
     agente = construir_agente_sql(modelo=modelo)
-    resultado_run = agente.run_sync(
-        pergunta,
-        deps=deps,
-        message_history=msgs_historico,
-        usage_limits=UsageLimits(request_limit=6),
-    )
+    try:
+        resultado_run = agente.run_sync(
+            pergunta,
+            deps=deps,
+            message_history=msgs_historico,
+            usage_limits=UsageLimits(request_limit=10),
+        )
+    except UsageLimitExceeded:
+        payload_limite: dict[str, Any] = {
+            "resposta": "Não consegui chegar a uma resposta confiável para essa pergunta. Tente reformular ou ser mais específico.",
+            "sql": None,
+            "tabelas": [],
+            "dados": {"colunas": [], "linhas": []},
+            "status": "nao_sei",
+            "gerado_em": datetime.now(timezone.utc),
+            "metadados": {
+                "dados_ficticios": False,
+                "gold_atualizada_em": gold_atualizada_em,
+                "observacoes": ["O agente atingiu o limite de chamadas ao modelo sem concluir."],
+            },
+            "apresentacao": "texto",
+        }
+        if conversa_id is not None:
+            payload_limite["conversa_id"] = conversa_id
+        return payload_limite
     etapas_ms["agente_ms"] = int((time.perf_counter() - t_agente) * 1000)
 
     t_val = time.perf_counter()
