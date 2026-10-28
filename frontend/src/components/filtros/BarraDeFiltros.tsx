@@ -59,8 +59,16 @@ export default function BarraDeFiltros({
       }
       case 'classe':
         return comoOpcoes(opcoes.classes, true)
-      case 'alimentador':
-        return comoOpcoes(opcoes.alimentadores)
+      case 'alimentador': {
+        const { alimentadores } = opcoes
+        if (Array.isArray(alimentadores)) return comoOpcoes(alimentadores)
+        const porMunicipio = (alimentadores ?? {}) as Readonly<Record<string, readonly string[]>>
+        // Com município escolhido, só os alimentadores que o atendem; sem município, todos.
+        const valores = filtros.municipio
+          ? (porMunicipio[filtros.municipio] ?? [])
+          : [...new Set(Object.values(porMunicipio).flat())]
+        return comoOpcoes(valores)
+      }
     }
   }
 

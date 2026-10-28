@@ -4,6 +4,7 @@ import {
   atualizarInspecao,
   buscarCandidatos,
   buscarDashboard,
+  buscarFiltros,
   buscarOperacao,
   buscarUnidade,
   buscarUnidades,
@@ -122,6 +123,21 @@ describe('GET /dashboard', () => {
   })
 })
 
+describe('GET /filtros', () => {
+  it('lista os nomes dos outros mocks, e um valor listado filtra o dashboard', async () => {
+    const filtros = await buscarFiltros()
+    expect(filtros.metadados.dados_ficticios).toBe(true)
+    expect(new Set(filtros.municipios).size).toBe(filtros.municipios.length)
+    for (const { municipio } of [...filtros.bairros, ...filtros.alimentadores]) {
+      expect(filtros.municipios).toContain(municipio)
+    }
+
+    const { municipio, bairro } = filtros.bairros[0]
+    const dash = await buscarDashboard({ ...DASH, municipio, bairro })
+    expect(dash.indicadores.receita_faturada.atual.valor).toBeGreaterThan(0)
+  })
+})
+
 describe('GET /unidades', () => {
   it('busca por ID ou titular e devolve lista vazia sem correspondência', async () => {
     const todas = await buscarUnidades({})
@@ -186,12 +202,15 @@ describe('GET /inspecoes/candidatos', () => {
     expect(c.resumo.ucs_analisadas.valor).toBeGreaterThanOrEqual(c.total)
   })
 
-  it('pagina e filtra por região', async () => {
+  it('pagina e filtra por região sem diferenciar caixa', async () => {
     const pagina = await buscarCandidatos({ periodo_atual: ATUAL, page: 2, page_size: 3 })
     expect(pagina.items).toHaveLength(3)
     expect(pagina.total).toBe(8)
     const recife = await buscarCandidatos({ periodo_atual: ATUAL, municipio: 'Recife' })
     expect(recife.items.every((i) => i.municipio === 'Recife')).toBe(true)
+    // O valor pode vir do GET /filtros da Gold real, em maiúsculas.
+    const maiusculo = await buscarCandidatos({ periodo_atual: ATUAL, municipio: 'RECIFE' })
+    expect(maiusculo.items.map((i) => i.id_uc)).toEqual(recife.items.map((i) => i.id_uc))
   })
 
   it('exige periodo_atual', async () => {
@@ -471,6 +490,17 @@ describe('POST /ia/insight', () => {
 })
 
 describe('roteamento', () => {
+  it('responde /filtros a partir do mesmo cadastro dos outros mocks', async () => {
+    const opcoes = await buscarFiltros()
+    expect(opcoes.municipios).toEqual(['Jaboatão dos Guararapes', 'Olinda', 'Recife'])
+    expect(opcoes.bairros).toContainEqual({ municipio: 'Recife', bairro: 'Boa Vista' })
+    expect(opcoes.alimentadores).toContainEqual({
+      alimentador: 'ALM-DEMO-001',
+      municipio: 'Recife',
+    })
+    expect(opcoes.metadados.dados_ficticios).toBe(true)
+  })
+
   it('responde /health, 404 para rota desconhecida e 405 para método errado', async () => {
     expect(await atenderMock('GET', '/health')).toEqual({ status: 'ok' })
     expect((await erroDe(atenderMock('GET', '/nada'))).status).toBe(404)
