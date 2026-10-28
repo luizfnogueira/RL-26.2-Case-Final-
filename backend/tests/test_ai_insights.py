@@ -40,6 +40,10 @@ def gerador(*saidas, vistas=None):
 def alternativo(dados):
     return any(o.startswith(PREFIXO_TEXTO_ALTERNATIVO) for o in dados["metadados"]["observacoes"])
 
+@pytest.fixture(autouse=True)
+def metadados_do_seed(monkeypatch):
+    # Os testes simulam o banco com db=None; com GOLD_SOURCE=real no .env, a leitura do _carga_metadata quebraria.
+    monkeypatch.setattr('app.repositories.gold_metadata.GOLD_SOURCE', 'seed')
 
 def test_texto_gerado_usa_os_numeros_da_gold_formatados():
     usar(gerador(BOM))

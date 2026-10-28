@@ -15,6 +15,7 @@ from app.repositories import interacao_repository
 from app.repositories.gold_metadata import metadados_gold
 from app.schemas.ia import PerguntaIA, RespostaIA
 from app.services import stub_ia
+from app.ai.consulta import descrever_tabela, valores_distintos
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,12 @@ class AgenteReal:
         try:
             responder = self.responder or _responder_do_agente()
             executar_sql = self.executar_sql or _executor_sql()
+            
+            extras = {}
+            if self.executar_sql is None:
+                from app.ai.consulta import descrever_tabela, valores_distintos
+                extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
+            
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
@@ -99,6 +106,7 @@ class AgenteReal:
                 historico=historico,
                 conversa_id=str(dados.conversa_id),
                 executar_sql_fn=executar_sql,
+                **extras,
                 gold_atualizada_em=gold["gold_atualizada_em"],
                 # Com o executor injetado o agente desliga o cache; aqui vale a chave dele (GENAI-24).
                 usar_cache=os.getenv("AI_CACHE_ENABLED", "1").strip() != "0",
