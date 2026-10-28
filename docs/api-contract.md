@@ -316,9 +316,9 @@ Cenários demonstrativos:
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
 - `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
-- `real`: a pergunta vai para o agente, que gera e executa a consulta somente leitura na Gold.
+- `real`: a pergunta vai para o agente PydanticAI da Equipe 3, que roda dentro do backend, sem chamada HTTP. Ele gera e executa a consulta somente leitura na Gold, com o usuário do banco próprio do agente. A API carrega as últimas trocas da conversa e grava cada resposta, inclusive `bloqueado` e `nao_sei`, em `ia.interacao`, que também serve de log de auditoria.
 
-Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. Chaves e endereço do agente ficam só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos; validar os nomes reais com a Equipe 3.
+Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` (o agente tem 5 s a menos, para sobrar tempo de gravar) ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. A chave do modelo fica só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos.
 
 ## 10. POST /ia/insight — Telas 2 e 3
 

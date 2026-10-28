@@ -92,10 +92,9 @@ def test_chave_de_ia_nunca_vai_na_resposta(monkeypatch):
         assert "chave-secreta-de-teste" not in client.post("/ia", json=pergunta).text
 
 
-def test_modo_real_sem_agente_integrado_vira_503(monkeypatch):
+def test_modo_real_usa_o_agente_real(monkeypatch):
     monkeypatch.setattr(config, "IA_MODO", "real")
-    with pytest.raises(AgenteIndisponivelException):
-        ia_service.obter_agente()
+    assert isinstance(ia_service.obter_agente(), ia_service.AgenteReal)
 
 
 def test_ia_modo_invalido_impede_a_api_de_subir(monkeypatch):
