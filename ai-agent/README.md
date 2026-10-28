@@ -1,5 +1,107 @@
 # Assistente de IA do V-Energy Grid 360
 
+O módulo de IA aparece de dois jeitos no portal:
+
+- **Assistente (Tela 7 e painel flutuante)**, `POST /ia`. A pessoa pergunta em português; o agente gera um SQL somente leitura, consulta a Gold e responde com os números do resultado.
+- **Insight da receita (Tela 2)**, `POST /ia/insight`. Os seis números da ponte vêm da Gold; o modelo escreve só o texto em volta deles.
+
+O agente roda **dentro do backend** (`backend/app/ai/`), com o PydanticAI. A avaliação (golden set e script) fica nesta pasta, em `avaliacao/`. Contrato da API: [docs/api-contract.md](../docs/api-contract.md), seções 9 e 10.
+
+## Arquitetura: CHESS simplificado
+
+Só uma etapa usa o modelo para responder (o agente gerador). As outras são código determinístico, que não gasta tokens nem inventa nada. A etapa UT do CHESS (testes gerados por LLM a cada pergunta) virou o golden set, rodado fora do caminho da pergunta.
+
+| # | Etapa | Arquivo | Tarefa | Estado |
+| --- | --- | --- | --- | --- |
+| 1 | Pré-filtro: bloqueia o óbvio sem chamar o modelo | `guardrails.py` | GENAI-22 | pendente |
+| 2 | Memória: últimas 3 trocas da conversa | `repositories/interacao_repository.py`, `agent.converter_historico_para_mensagens` | GENAI-11, 13 | pronto |
+| 3 | IR: liga "Jaboatão" ao valor do banco | `entidades.py` | GENAI-8 | pendente (hoje `valores_distintos` usa listas fixas) |
+| 4 | SS: escolhe 1 ou 2 skills | `roteador.py`, `skills/` | GENAI-7, 23 | `receita.md` pronta; demais skills pendentes |
+| 5 | CG: plano → SQL → `consultar_gold` → corrige até 2× | `agent.py` | GENAI-9 | pronto |
+| 6 | Validação de saída: marcadores e números conferidos | `resposta.py` | GENAI-10 | pronto |
+| 7 | Apresentação: texto ou tabela | `resposta.py` | GENAI-14 | pronto |
+| 8 | Telemetria e gravação | `telemetria.py`, `interacao_repository.registrar` | GENAI-17, 20 | pronto |
+| — | Ponte com o `POST /ia`: memória, prazo, log | `services/ia_service.py` (`AgenteReal`) | GENAI-2 | pronto |
+| — | Insight da Tela 2 | `ai/insights.py`, `services/insight_service.py` (`GeradorIA`) | GENAI-25 | pronto |
+
+Caminho de uma pergunta com `IA_MODO=real`:
+
+1. O backend cria o `conversa_id` na primeira pergunta e carrega as últimas trocas daquela conversa.
+2. `responder()` escolhe as skills, monta as instruções (regras críticas no começo e no fim) e roda o agente com `UsageLimits(request_limit=6)`.
+3. O agente preenche o plano, chama `consultar_gold`, corrige o SQL se der erro e devolve o texto com marcadores (`{v1}`), que o código preenche com os valores do resultado.
+4. A ponte confere a resposta contra o contrato, grava a troca em `ia.interacao` e devolve a resposta com `apresentacao` e `detalhes_tecnicos`.
+5. Falha do provedor, estouro do prazo (`IA_TIMEOUT_S` − 5 s) ou resposta fora do contrato: 503 `AGENTE_INDISPONIVEL`. No insight, falha vira o texto por regra, nunca 503.
+
+## Segurança em camadas
+
+| Camada | O que segura | Onde |
+| --- | --- | --- |
+| A1 · usuário do banco só para o agente | Escrita, schemas `portal` e `ia`, dados pessoais (views sem `cpf_cnpj`, `nome_titular`, endereço) | `db/session.obter_engine_agente` + script SQL (GENAI-5) |
+| A2 · validador de SQL | Mais de um comando, escrita dentro de `WITH`, funções perigosas, tabelas fora da lista | `ai/consulta.py` (GENAI-6) |
+| Regras do agente | Só `SELECT`, consumo negativo, recusa de pedido de titular ou CPF | `agent.py` |
+| Marcadores + `output_validator` | Número fora dos dados (chat e insight) | `resposta.py`, `insights.py` |
+| Memória no servidor | Histórico forjado pelo navegador; trocas bloqueadas não voltam ao modelo | `interacao_repository.py` |
+| Front sem HTML vindo da resposta | XSS pela resposta, pelo SQL ou pelos detalhes técnicos | Tela 7 (teste com `<img onerror>`) |
+| Chave só no `backend/.env` | Vazamento de credencial | `ai/modelo.py`; nunca em código, log ou resposta |
+
+**Até a GENAI-6 ser entregue, `IA_MODO=real` responde 503.** A ponte importa `executar_consulta` de `backend/app/ai/consulta.py`; enquanto o arquivo não existe, o log da API mostra `IA_MODO=real sem a ferramenta de consulta`. O agente não consulta o banco sem o validador e o usuário somente leitura.
+
+## Memória da conversa
+
+O front guarda só o `conversa_id` e o reenvia. O histórico fica no servidor, na tabela `ia.interacao`. Ao agente vão as 3 últimas trocas `ok` das últimas 2 horas, como pares de mensagens user/model: a pergunta interpretada, um resumo de até 300 caracteres e o SQL executado. As linhas de dados nunca vão. "Limpar conversa" começa um id novo.
+
+## Como rodar
+
+1. Configure o modelo no `backend/.env`; a chave nunca vai para o Git. Exemplo com a API gratuita do Gemini, usando o modelo recomendado pelo case. Chaves novas podem não ter acesso ao `gemini-2.5-flash-lite`, que é o padrão do `modelo.py`.
+
+   ```env
+   IA_MODO=real
+   LLM_PROVIDER=google
+   LLM_MODELO=gemini-3.1-flash-lite
+   LLM_API_KEY=sua-chave
+   ```
+
+   No plano gratuito, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Por isso o agente só manda a pergunta, o contexto do schema e o resultado agregado da consulta, nunca dados pessoais.
+
+   | Variável | Para quê |
+   | --- | --- |
+   | `IA_MODO` | `mock` (respostas prontas, sem modelo) ou `real` |
+   | `LLM_PROVIDER` | `google`, `openrouter`, `openai`, `groq` ou `test` |
+   | `LLM_MODELO` | Nome do modelo no provedor (`LLM_MODELO_SQL` e `LLM_MODELO_INSIGHT` sobrescrevem por perfil) |
+   | `LLM_API_KEY` | Chave do provedor (também aceita `OPENROUTER_API_KEY`, `IA_API_KEY`, `GEMINI_API_KEY`) |
+   | `IA_TIMEOUT_S` | Prazo do `POST /ia`; o agente tem 5 s a menos |
+   | `AI_CACHE_ENABLED` | `1` (padrão) reaproveita respostas repetidas sem histórico |
+   | `AI_MODO_SCHEMA` | `skills` (padrão) ou `catalogo_inteiro`, para comparar no golden set |
+   | `AI_SELF_CONSISTENCY` | `1` liga a votação entre candidatos quando a confiança vem baixa (desligado por padrão) |
+
+2. Crie a tabela das conversas: `python -m app.db.init_portal` (ou `docker compose exec api python -m app.db.init_portal`).
+3. Reinicie a API para ler o `.env` (no Docker: `docker compose up -d --force-recreate api`).
+4. No front, use `VITE_USE_MOCKS=false` para falar com a API.
+
+Testes, sem gastar tokens (o modelo é um `FunctionModel`/`TestModel` do PydanticAI):
+
+```bash
+cd backend
+pytest tests/test_ia*.py tests/test_ai_*.py tests/test_insight.py tests/test_sugestoes_golden.py
+```
+
+Os testes da tabela `ia.interacao` usam o PostgreSQL só com `TEST_DATABASE_URL` apontando para um banco descartável, como os demais testes de banco.
+
+## Como avaliar (GENAI-26, 27)
+
+O golden set (`avaliacao/perguntas.yaml`) e o script (`avaliacao/avaliar.py`) estão em construção. O script grava `backend/app/ai/avaliacao_ultima.json`, só com métricas, e o painel "Detalhes técnicos" mostra o último run. Formato esperado: [contrato, seção 9](../docs/api-contract.md). Toda pergunta sugerida na Tela 7 precisa estar no golden set com status `ok`; o teste `backend/tests/test_sugestoes_golden.py` passa a conferir isso quando o arquivo existir.
+
+## Integração ponta a ponta (GENAI-28)
+
+Roteiro antes do congelamento, com a Gold real:
+
+1. Backend com `GOLD_SOURCE=real`, `IA_MODO=real` e a chave do modelo; `python -m app.db.init_portal` rodado.
+2. Front com `VITE_USE_MOCKS=false`.
+3. Tela 7: as três perguntas do case, um follow-up ("E só comercial?"), uma resposta em tabela, os detalhes técnicos, "Testar segurança" (bloqueado) e "Testar não sei".
+4. Tela 2: o insight com o selo "Gerado por IA" e os mesmos números do gráfico de cascata.
+5. Provedor fora do ar (chave errada): o chat mostra a mensagem de indisponível e o insight cai no texto alternativo.
+6. Rodar as perguntas sugeridas e conferir com o gabarito. O console do navegador tem que ficar sem erro; tire prints.
+
 ## Log de auditoria (B1)
 
 Em `IA_MODO=real`, toda resposta do `POST /ia` grava uma linha em `ia.interacao`, inclusive `bloqueado` e `nao_sei`. A mesma tabela guarda a memória da conversa. A gravação usa a conexão da API, e o usuário somente leitura do agente não enxerga o schema `ia`. CPF, CNPJ e e-mails digitados são mascarados antes de gravar. Linhas com mais de 30 dias são apagadas quando a API sobe.
