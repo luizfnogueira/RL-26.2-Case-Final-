@@ -1,12 +1,23 @@
-"""V1a: regras da Visão 360 (GET /unidades/{id}) que não dependem do banco."""
+"""V1a: Visão 360 (GET /unidades e /unidades/{id}): diagnóstico da conta e montagem da resposta."""
+from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from app.repositories.unidade_repository import MesConsumo
+from app.core.config import GOLD_SOURCE
+from app.core.exceptions import UCInexistenteException
+from app.repositories.unidade_repository import (
+    ChamadoUC, FaturaUC, FichaUC, InterrupcaoUC, LeituraUC, MesConsumo, UnidadeRepositoryInterface,
+)
 from app.schemas.common import limites
+from app.schemas.unidades import MESES_JANELA, FiltroUnidade, FiltrosUnidades
+from app.services.stubs import exemplo, filtrar_regiao, paginar, verificar_cenario
 
 # Mesmo limiar da flag_conta_alta da Gold (p95 da variação), aplicado pela API à média dos meses anteriores.
 LIMIAR_MEDIA_PCT = 20
 MESES_MEDIA = 12
+LIMITE_INTERRUPCOES = 10
+HORA_LOCAL = timezone(timedelta(hours=-3))   # Recife, sem horário de verão
+UC_EXEMPLO = 'UC-DEMO-001'                   # única UC com visão detalhada no fixture (GOLD_SOURCE=seed)
 
 
 def _indicador(valor: Decimal | float | None, unidade: str, periodo: str) -> dict:
@@ -106,3 +117,148 @@ def diagnosticar_conta(meses: list[MesConsumo], periodo: str) -> dict:
         'leitura_estimada': any(m is not None and m.tipo_leitura == 'ESTIMADA' for m in (ultimo, anterior)),
         'alerta': _alerta(ultimo, anterior) if ultimo else None,
     }
+
+
+def janela_padrao(ultimo_mes: str) -> str:
+    """Os 12 meses que terminam no último mês da Gold (acompanha cada recarga)."""
+    return f'{somar_meses(ultimo_mes, -(MESES_JANELA - 1))}/{ultimo_mes}'
+
+
+def _numero(valor: Decimal | None) -> float | None:
+    return None if valor is None else float(valor)
+
+
+def hora_local(instante: datetime) -> datetime:
+    """Hora de negócio (interrupções e chamados): a origem exporta hora local e o CSV a marca como UTC.
+
+    Lê o relógio em UTC e troca só o rótulo para -03:00, sem converter. Não vale para
+    gold_atualizada_em, que é UTC de verdade.
+    """
+    return instante.astimezone(timezone.utc).replace(tzinfo=HORA_LOCAL)
+
+
+def _consumo(meses: list[MesConsumo], periodo: str) -> list[dict]:
+    """Os 12 meses da janela, cada um com o mesmo mês do ano anterior.
+
+    Como na série do /dashboard, mês sem dado entra com valores null, nunca some: eixo fixo no gráfico.
+    """
+    inicio, _ = limites(periodo)
+    por_mes = {m.mes: m for m in meses}
+    resultado = []
+    for i in range(MESES_JANELA):
+        mes = somar_meses(inicio, i)
+        m = por_mes.get(mes)
+        resultado.append({
+            'mes': mes,
+            'atual': _indicador(m.consumo_kwh if m else None, 'kWh', mes),
+            'ano_anterior': _indicador(m.consumo_kwh_ano_anterior if m else None, 'kWh', somar_meses(mes, -12)),
+            'tipo_leitura': m.tipo_leitura if m else None,
+        })
+    return resultado
+
+
+def _fatura(f: FaturaUC) -> dict:
+    return {'id_fatura': f.id_fatura, 'mes_referencia': f.mes_referencia,
+            'valor_energia': _numero(f.valor_energia), 'tributos': _numero(f.tributos),
+            'valor_total': _numero(f.valor_total), 'bandeira_tarifaria': f.bandeira_tarifaria,
+            'data_emissao': f.data_emissao, 'data_vencimento': f.data_vencimento,
+            'data_pagamento': f.data_pagamento, 'status': f.status}
+
+
+def _medidor(ficha: FichaUC, leitura: LeituraUC | None) -> dict | None:
+    if ficha.medidor is None:
+        return None
+    m = ficha.medidor
+    return {'id_medidor': m.id_medidor, 'modelo': m.modelo, 'tipo': m.tipo, 'data_instalacao': m.data_instalacao,
+            'ultima_leitura': None if leitura is None else {
+                'data': leitura.data, 'leitura_kwh': _numero(leitura.leitura_kwh),
+                'tipo_leitura': leitura.tipo_leitura}}
+
+
+def _gd(ficha: FichaUC, periodo: str) -> dict | None:
+    if ficha.gd is None:
+        return None
+    gd = ficha.gd
+    return {'potencia_kwp': _numero(gd.potencia_kwp), 'data_conexao': gd.data_conexao, 'modalidade': gd.modalidade,
+            'energia_injetada_media_mensal': _indicador(gd.energia_injetada_media_mensal, 'kWh', periodo)}
+
+
+def _interrupcao(i: InterrupcaoUC) -> dict:
+    return {'id_ocorrencia': i.id_ocorrencia, 'alimentador': i.alimentador, 'tipo': i.tipo, 'causa': i.causa,
+            'data_abertura': hora_local(i.data_abertura), 'data_encerramento': hora_local(i.data_encerramento),
+            'duracao_min': _numero(i.duracao_min)}
+
+
+def _chamado(c: ChamadoUC) -> dict:
+    return {'protocolo': c.protocolo, 'canal': c.canal, 'assunto': c.assunto, 'subassunto': c.subassunto,
+            'data_abertura': hora_local(c.data_abertura), 'data_fechamento': hora_local(c.data_fechamento),
+            'nota_satisfacao': _numero(c.nota_satisfacao), 'tempo_atendimento_h': _numero(c.tempo_atendimento_h)}
+
+
+class UnidadeService:
+    """Com GOLD_SOURCE=real lê a Gold pelo repository; com seed devolve o fixture rotulado como fictício."""
+
+    def __init__(self, repository: UnidadeRepositoryInterface | None, fonte: str = GOLD_SOURCE) -> None:
+        self.repository = repository
+        self.real = fonte == 'real'
+
+    def buscar(self, filtros: FiltrosUnidades) -> dict:
+        if not self.real:
+            return _buscar_exemplo(filtros)
+        itens, total = self.repository.buscar(
+            busca=filtros.busca, municipio=filtros.municipio, bairro=filtros.bairro, classe=filtros.classe,
+            alimentador=filtros.alimentador, page=filtros.page, page_size=filtros.page_size)
+        return {'items': [asdict(uc) for uc in itens], 'page': filtros.page, 'page_size': filtros.page_size,
+                'total': total, 'metadados': self.repository.metadados()}
+
+    def detalhar(self, id_uc: str, filtros: FiltroUnidade) -> dict:
+        if not self.real:
+            return _detalhar_exemplo(id_uc, filtros)
+        repo = self.repository
+        ficha = repo.ficha(id_uc)
+        if ficha is None:
+            raise UCInexistenteException(f"Unidade Consumidora '{id_uc}' não encontrada no cadastro.")
+        periodo = filtros.periodo_atual or janela_padrao(repo.ultimo_mes())
+        inicio, fim = limites(periodo)
+        # 12 meses antes da janela: média e mesmo mês do ano anterior do mês analisado.
+        meses = repo.consumo(id_uc, somar_meses(inicio, -12), fim)
+        interrupcoes, total_interrupcoes = repo.interrupcoes(id_uc, inicio, fim, LIMITE_INTERRUPCOES)
+        c = ficha.cadastro
+        return {
+            'periodo_referencia': periodo,
+            'cadastro': {
+                'id_uc': c.id_uc, 'nome_titular': c.nome_titular, 'municipio': c.municipio, 'bairro': c.bairro,
+                'classe': c.classe, 'alimentador': c.alimentador, 'status': c.status,
+                'cpf_cnpj_mascarado': c.cpf_cnpj, 'telefone': None, 'logradouro': c.logradouro,
+                'numero': c.numero, 'uf': c.uf, 'cep': c.cep, 'subgrupo_tarifario': c.subgrupo_tarifario,
+                'data_ligacao': c.data_ligacao, 'latitude': _numero(c.latitude),
+                'longitude': _numero(c.longitude)},
+            'consumo': _consumo(meses, periodo),
+            'diagnostico_conta': diagnosticar_conta(meses, periodo),
+            'faturas_abertas': [_fatura(f) for f in repo.faturas_abertas(id_uc)],
+            'faturas_pagas': [_fatura(f) for f in repo.faturas_pagas(id_uc, inicio, fim)],
+            'medidor': _medidor(ficha, repo.ultima_leitura(id_uc)),
+            'geracao_distribuida': _gd(ficha, periodo),
+            'interrupcoes_recentes': [_interrupcao(i) for i in interrupcoes],
+            'total_interrupcoes': _indicador(total_interrupcoes, 'interrupcoes', periodo),
+            'chamados': [_chamado(ch) for ch in repo.chamados(id_uc)],
+            'metadados': repo.metadados(),
+        }
+
+
+def _buscar_exemplo(filtros: FiltrosUnidades) -> dict:
+    base = exemplo('unidades')
+    unidades = filtrar_regiao(base['items'], filtros)
+    if filtros.busca:
+        busca = filtros.busca.casefold()
+        unidades = [uc for uc in unidades
+                    if busca in uc['id_uc'].casefold() or busca in uc['nome_titular'].casefold()]
+    unidades.sort(key=lambda uc: uc['id_uc'])
+    return {**paginar(unidades, filtros), 'metadados': base['metadados']}
+
+
+def _detalhar_exemplo(id_uc: str, filtros: FiltroUnidade) -> dict:
+    verificar_cenario(filtros.periodo_atual)
+    if id_uc != UC_EXEMPLO:
+        raise UCInexistenteException(f"Unidade Consumidora '{id_uc}' não disponível no cenário.")
+    return exemplo('unidade')

@@ -50,12 +50,15 @@ export interface Cadastro extends Unidade {
   longitude: number
 }
 
-/** Um dos 12 meses: valor do mês e do mesmo mês do ano anterior. */
+/**
+ * Um dos 12 meses da janela (sempre 12, eixo fixo): valor do mês e do mesmo mês do ano anterior.
+ * Mês sem dado da UC vem com os valores e `tipo_leitura` null, nunca some.
+ */
 export interface ConsumoMes {
   mes: Mes
   atual: Indicador
   ano_anterior: Indicador
-  tipo_leitura: TipoLeitura
+  tipo_leitura: TipoLeitura | null
 }
 
 /** Resposta à pergunta "a conta veio alta?" sobre o mês analisado. */

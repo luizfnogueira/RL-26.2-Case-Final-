@@ -58,7 +58,7 @@ class ConsumoMes(Schema):
     mes: Mes
     atual: Indicador
     ano_anterior: Indicador
-    tipo_leitura: TipoLeitura
+    tipo_leitura: TipoLeitura | None          # mês da janela sem dado da UC: null, o mês não some
 
 
 class DiagnosticoConta(Schema):
