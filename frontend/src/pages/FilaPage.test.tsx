@@ -1,25 +1,69 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import candidatosFixture from '@/data/mocks/candidatos.json'
-import { buscarCandidatos } from '@/services'
+import { buscarCandidatos, buscarFiltros, criarInspecao, normalizarErro } from '@/services'
+import { ApiError } from '@/services/erro-api'
+import type { OpcoesFiltrosApi } from '@/types/filtros'
 import type { Candidatos, ParamsCandidatos } from '@/types/inspecoes'
+import { esquecerOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gerarCsvCandidatos } from '@/utils/exportarCandidatos'
 import FilaPage from './FilaPage'
 
 const mocks = vi.hoisted(() => ({
   buscarCandidatos: vi.fn(),
+  buscarFiltros: vi.fn(),
   criarInspecao: vi.fn(),
   normalizarErro: vi.fn(),
 }))
 
 vi.mock('@/services', () => mocks)
-vi.mock('@/hooks/useOpcoesFiltros', () => ({
-  useOpcoesFiltros: () => ({
-    municipios: ['Recife', 'Jaboatão dos Guararapes', 'Olinda'],
-    classes: ['Comercial', 'Industrial', 'Residencial'],
+vi.mock('@/services/filtros', () => ({
+  buscarFiltros: mocks.buscarFiltros,
+  paraOpcoes: (resposta: OpcoesFiltrosApi) => ({
+    municipios: resposta.municipios,
+    bairros: resposta.bairros.reduce<Record<string, string[]>>((opcoes, item) => {
+      ;(opcoes[item.municipio] ??= []).push(item.bairro)
+      return opcoes
+    }, {}),
+    classes: resposta.classes,
+    alimentadores: resposta.alimentadores.map((item) => item.alimentador),
   }),
 }))
+
+function opcoesDoFixture(): OpcoesFiltrosApi {
+  const todos = candidatosFixture as Candidatos
+  return {
+    municipios: [...new Set(todos.items.map((item) => item.municipio))],
+    bairros: [
+      ...new Map(
+        todos.items.map((item) => [
+          `${item.municipio}|${item.bairro}`,
+          { municipio: item.municipio, bairro: item.bairro },
+        ]),
+      ).values(),
+    ],
+    classes: [...new Set(todos.items.map((item) => item.classe))],
+    alimentadores: [
+      ...new Map(
+        todos.items.map((item) => [
+          item.alimentador,
+          { alimentador: item.alimentador, municipio: item.municipio },
+        ]),
+      ).values(),
+    ],
+    metadados: todos.metadados,
+  }
+}
+
+beforeEach(() => {
+  esquecerOpcoesFiltros()
+  vi.mocked(buscarFiltros).mockResolvedValue(opcoesDoFixture())
+  vi.mocked(criarInspecao).mockResolvedValue({} as never)
+  vi.mocked(normalizarErro).mockImplementation(
+    (erro: unknown) => new ApiError(0, 'ERRO', erro instanceof Error ? erro.message : String(erro)),
+  )
+})
 
 afterEach(() => {
   cleanup()
@@ -69,6 +113,9 @@ describe('FilaPage', () => {
 
       await screen.findByText('UC-DEMO-001')
       expect(screen.getByRole('columnheader', { name: 'Alimentador' })).toBeTruthy()
+      expect(
+        screen.getByRole('columnheader', { name: 'Prioridade' }).classList.contains('text-center'),
+      ).toBe(true)
       expect(screen.getAllByText('ALM-DEMO-001').length).toBeGreaterThan(0)
       fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
 
@@ -112,6 +159,7 @@ describe('FilaPage', () => {
     )
 
     await screen.findByText('UC-DEMO-001')
+    await screen.findByRole('option', { name: 'Jaboatão dos Guararapes' })
     fireEvent.change(screen.getByRole('combobox', { name: 'Município' }), {
       target: { value: 'Jaboatão dos Guararapes' },
     })
@@ -123,6 +171,54 @@ describe('FilaPage', () => {
     await act(async () => concluirConsulta(filtrados))
     await waitFor(() => expect(screen.getByText('UC-DEMO-006')).toBeTruthy())
     expect(screen.queryByText('UC-DEMO-001')).toBeNull()
+  })
+
+  it('cria a ordem com o motivo e o kWh estimado que vieram da fila da Gold', async () => {
+    const todos = candidatosFixture as Candidatos
+    vi.mocked(buscarCandidatos).mockResolvedValue(todos)
+    const candidato = todos.items.find((item) => item.id_uc === 'UC-DEMO-001')!
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem de inspeção' }))
+    fireEvent.change(screen.getByLabelText('Equipe responsável *'), {
+      target: { value: 'Equipe Norte 02' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
+
+    await waitFor(() =>
+      expect(mocks.criarInspecao).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id_uc: 'UC-DEMO-001',
+          equipe_responsavel: 'Equipe Norte 02',
+          motivo: candidato.motivos.join(' · '),
+          kwh_estimado: candidato.energia_estimada.valor,
+        }),
+      ),
+    )
+  })
+
+  it('mostra o domínio de filtros vindo de /filtros, sem lista fixa no front', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-001')
+    expect(buscarFiltros).toHaveBeenCalledTimes(1)
+    await screen.findByRole('option', { name: 'Jaboatão dos Guararapes' })
+    const municipio = screen.getByRole('combobox', { name: 'Município' }) as HTMLSelectElement
+    expect([...municipio.options].map((opcao) => opcao.value)).toEqual(
+      expect.arrayContaining(['Recife', 'Jaboatão dos Guararapes', 'Olinda']),
+    )
   })
 })
 
