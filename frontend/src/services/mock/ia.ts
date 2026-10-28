@@ -125,10 +125,14 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
   }
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
-  if (pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta))
-    return fixtures.respostaIaBloqueado()
-  if (pergunta === PERGUNTA_OK) return fixtures.respostaIa()
-  return (await respostaExtra(normalizar(bruta))) ?? fixtures.respostaIaNaoSei()
+  const resposta =
+    pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta)
+      ? await fixtures.respostaIaBloqueado()
+      : pergunta === PERGUNTA_OK
+        ? await fixtures.respostaIa()
+        : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
+  // Como a API: devolve o id recebido ou cria um na primeira pergunta.
+  return { ...resposta, conversa_id: (conversa as string | null | undefined) ?? crypto.randomUUID() }
 }
 
 // ---------- POST /ia/insight ----------

@@ -63,7 +63,7 @@ describe('Tela 7 — erro e indisponibilidade', () => {
     ).toBeTruthy()
   })
 
-  it('manda só a pergunta para o POST /ia', async () => {
+  it('manda só a pergunta para o POST /ia na primeira vez', async () => {
     perguntar.mockResolvedValueOnce(resposta as RespostaIA)
     const painel = abrirPainel()
     fireEvent.change(within(painel).getByLabelText('Sua pergunta'), {
@@ -74,6 +74,29 @@ describe('Tela 7 — erro e indisponibilidade', () => {
     expect(perguntar).toHaveBeenCalledWith(
       'Qual foi a receita no período?',
       expect.any(AbortSignal),
+      null,
     )
+  })
+
+  it('reenvia o conversa_id da resposta e esquece ao limpar a conversa (GENAI-12)', async () => {
+    const primeira = { ...(resposta as RespostaIA), conversa_id: 'id-da-conversa' }
+    perguntar.mockResolvedValue(primeira)
+    const painel = abrirPainel()
+    const enviar = async (texto: string) => {
+      fireEvent.change(within(painel).getByLabelText('Sua pergunta'), {
+        target: { value: texto },
+      })
+      fireEvent.click(within(painel).getByRole('button', { name: 'Enviar' }))
+      await vi.waitFor(() => expect(within(painel).queryByRole('status')).toBeNull())
+    }
+
+    await enviar('Qual foi a receita no período?')
+    await enviar('E só comercial?')
+    expect(perguntar.mock.calls[0][2]).toBeNull()
+    expect(perguntar.mock.calls[1][2]).toBe('id-da-conversa')
+
+    fireEvent.click(within(painel).getByRole('button', { name: 'Limpar conversa' }))
+    await enviar('Qual foi a receita no período?')
+    expect(perguntar.mock.calls[2][2]).toBeNull()
   })
 })

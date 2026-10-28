@@ -82,7 +82,8 @@ def test_agente_fora_do_ar_vira_503(agente):
 
 def test_resposta_valida_do_agente_passa_sem_alteracao(agente):
     agente(AgenteFixo(exemplo("resposta_ia")))
-    assert client.post("/ia", json={"pergunta": "Qual foi a receita?"}).json() == exemplo("resposta_ia")
+    pergunta = {"pergunta": "Qual foi a receita?", "conversa_id": exemplo("resposta_ia")["conversa_id"]}
+    assert client.post("/ia", json=pergunta).json() == exemplo("resposta_ia")
 
 
 def test_chave_de_ia_nunca_vai_na_resposta(monkeypatch):
