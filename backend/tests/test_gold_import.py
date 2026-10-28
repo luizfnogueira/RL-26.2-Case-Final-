@@ -63,6 +63,8 @@ def package(tmp_path):
                 row[c] = 'SYNTHETIC'
             elif c in {'municipio', 'bairro', 'classe', 'status'}:
                 row[c] = 'SYNTHETIC'
+            elif c in {'logradouro', 'numero', 'subgrupo_tarifario', 'modelo_medidor'}:
+                row[c] = 'SYNTHETIC'   # sem nulo na Gold real; a Visão 360 os exige
             elif c == 'cpf_cnpj':
                 row[c] = '***.***.***-00'
             elif c == 'acao_recomendada':
