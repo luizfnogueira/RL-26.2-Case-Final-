@@ -1,24 +1,12 @@
 """V1a: regras da Visão 360 (GET /unidades/{id}) que não dependem do banco."""
-from dataclasses import dataclass
 from decimal import Decimal
 
+from app.repositories.unidade_repository import MesConsumo
 from app.schemas.common import limites
 
 # Mesmo limiar da flag_conta_alta da Gold (p95 da variação), aplicado pela API à média dos meses anteriores.
 LIMIAR_MEDIA_PCT = 20
 MESES_MEDIA = 12
-
-
-@dataclass(frozen=True)
-class MesConsumo:
-    """Um mês da UC: consumo e comparação da uc_consumo_comparativo + troca de medidor do fato_uc_mes."""
-    mes: str
-    consumo_kwh: Decimal | None
-    consumo_kwh_ano_anterior: Decimal | None
-    variacao_pct: Decimal | None
-    flag_conta_alta: bool | None
-    tipo_leitura: str | None
-    troca_medidor: bool = False
 
 
 def _indicador(valor: Decimal | float | None, unidade: str, periodo: str) -> dict:
