@@ -104,7 +104,7 @@ class AgenteReal:
             resposta = executar_com_prazo(lambda: responder(
                 dados.pergunta,
                 historico=historico,
-                conversa_id=str(dados.conversa_id),
+                conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
                 executar_sql_fn=executar_sql,
                 **extras,
                 gold_atualizada_em=gold["gold_atualizada_em"],
