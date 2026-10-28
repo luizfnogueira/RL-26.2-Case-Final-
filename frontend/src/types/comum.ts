@@ -93,6 +93,8 @@ export type CodigoErro =
   | 'DADOS_INDISPONIVEIS'
   /** 503 do POST /ia: agente fora do ar, lento além do timeout ou com resposta fora do contrato. */
   | 'AGENTE_INDISPONIVEL'
+  /** 503 do GET /unidades/{id}: Gold não carregada no banco (dim_mes vazia). */
+  | 'GOLD_NAO_CARREGADA'
   | 'ERRO_INTERNO'
   /** Gerado no front: a API não respondeu (rede, CORS, servidor fora do ar). */
   | 'REDE_INDISPONIVEL'
