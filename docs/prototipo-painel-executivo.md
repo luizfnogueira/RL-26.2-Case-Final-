@@ -56,7 +56,7 @@ com seis cards no desktop amplo, três no tablet e um/dois em telas menores.
 
 Protótipo para avaliação de design. A validação visual no navegador e o aceite
 com a Gold real ainda precisam ocorrer. O serviço `buscarDashboard` e os tipos
-da equipe são reutilizados; os domínios dos filtros continuam os mocks existentes.
+da equipe são reutilizados; as opções dos filtros vêm de `GET /filtros`, pelo
+hook compartilhado `useOpcoesFiltros`.
 Login, autenticação, Operação e a aba de comparação de recortes não integram esta
-entrega. O trabalho local anterior foi preservado no stash identificado
-`Artur AUTH-b R1a e docs locais antes do prototipo T1 2026-10-28`.
+entrega.

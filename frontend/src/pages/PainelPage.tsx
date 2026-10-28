@@ -9,9 +9,9 @@ import EmptyState from '@/components/ui/EmptyState'
 import ErrorState from '@/components/ui/ErrorState'
 import SeloFicticio from '@/components/ui/SeloFicticio'
 import Skeleton from '@/components/ui/Skeleton'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
+import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { buscarDashboard } from '@/services/dashboard'
 import { construirQuery } from '@/services/http'
@@ -31,6 +31,7 @@ const PADROES: FiltrosUrl = {
 }
 
 export default function PainelPage() {
+  const opcoesFiltros = useOpcoesFiltros()
   const { filtros } = useFiltrosUrl(CAMPOS, PADROES)
   const periodo_atual = filtros.periodo_atual ?? PERIODO_ATUAL_PADRAO
   const periodo_comparacao = filtros.periodo_comparacao ?? PERIODO_COMPARACAO_PADRAO
@@ -49,7 +50,7 @@ export default function PainelPage() {
       <BarraDeFiltros
         campos={CAMPOS}
         padroes={PADROES}
-        opcoes={OPCOES_FILTROS_MOCK}
+        opcoes={opcoesFiltros.opcoes}
         mostrarLimparSempre
       />
       {consulta.erro ? (

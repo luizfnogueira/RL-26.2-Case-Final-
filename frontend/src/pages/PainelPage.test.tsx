@@ -7,6 +7,15 @@ import { ApiError } from '@/services/erro-api'
 import type { Dashboard } from '@/types/dashboard'
 import PainelPage from './PainelPage'
 
+vi.mock('@/hooks/useOpcoesFiltros', () => ({
+  useOpcoesFiltros: () => ({
+    opcoes: { municipios: ['RECIFE', 'JABOATÃO DOS GUARARAPES', 'OLINDA'] },
+    metadados: null,
+    erro: null,
+    carregando: false,
+  }),
+}))
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
@@ -49,9 +58,9 @@ describe('Tela 1 — Painel executivo', () => {
     abrir()
     await screen.findByLabelText('Seis indicadores executivos')
     fireEvent.change(screen.getByRole('combobox', { name: 'Município' }), {
-      target: { value: 'Recife' },
+      target: { value: 'RECIFE' },
     })
-    expect(screen.getByLabelText('Endereço atual').textContent).toContain('municipio=Recife')
+    expect(screen.getByLabelText('Endereço atual').textContent).toContain('municipio=RECIFE')
     const aviso = await screen.findAllByText(
       'DEC/FEC indisponíveis para este recorte na fonte consultada.',
     )
@@ -65,14 +74,14 @@ describe('Tela 1 — Painel executivo', () => {
   })
 
   it('preserva o município ao recarregar e no atalho da receita', async () => {
-    abrir('/painel?municipio=Olinda')
+    abrir('/painel?municipio=OLINDA')
     const link = await screen.findByRole('link', { name: 'Ver diagnóstico da receita' })
     expect((screen.getByRole('combobox', { name: 'Município' }) as HTMLSelectElement).value).toBe(
-      'Olinda',
+      'OLINDA',
     )
     const destino = new URL(link.getAttribute('href')!, 'http://localhost')
     expect(destino.pathname).toBe('/receita')
-    expect(destino.searchParams.get('municipio')).toBe('Olinda')
+    expect(destino.searchParams.get('municipio')).toBe('OLINDA')
     expect(destino.searchParams.get('periodo_atual')).toBe('2025-07/2026-06')
     expect(destino.searchParams.get('periodo_comparacao')).toBe('2022-07/2023-06')
   })
@@ -116,7 +125,7 @@ describe('Tela 1 — Painel executivo', () => {
     abrir()
     await screen.findByLabelText('Seis indicadores executivos')
     fireEvent.change(screen.getByRole('combobox', { name: 'Município' }), {
-      target: { value: 'Recife' },
+      target: { value: 'RECIFE' },
     })
     expect(screen.getByLabelText('Carregando painel executivo')).toBeTruthy()
     expect(screen.queryByLabelText('Seis indicadores executivos')).toBeNull()
