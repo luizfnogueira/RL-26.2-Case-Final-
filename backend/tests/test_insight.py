@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.main import app
 from app.services import insight_service
 from app.services.insight_service import (
-    PREFIXO_TEXTO_ALTERNATIVO, GeradorMock, GeradorReal, obter_gerador_insight,
+    PREFIXO_TEXTO_ALTERNATIVO, GeradorIA, GeradorMock, GeradorReal, obter_gerador_insight,
 )
 from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, exemplo
 
@@ -143,9 +143,9 @@ class TestModuloDaEquipe3:
         assert 'O crescimento da receita veio do preço' in dados['texto']
         assert not any(o.startswith(PREFIXO_TEXTO_ALTERNATIVO) for o in dados['metadados']['observacoes'])
 
-    def test_modo_real_escolhe_o_gerador_real(self, monkeypatch):
+    def test_modo_real_escolhe_o_agente_de_insight_dentro_do_backend(self, monkeypatch):
         monkeypatch.setattr(config, 'IA_MODO', 'real')
-        assert isinstance(obter_gerador_insight(), GeradorReal)
+        assert isinstance(obter_gerador_insight(), GeradorIA)
 
     def test_texto_do_modulo_e_usado_e_os_numeros_continuam_os_da_gold(self):
         gerador = usar(GeradorFixo({'titulo': 'Preço sustentou', 'texto': 'O reajuste explica o avanço.',
