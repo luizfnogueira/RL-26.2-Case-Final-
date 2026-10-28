@@ -273,14 +273,37 @@ Content-Type: application/json
 
 ```json
 {
-  "pergunta": "Qual foi a receita no período?"
+  "pergunta": "Qual foi a receita no período?",
+  "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d"
 }
 ```
 
+`conversa_id` (UUID) é opcional. Na primeira pergunta o front não envia o campo: o backend cria o id e o devolve na resposta. Nas perguntas seguintes, o front reenvia o mesmo id, e o agente usa as últimas trocas daquela conversa (até 3, guardadas no servidor) para entender perguntas de continuação ("E só comercial?"). “Limpar conversa” no front começa uma conversa nova. Um id desconhecido ou expirado (mais de 2 h sem perguntas) abre uma conversa nova, sem erro.
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_ia.json)**
 
 Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
+
+Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem eles continuam válidos:
+
+| Campo | Tipo | Para quê |
+| --- | --- | --- |
+| `conversa_id` | UUID | Memória da conversa (ver acima). |
+| `apresentacao` | `"texto"` ou `"tabela"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. |
+| `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
+
+Blocos de `detalhes_tecnicos`. Campos novos da telemetria são aceitos e o front os ignora:
+
+| Bloco | Conteúdo |
+| --- | --- |
+| `estrutura_pensamento` | `pergunta_interpretada`, `plano` (`tabelas`, `colunas`, `filtros`, `agregacao`, `ordenacao`, `limite`, `periodo`), `skills`, `premissas` e `justificativa` (declarada pelo modelo, e assim rotulada na tela) |
+| `acoes[]` | Ferramentas chamadas pelo agente, em ordem: `ordem`, `ferramenta`, `argumentos`, `resumo_retorno`, `sucesso` |
+| `consulta` | `sql_executado`, `tentativas` e `linhas` |
+| `tokens_tempo` | `tokens_entrada`, `tokens_saida`, `tokens_raciocinio`, `chamadas`, `latencia_total_ms`, `etapas_ms{}`, `modelo`, `provedor` e `cache` |
+| `verificacoes` | `sql_validado`, `numeros_conferidos` e `confianca` (`alta`, `media` ou `baixa`) |
+| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). |
+
+As métricas de `avaliacao` medem o conjunto de perguntas com gabarito, não esta resposta. As verificações desta resposta ficam em `verificacoes`.
 
 Cenários demonstrativos:
 

@@ -11,6 +11,7 @@ import { montarDashboard } from './dashboard'
 const PERGUNTA_OK = 'qual foi a receita no período?'
 const PERGUNTA_BLOQUEADA = 'drop table clientes'
 const DESTRUTIVA = /\b(drop|delete|truncate|apague|apagar|exclua|excluir|remova|remover)\b/i
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const UC_INSIGHT = 'UC-DEMO-001'
 const NUMEROS_UNIDADE = [
   ['ultimo_mes', 'Último mês'],
@@ -115,9 +116,13 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
   if (typeof bruta !== 'string' || bruta.trim().length < 1 || bruta.length > 2000) {
     throw invalido('pergunta deve ter de 1 a 2000 caracteres.')
   }
-  // Como a API (extra='forbid'): o corpo é só {pergunta}
-  const extras = Object.keys(corpo).filter((campo) => campo !== 'pergunta')
+  // Como a API (extra='forbid'): o corpo é só {pergunta, conversa_id?}
+  const extras = Object.keys(corpo).filter((campo) => campo !== 'pergunta' && campo !== 'conversa_id')
   if (extras.length > 0) throw invalido(`Campo não permitido: ${extras.join(', ')}.`)
+  const conversa = corpo.conversa_id
+  if (conversa !== undefined && conversa !== null && (typeof conversa !== 'string' || !UUID.test(conversa))) {
+    throw invalido('conversa_id deve ser um UUID.')
+  }
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
   if (pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta))
