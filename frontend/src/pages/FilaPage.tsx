@@ -288,10 +288,20 @@ export default function FilaPage() {
           <BarraDeFiltros
             campos={CAMPOS}
             padroes={PADROES}
-            opcoes={opcoesFiltros}
+            opcoes={opcoesFiltros.opcoes}
             mostrarLimparSempre
             className="rounded-none border-b border-[#dfeaf0] bg-[#edf3f5] p-4 shadow-none"
           />
+
+          {opcoesFiltros.erro && (
+            <p
+              role="status"
+              className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-[12px] text-amber-900"
+            >
+              Não foi possível carregar as opções de filtro da Gold. A fila continua disponível, mas
+              os filtros de região ficam sem valores.
+            </p>
+          )}
 
           {candidatos.erro && !dados ? (
             <ErrorState

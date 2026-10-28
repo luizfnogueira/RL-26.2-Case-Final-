@@ -4,7 +4,6 @@ import { buscarCandidatos, buscarFiltros, criarInspecao, normalizarErro } from '
 import { ApiError } from '@/services/erro-api'
 import type { OpcoesFiltrosApi } from '@/types/filtros'
 import type { Candidatos, ParamsCandidatos } from '@/types/inspecoes'
-import { esquecerOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gerarCsvCandidatos } from '@/utils/exportarCandidatos'
@@ -18,18 +17,6 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/services', () => mocks)
-vi.mock('@/services/filtros', () => ({
-  buscarFiltros: mocks.buscarFiltros,
-  paraOpcoes: (resposta: OpcoesFiltrosApi) => ({
-    municipios: resposta.municipios,
-    bairros: resposta.bairros.reduce<Record<string, string[]>>((opcoes, item) => {
-      ;(opcoes[item.municipio] ??= []).push(item.bairro)
-      return opcoes
-    }, {}),
-    classes: resposta.classes,
-    alimentadores: resposta.alimentadores.map((item) => item.alimentador),
-  }),
-}))
 
 function opcoesDoFixture(): OpcoesFiltrosApi {
   const todos = candidatosFixture as Candidatos
@@ -57,7 +44,6 @@ function opcoesDoFixture(): OpcoesFiltrosApi {
 }
 
 beforeEach(() => {
-  esquecerOpcoesFiltros()
   vi.mocked(buscarFiltros).mockResolvedValue(opcoesDoFixture())
   vi.mocked(criarInspecao).mockResolvedValue({} as never)
   vi.mocked(normalizarErro).mockImplementation(

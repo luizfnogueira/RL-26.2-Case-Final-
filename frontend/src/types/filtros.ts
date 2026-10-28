@@ -15,17 +15,35 @@ export type CampoFiltro = (typeof CAMPOS_FILTRO)[number]
 /** Valores lidos da URL. Só aparecem as chaves preenchidas; ausente significa "todos". */
 export type FiltrosUrl = Partial<Record<CampoFiltro, string>>
 
-/** GET /filtros: valores aceitos nos filtros, exatamente como estão no banco (ex.: RECIFE). */
-export interface RespostaFiltros {
+// ---------- GET /filtros (domínios lidos da Gold) ----------
+
+/** Bairro sempre vem com o município: o mesmo nome existe em cidades diferentes. */
+export interface OpcaoBairro {
+  municipio: string
+  bairro: string
+}
+
+/** Alimentador sempre vem com o município que ele atende. */
+export interface OpcaoAlimentador {
+  alimentador: string
+  municipio: string
+}
+
+/**
+ * Resposta de `GET /filtros`. Os valores são exatamente os do cadastro de UCs da Gold
+ * (maiúsculas, ex.: `RECIFE`, `BOA VISTA`) e são os mesmos enviados nas outras rotas.
+ */
+export interface OpcoesFiltrosApi {
   municipios: string[]
-  /** O mesmo nome de bairro existe em vários municípios: o par é a chave. */
-  bairros: { municipio: string; bairro: string }[]
+  bairros: OpcaoBairro[]
   classes: string[]
-  alimentadores: { alimentador: string; municipio: string }[]
+  alimentadores: OpcaoAlimentador[]
   metadados: Metadados
 }
 
-/** Listas que alimentam as listas suspensas (vêm de GET /filtros pelo useOpcoesFiltros). */
+// ---------- Formato consumido pela BarraDeFiltros ----------
+
+/** Listas que alimentam as listas suspensas da barra de filtros. */
 export interface OpcoesFiltros {
   /** Janelas disponíveis para os dois filtros de período. */
   periodos?: readonly Periodo[]
@@ -33,5 +51,9 @@ export interface OpcoesFiltros {
   /** Lista única, ou bairros por município (o bairro só habilita depois do município). */
   bairros?: readonly string[] | Readonly<Record<string, readonly string[]>>
   classes?: readonly string[]
-  alimentadores?: readonly string[]
+  /**
+   * Lista única, ou alimentadores por município. A API devolve o município de cada
+   * alimentador; a barra usa isso para filtrar a lista quando há município escolhido.
+   */
+  alimentadores?: readonly string[] | Readonly<Record<string, readonly string[]>>
 }

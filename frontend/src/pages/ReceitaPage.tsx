@@ -120,7 +120,7 @@ export default function ReceitaPage() {
       titulo="Diagnóstico da receita"
       subtitulo="Decomposição da variação de preço e volume da receita de energia"
     >
-      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros} />
+      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros.opcoes} />
 
       {dashboard.erro && !dados ? (
         <ErrorState erro={dashboard.erro} aoTentarNovamente={dashboard.recarregar} />

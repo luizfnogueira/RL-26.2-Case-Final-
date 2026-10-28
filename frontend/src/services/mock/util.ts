@@ -39,7 +39,11 @@ export function verificarCenario(periodoAtual?: string | null, periodoComparacao
   }
 }
 
-/** Filtros geográficos por AND; `cadastro` completa a região de itens que só têm id_uc. */
+/**
+ * Filtros geográficos por AND; `cadastro` completa a região de itens que só têm id_uc.
+ * Compara sem diferenciar maiúsculas/minúsculas, como o backend: o `GET /filtros` pode
+ * devolver `RECIFE` (Gold real) enquanto o fixture usa `Recife`.
+ */
 export function filtrarRegiao<T extends object>(
   items: T[],
   filtros: FiltrosRegiao,
@@ -52,7 +56,10 @@ export function filtrarRegiao<T extends object>(
       const registro = item as Registro
       const valor =
         campo in registro ? registro[campo] : cadastro?.[String(registro.id_uc)]?.[campo]
-      return valor === alvo
+      return (
+        typeof valor === 'string' &&
+        valor.toLocaleLowerCase('pt-BR') === alvo.toLocaleLowerCase('pt-BR')
+      )
     }),
   )
 }

@@ -1,15 +1,15 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { paraOpcoes } from '@/services/filtros'
-import type { RespostaFiltros } from '@/types/filtros'
+import type { OpcoesFiltrosApi } from '@/types/filtros'
+import { paraOpcoesBarra } from '@/utils/filtros'
 import SeletorDeItens from './SeletorDeItens'
 import { selecaoValida, type SelecaoItens } from './selecaoItens'
 
 afterEach(cleanup)
 
 // Mesmo formato e nomes de GET /filtros com a Gold: caixa alta, bairro repetido em municípios.
-const RESPOSTA: RespostaFiltros = {
+const RESPOSTA: OpcoesFiltrosApi = {
   municipios: ['JABOATÃO DOS GUARARAPES', 'OLINDA', 'PAULISTA', 'RECIFE', 'CAMARAGIBE'],
   bairros: [
     { municipio: 'OLINDA', bairro: 'CENTRO' },
@@ -20,7 +20,7 @@ const RESPOSTA: RespostaFiltros = {
   alimentadores: [{ alimentador: 'ALM-REC-001', municipio: 'RECIFE' }],
   metadados: { dados_ficticios: true, gold_atualizada_em: null, observacoes: [] },
 }
-const OPCOES = paraOpcoes(RESPOSTA)
+const OPCOES = paraOpcoesBarra(RESPOSTA)
 
 /** Renderiza com estado de verdade e expõe a última seleção. */
 function montar(inicial: SelecaoItens) {
@@ -36,11 +36,11 @@ function montar(inicial: SelecaoItens) {
 
 const caixa = (nome: string) => screen.getByRole('checkbox', { name: nome })
 
-describe('paraOpcoes', () => {
-  it('agrupa os bairros pelo município e mantém os nomes do banco', () => {
+describe('paraOpcoesBarra', () => {
+  it('agrupa os bairros e alimentadores pelo município e mantém os nomes do banco', () => {
     expect(OPCOES.bairros).toEqual({ OLINDA: ['CENTRO'], RECIFE: ['BOA VISTA', 'CENTRO'] })
     expect(OPCOES.municipios).toContain('RECIFE')
-    expect(OPCOES.alimentadores).toEqual(['ALM-REC-001'])
+    expect(OPCOES.alimentadores).toEqual({ RECIFE: ['ALM-REC-001'] })
   })
 })
 

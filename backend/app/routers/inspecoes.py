@@ -8,6 +8,7 @@ from app.core.exceptions import (
 )
 from app.db.session import get_db
 from app.repositories.candidato_repository import SqlAlchemyCandidatoRepository
+from app.repositories.gold_metadata import metadados_gold
 from app.repositories.inspecao_repository import SqlAlchemyOrdemInspecaoRepository
 from app.routers.common import respostas
 from app.schemas.inspecao import (
@@ -42,14 +43,14 @@ def para_transporte(ordem: OrdemInspecaoResponse) -> dict:
     return ordem.model_dump(mode='json')
 
 
-def metadados() -> dict:
-    return {
-        'dados_ficticios': True,
-        'gold_atualizada_em': None,
-        'observacoes': [
-            'Dados fictícios do seed; as ordens de inspeção são persistidas no schema portal.'
-        ],
-    }
+def metadados(db: Session) -> dict:
+    # A listagem cruza as ordens do portal com a região do cadastro (dim_uc). O selo de
+    # "dado fictício" precisa seguir a fonte da Gold: seed em desenvolvimento, real na entrega.
+    return metadados_gold(
+        db,
+        'dim_uc',
+        'Dados fictícios do seed; as ordens de inspeção são persistidas no schema portal.',
+    )
 
 
 @router.get('/candidatos', response_model=Candidatos, summary='Fila priorizada de candidatos',
@@ -75,6 +76,7 @@ async def candidatos(
 async def listar_inspecoes(
     filtros: Annotated[FiltrosInspecoes, Query()],
     servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     ordens, total, contagem = servico.consultar_ordens(
         status=StatusOrdem(filtros.status) if filtros.status is not None else None,
@@ -93,7 +95,7 @@ async def listar_inspecoes(
         'page_size': filtros.page_size,
         'total': total,
         'contagem_status': contagem,
-        'metadados': metadados(),
+        'metadados': metadados(db),
     }
 
 

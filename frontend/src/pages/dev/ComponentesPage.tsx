@@ -99,7 +99,7 @@ export default function ComponentesPage() {
       titulo="Componentes comuns"
       subtitulo="Galeria de desenvolvimento (F2). Não aparece no build de produção."
     >
-      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros} />
+      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros.opcoes} />
       <Card titulo="Estado dos filtros na URL" subtitulo="Recarregue a página: os filtros ficam.">
         <pre className="overflow-x-auto rounded-md bg-surface-alt p-3 text-legenda">
           {JSON.stringify(filtros, null, 2)}
@@ -152,7 +152,7 @@ export default function ComponentesPage() {
           valor={classe}
           aoMudar={setClasse}
           vazio="Todas"
-          opcoes={(opcoesFiltros.classes ?? []).map((c) => ({ valor: c, rotulo: c }))}
+          opcoes={(opcoesFiltros.opcoes.classes ?? []).map((c) => ({ valor: c, rotulo: c }))}
           className="w-60"
         />
       </Secao>
@@ -199,7 +199,7 @@ export default function ComponentesPage() {
         titulo="Seletor de itens"
         subtitulo="Comparação de recortes: de 2 a 4 itens do mesmo nível."
       >
-        <SeletorDeItens opcoes={opcoesFiltros} valor={selecao} aoMudar={setSelecao} />
+        <SeletorDeItens opcoes={opcoesFiltros.opcoes} valor={selecao} aoMudar={setSelecao} />
         <pre className="mt-3 overflow-x-auto rounded-md bg-surface-alt p-3 text-legenda">
           {JSON.stringify({ ...selecao, valida: selecaoValida(selecao) }, null, 2)}
         </pre>

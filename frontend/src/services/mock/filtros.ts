@@ -1,33 +1,37 @@
-// Filtros simulados. Saem dos próprios recortes fictícios, e não de filtros.json: assim os nomes
-// escolhidos na barra (ex.: Recife) existem nos outros mocks e as telas filtram de verdade.
-import type { RespostaFiltros } from '@/types/filtros'
+import type { OpcoesFiltrosApi } from '@/types/filtros'
 import { fixtures } from './fixtures'
 
-const ordenados = (valores: Iterable<string>) =>
-  [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'pt-BR'))
-
-export async function listarFiltros(): Promise<RespostaFiltros> {
-  const { recortes } = await fixtures.recortes()
-  const bairros = new Map(recortes.map((r) => [`${r.municipio}|${r.bairro}`, r]))
-  const alimentadores = new Map(recortes.map((r) => [r.alimentador, r.municipio]))
-  return {
-    municipios: ordenados(recortes.map((r) => r.municipio)),
-    bairros: [...bairros.values()]
-      .map(({ municipio, bairro }) => ({ municipio, bairro }))
-      .sort(
-        (a, b) =>
-          a.municipio.localeCompare(b.municipio, 'pt-BR') ||
-          a.bairro.localeCompare(b.bairro, 'pt-BR'),
-      ),
-    classes: ordenados(recortes.map((r) => r.classe)),
-    alimentadores: ordenados(alimentadores.keys()).map((alimentador) => ({
-      alimentador,
-      municipio: alimentadores.get(alimentador)!,
-    })),
-    metadados: {
-      dados_ficticios: true,
-      gold_atualizada_em: null,
-      observacoes: ['Dados fictícios: os mesmos municípios, bairros e classes dos outros mocks.'],
-    },
-  }
+/**
+ * GET /filtros simulado a partir do mesmo cadastro dos outros mocks (`unidades.json`).
+ * Assim os valores listados existem nos dados fictícios, como no backend leem a `dim_uc`.
+ */
+export async function listarFiltros(): Promise<OpcoesFiltrosApi> {
+  const unidades = await fixtures.unidades()
+  const municipios = [...new Set(unidades.items.map((uc) => uc.municipio))].sort((a, b) =>
+    a.localeCompare(b, 'pt-BR'),
+  )
+  const bairros = [
+    ...new Map(
+      unidades.items.map((uc) => [
+        `${uc.municipio}|${uc.bairro}`,
+        { municipio: uc.municipio, bairro: uc.bairro },
+      ]),
+    ).values(),
+  ].sort(
+    (a, b) =>
+      a.municipio.localeCompare(b.municipio, 'pt-BR') || a.bairro.localeCompare(b.bairro, 'pt-BR'),
+  )
+  const classes = [...new Set(unidades.items.map((uc) => uc.classe))].sort((a, b) =>
+    a.localeCompare(b, 'pt-BR'),
+  )
+  const alimentadores = [
+    ...new Map(
+      unidades.items.map((uc) => [
+        uc.alimentador,
+        { alimentador: uc.alimentador, municipio: uc.municipio },
+      ]),
+    ).values(),
+  ].sort((a, b) => a.alimentador.localeCompare(b.alimentador, 'pt-BR'))
+  return { municipios, bairros, classes, alimentadores, metadados: unidades.metadados }
+  return { municipios, bairros, classes, alimentadores, metadados: unidades.metadados }
 }
