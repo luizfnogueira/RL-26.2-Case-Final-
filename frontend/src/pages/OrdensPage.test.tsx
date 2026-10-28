@@ -182,7 +182,7 @@ describe('OrdensPage', () => {
     )
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Município' }), {
-      target: { value: 'Recife' },
+      target: { value: 'RECIFE' },
     })
     fireEvent.change(await screen.findByRole('combobox', { name: 'Alimentador' }), {
       target: { value: 'ALM-DEMO-001' },
@@ -192,7 +192,7 @@ describe('OrdensPage', () => {
       expect(listarInspecoes).toHaveBeenLastCalledWith(
         expect.objectContaining({
           periodo_atual: mesCriacao,
-          municipio: 'Recife',
+          municipio: 'RECIFE',
           alimentador: 'ALM-DEMO-001',
         }),
         expect.anything(),
