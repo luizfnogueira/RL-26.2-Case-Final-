@@ -1,4 +1,4 @@
-import { ClipboardPlus, LockKeyhole, Search, ShieldAlert } from 'lucide-react'
+import { ClipboardPlus, Download, LockKeyhole, Search, ShieldAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
@@ -15,6 +15,7 @@ import { buscarCandidatos, criarInspecao, normalizarErro } from '@/services'
 import type { Candidato } from '@/types/inspecoes'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
 import { formatarEnergia, formatarNome } from '@/utils/formatacao'
+import { gerarCsvCandidatos } from '@/utils/exportarCandidatos'
 import { PERIODO_ATUAL_PADRAO } from '@/utils/periodos'
 
 const CAMPOS: readonly CampoFiltro[] = ['periodo_atual', 'municipio', 'bairro', 'classe']
@@ -46,6 +47,7 @@ export default function FilaPage() {
   const [dataPrevista, setDataPrevista] = useState('')
   const [erroCriacao, setErroCriacao] = useState<string | null>(null)
   const [criando, setCriando] = useState(false)
+  const [exportando, setExportando] = useState(false)
   const [toast, setToast] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null)
 
   const candidatos = useConsulta(
@@ -86,6 +88,70 @@ export default function FilaPage() {
     setEquipe('')
     setDataPrevista('')
     setModalAberto(true)
+  }
+
+  const exportarFila = async () => {
+    if (!dados || dados.total === 0 || exportando || atualizando) return
+
+    setExportando(true)
+    try {
+      const pageSize = 100
+      const primeiraPagina = await buscarCandidatos({
+        periodo_atual: periodoAtual,
+        municipio,
+        bairro,
+        classe,
+        page: 1,
+        page_size: pageSize,
+      })
+      const candidatos = [...primeiraPagina.items]
+      const totalPaginas = Math.ceil(primeiraPagina.total / pageSize)
+
+      for (let page = 2; page <= totalPaginas; page += 1) {
+        const resposta = await buscarCandidatos({
+          periodo_atual: periodoAtual,
+          municipio,
+          bairro,
+          classe,
+          page,
+          page_size: pageSize,
+        })
+        if (resposta.total !== primeiraPagina.total) {
+          throw new Error('A fila mudou durante a exportação. Tente novamente.')
+        }
+        candidatos.push(...resposta.items)
+      }
+
+      if (
+        candidatos.length !== primeiraPagina.total ||
+        new Set(candidatos.map((candidato) => candidato.id_uc)).size !== candidatos.length
+      ) {
+        throw new Error('Não foi possível carregar todos os candidatos. Tente exportar novamente.')
+      }
+
+      const conteudo = gerarCsvCandidatos(candidatos)
+      const arquivo = new Blob([conteudo], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(arquivo)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = primeiraPagina.metadados.dados_ficticios
+        ? 'fila-inspecao-mock.csv'
+        : 'fila-inspecao.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+
+      const origem = primeiraPagina.metadados.dados_ficticios ? 'Dados fictícios: ' : ''
+      setToast({
+        tipo: 'sucesso',
+        texto: `${origem}${candidatos.length} ${candidatos.length === 1 ? 'candidato exportado' : 'candidatos exportados'}`,
+      })
+    } catch (erro: unknown) {
+      setToast({ tipo: 'erro', texto: normalizarErro(erro).mensagem })
+    } finally {
+      setExportando(false)
+    }
   }
 
   const fecharModal = () => {
@@ -220,6 +286,15 @@ export default function FilaPage() {
                       </span>
                     )}
                     <Button
+                      variante="secundario"
+                      icone={<Download size={18} aria-hidden="true" />}
+                      onClick={exportarFila}
+                      carregando={exportando}
+                      disabled={dados.total === 0 || atualizando}
+                    >
+                      Exportar CSV
+                    </Button>
+                    <Button
                       icone={<ClipboardPlus size={18} aria-hidden="true" />}
                       onClick={abrirModal}
                       disabled={selecionadas.size === 0 || atualizando}
@@ -278,10 +353,17 @@ export default function FilaPage() {
                       </thead>
                       <tbody>
                         {tabelarows.map((linha, index) => (
-                          <tr key={linha.id_uc} className={index % 2 === 0 ? 'bg-white' : 'bg-[#f3f7f9]'}>
+                          <tr
+                            key={linha.id_uc}
+                            className={index % 2 === 0 ? 'bg-white' : 'bg-[#f3f7f9]'}
+                          >
                             <td className="border-b border-[#edf2f5] px-3 py-3 text-center">
                               {linha.ordem_ativa ? (
-                                <LockKeyhole size={14} className="mx-auto text-[#9aa3a9]" aria-label="Ordem em andamento" />
+                                <LockKeyhole
+                                  size={14}
+                                  className="mx-auto text-[#9aa3a9]"
+                                  aria-label="Ordem em andamento"
+                                />
                               ) : (
                                 <input
                                   type="checkbox"
@@ -300,28 +382,38 @@ export default function FilaPage() {
                               <div className="flex flex-col">
                                 <span className="font-semibold text-[#2c2d2d]">{linha.id_uc}</span>
                                 {linha.ordem_ativa && (
-                                  <span className="text-[10px] text-[#6f7c84]">Ordem em andamento</span>
+                                  <span className="text-[10px] text-[#6f7c84]">
+                                    Ordem em andamento
+                                  </span>
                                 )}
                               </div>
                             </td>
                             <td className="border-b border-[#edf2f5] px-3 py-3">
                               <div className="flex flex-col">
-                                <span className="font-medium text-[#2c2d2d]">{formatarNome(linha.municipio)}</span>
-                                <span className="text-[10px] text-[#7d858d]">{formatarNome(linha.bairro)}</span>
+                                <span className="font-medium text-[#2c2d2d]">
+                                  {formatarNome(linha.municipio)}
+                                </span>
+                                <span className="text-[10px] text-[#7d858d]">
+                                  {formatarNome(linha.bairro)}
+                                </span>
                               </div>
                             </td>
                             <td className="border-b border-[#edf2f5] px-3 py-3 text-[#4b5156]">
                               {formatarNome(linha.classe)}
                             </td>
                             <td className="border-b border-[#edf2f5] px-3 py-3">
-                              <div className="flex flex-wrap gap-1.5">{formatarMotivos(linha.motivos)}</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {formatarMotivos(linha.motivos)}
+                              </div>
                             </td>
                             <td className="border-b border-[#edf2f5] px-2 py-3 text-center font-medium tabular-nums text-[#2d425a]">
                               {formatarEnergia(Number(linha.energia_estimada.valor ?? 0))}
                             </td>
                             <td className="border-b border-[#edf2f5] px-2 py-3">
                               <div className="flex items-center justify-center gap-2">
-                                <span className="text-[#2d425a] font-semibold">{linha.score.toFixed(1)}</span>
+                                <span className="text-[#2d425a] font-semibold">
+                                  {linha.score.toFixed(1)}
+                                </span>
                                 <div className="h-2 w-20 overflow-hidden rounded-full bg-[#dfeaf0]">
                                   <div
                                     className="h-full rounded-full bg-[#7bbfd0]"
@@ -365,7 +457,10 @@ export default function FilaPage() {
             <p className="mb-2 text-sm font-medium text-[#2d425a]">UCs selecionadas</p>
             <div className="flex flex-wrap gap-2">
               {Array.from(selecionadas).map((idUc) => (
-                <span key={idUc} className="rounded-full bg-[#eef3f6] px-2.5 py-1 text-[11px] text-[#3b3f42]">
+                <span
+                  key={idUc}
+                  className="rounded-full bg-[#eef3f6] px-2.5 py-1 text-[11px] text-[#3b3f42]"
+                >
                   {idUc}
                 </span>
               ))}
