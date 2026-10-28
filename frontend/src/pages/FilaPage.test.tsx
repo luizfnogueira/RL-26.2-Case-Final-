@@ -62,6 +62,8 @@ describe('FilaPage', () => {
       )
 
       await screen.findByText('UC-DEMO-001')
+      expect(screen.getByRole('columnheader', { name: 'Alimentador' })).toBeTruthy()
+      expect(screen.getAllByText('ALM-DEMO-001').length).toBeGreaterThan(0)
       fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
 
       await screen.findByText('Dados fictícios: 101 candidatos exportados')

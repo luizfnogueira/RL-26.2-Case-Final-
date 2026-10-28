@@ -327,7 +327,7 @@ export default function FilaPage() {
                   <div className="overflow-hidden rounded-xl border border-[#dfeaf0] bg-white">
                     <table
                       aria-busy={atualizando}
-                      className={`w-full min-w-[860px] table-fixed border-collapse text-left text-[12px] ${atualizando ? 'opacity-60' : ''}`}
+                      className={`w-full min-w-[980px] table-fixed border-collapse text-left text-[12px] ${atualizando ? 'opacity-60' : ''}`}
                     >
                       <colgroup>
                         <col className="w-10" />
@@ -335,6 +335,7 @@ export default function FilaPage() {
                         <col className="w-[110px]" />
                         <col className="w-[112px]" />
                         <col className="w-[88px]" />
+                        <col className="w-[118px]" />
                         <col />
                         <col className="w-[108px]" />
                         <col className="w-[132px]" />
@@ -346,6 +347,7 @@ export default function FilaPage() {
                           <th className="px-3 py-3">UC</th>
                           <th className="px-3 py-3">Localização</th>
                           <th className="px-3 py-3">Classe</th>
+                          <th className="px-3 py-3">Alimentador</th>
                           <th className="px-3 py-3">Motivos da suspeita</th>
                           <th className="px-3 py-3 text-right">kWh estimado</th>
                           <th className="px-3 py-3 text-right">Prioridade</th>
@@ -400,6 +402,9 @@ export default function FilaPage() {
                             </td>
                             <td className="border-b border-[#edf2f5] px-3 py-3 text-[#4b5156]">
                               {formatarNome(linha.classe)}
+                            </td>
+                            <td className="border-b border-[#edf2f5] px-3 py-3 font-medium text-[#4b5156]">
+                              {linha.alimentador}
                             </td>
                             <td className="border-b border-[#edf2f5] px-3 py-3">
                               <div className="flex flex-wrap gap-1.5">
