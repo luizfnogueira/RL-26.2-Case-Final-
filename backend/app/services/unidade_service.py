@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.core.config import GOLD_SOURCE
-from app.core.exceptions import UCInexistenteException
+from app.core.exceptions import GoldNaoCarregadaException, UCInexistenteException
 from app.repositories.unidade_repository import (
     ChamadoUC, FaturaUC, FichaUC, InterrupcaoUC, LeituraUC, MesConsumo, UnidadeRepositoryInterface,
 )
@@ -215,10 +215,14 @@ class UnidadeService:
         if not self.real:
             return _detalhar_exemplo(id_uc, filtros)
         repo = self.repository
+        # Antes da UC: com a Gold vazia, um 404 faria parecer que o ID foi digitado errado.
+        ultimo_mes = repo.ultimo_mes()
+        if ultimo_mes is None:
+            raise GoldNaoCarregadaException()
         ficha = repo.ficha(id_uc)
         if ficha is None:
             raise UCInexistenteException(f"Unidade Consumidora '{id_uc}' não encontrada no cadastro.")
-        periodo = filtros.periodo_atual or janela_padrao(repo.ultimo_mes())
+        periodo = filtros.periodo_atual or janela_padrao(ultimo_mes)
         inicio, fim = limites(periodo)
         # 12 meses antes da janela: média e mesmo mês do ano anterior do mês analisado.
         meses = repo.consumo(id_uc, somar_meses(inicio, -12), fim)

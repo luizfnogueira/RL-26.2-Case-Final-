@@ -141,9 +141,11 @@ def _escapar_like(texto: str) -> str:
 
 
 def _condicoes_regiao(**filtros: Optional[str]) -> list:
-    """Filtros geográficos por AND, sem diferenciar maiúsculas (a Gold usa RECIFE, BOA VISTA)."""
-    return [func.lower(getattr(DimUC, campo)) == valor.strip().lower()
-            for campo, valor in filtros.items() if valor is not None]
+    """Filtros geográficos por AND, com o valor exato da Gold (RECIFE, BOA VISTA), como o /dashboard.
+
+    Os valores vêm do GET /filtros; só a busca livre por ID e titular ignora maiúsculas.
+    """
+    return [getattr(DimUC, campo) == valor for campo, valor in filtros.items() if valor is not None]
 
 
 def _mes_da_ocorrencia(coluna):

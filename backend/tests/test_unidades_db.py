@@ -39,6 +39,11 @@ with TestClient(app) as client:
     assert busca['total'] == 1 and busca['items'][0]['id_uc'] == 'UC-TEST'
     assert busca['metadados']['dados_ficticios'] is False and busca['metadados']['gold_atualizada_em']
     assert client.get('/unidades', params={'busca': 'inexistente'}).json()['total'] == 0
+    # Região com o valor exato da Gold, como o /dashboard; só a busca livre ignora maiúsculas.
+    assert client.get('/unidades', params={'municipio': 'SYNTHETIC'}).json()['total'] == 1
+    assert client.get('/unidades', params={'municipio': 'synthetic'}).json()['total'] == 0
+    assert client.get('/unidades', params={'busca': 'UC-te', 'classe': 'SYNTHETIC'}).json()['total'] == 1
+    assert client.get('/unidades', params={'busca': 'UC-te', 'classe': 'Synthetic'}).json()['total'] == 0
     assert client.get('/unidades', params={'busca': 'ab'}).json()['codigo'] == 'DADOS_INVALIDOS'
 
     r = client.get('/unidades/UC-TEST')

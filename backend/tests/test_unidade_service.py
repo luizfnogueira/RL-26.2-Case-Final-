@@ -4,7 +4,11 @@ from decimal import Decimal
 
 import pytest
 
-from app.core.exceptions import CenarioStubIndisponivelException, UCInexistenteException
+from fastapi.testclient import TestClient
+
+from app.core.exceptions import CenarioStubIndisponivelException, GoldNaoCarregadaException, UCInexistenteException
+from app.main import app
+from app.routers import unidades
 from app.repositories.unidade_repository import (
     CadastroUC, ChamadoUC, FaturaUC, FichaUC, GeracaoDistribuidaUC, InterrupcaoUC, LeituraUC, MedidorUC,
     MesConsumo, UnidadeResumo,
@@ -106,6 +110,25 @@ def test_periodo_informado_e_respeitado():
 def test_uc_inexistente_da_404():
     with pytest.raises(UCInexistenteException):
         UnidadeService(RepositorioFalso(), fonte='real').detalhar('UC-X', FiltroUnidade())
+
+
+@pytest.mark.parametrize('id_uc', ['UC-1', 'UC-X'])
+@pytest.mark.parametrize('periodo', [None, '2025-07/2026-06'])
+def test_gold_nao_carregada_vem_antes_do_404(id_uc, periodo):
+    # Com a dim_mes vazia, nem a UC existente nem a inexistente respondem 404.
+    with pytest.raises(GoldNaoCarregadaException):
+        UnidadeService(RepositorioFalso(ultimo=None), fonte='real').detalhar(id_uc, FiltroUnidade(periodo_atual=periodo))
+
+
+def test_rota_responde_503_gold_nao_carregada():
+    app.dependency_overrides[unidades.get_service] = (
+        lambda: UnidadeService(RepositorioFalso(ultimo=None), fonte='real'))
+    try:
+        r = TestClient(app).get('/unidades/UC-1')
+    finally:
+        app.dependency_overrides.pop(unidades.get_service, None)
+    assert r.status_code == 503
+    assert r.json() == {'codigo': 'GOLD_NAO_CARREGADA', 'mensagem': GoldNaoCarregadaException.mensagem}
 
 
 def test_monta_os_blocos_no_formato_do_contrato():

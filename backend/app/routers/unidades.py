@@ -22,7 +22,8 @@ def get_service(db: Annotated[Session, Depends(get_db)]) -> UnidadeService:
 # def (não async): a sessão do banco bloqueia, então o FastAPI roda a rota numa thread
 @router.get('', response_model=Unidades, summary='Buscar unidades',
             description='Busca por ID ou titular (3 a 100 caracteres, sem diferenciar maiúsculas), '
-                        'filtros de região por AND e paginação; ordenação por ID.' + FONTE,
+                        'filtros de região por AND com o valor exato da Gold (ex.: RECIFE), como o '
+                        '/dashboard, e paginação; ordenação por ID.' + FONTE,
             responses=respostas('unidades'))
 def listar_unidades(filtros: Annotated[FiltrosUnidades, Query()],
                     service: Annotated[UnidadeService, Depends(get_service)]):
@@ -32,8 +33,10 @@ def listar_unidades(filtros: Annotated[FiltrosUnidades, Query()],
 @router.get('/{id}', response_model=Unidade360, summary='Visão 360 da unidade',
             description='Cadastro, 12 meses de consumo com o ano anterior, diagnóstico "a conta veio alta?", '
                         'faturas, medidor, GD, interrupções e chamados. periodo_atual tem 12 meses; sem ele, '
-                        'a janela termina no último mês da Gold. UC inexistente: 404.' + FONTE,
-            responses=respostas('unidade', erros=('UC_INEXISTENTE', 'CENARIO_STUB_INDISPONIVEL')))
+                        'a janela termina no último mês da Gold. UC inexistente: 404. Gold não carregada '
+                        '(dim_mes vazia): 503 GOLD_NAO_CARREGADA.' + FONTE,
+            responses=respostas('unidade', erros=('UC_INEXISTENTE', 'CENARIO_STUB_INDISPONIVEL',
+                                                  'GOLD_NAO_CARREGADA')))
 def detalhar_unidade(id: str, filtros: Annotated[FiltroUnidade, Query()],
                      service: Annotated[UnidadeService, Depends(get_service)]):
     return service.detalhar(id, filtros)

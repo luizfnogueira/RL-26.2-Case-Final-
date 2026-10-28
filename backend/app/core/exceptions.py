@@ -79,3 +79,11 @@ class AgenteIndisponivelException(AppException):
     status_code = 503
     codigo = "AGENTE_INDISPONIVEL"
     mensagem = "O assistente está indisponível no momento. Tente novamente em alguns instantes."
+
+
+class GoldNaoCarregadaException(AppException):
+    """A Gold não está carregada no banco (gold.dim_mes vazia): não há como montar a janela de meses."""
+    status_code = 503
+    codigo = "GOLD_NAO_CARREGADA"
+    mensagem = ("Os dados da Gold ainda não foram carregados no banco. "
+                "Tente novamente depois da próxima carga.")

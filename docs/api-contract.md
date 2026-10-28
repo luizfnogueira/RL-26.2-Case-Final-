@@ -58,6 +58,7 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
 | 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
+| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` |
 
 `AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
 
@@ -96,7 +97,7 @@ GET /unidades?busca=UC-DEMO&page=1&page_size=20
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/unidades.json)**
 
-Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular, de 3 a 100 caracteres (fora disso, 422 `DADOS_INVALIDOS`), sem diferenciar maiúsculas; ordenação por ID. Sem correspondência: lista vazia. Fonte: `gold.dim_uc`.
+Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular, de 3 a 100 caracteres (fora disso, 422 `DADOS_INVALIDOS`), sem diferenciar maiúsculas. Filtros de região (município, bairro, classe, alimentador) comparam o valor exato da Gold, como o `GET /dashboard` (ex.: `RECIFE`; os valores vêm do `GET /filtros`). Ordenação por ID. Sem correspondência: lista vazia. Fonte: `gold.dim_uc`.
 
 ## 5. GET /unidades/{id} — Tela 3
 
@@ -106,7 +107,7 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/unidade.json)**
 
-- **Janela:** `periodo_atual` tem sempre 12 meses (outra duração: 422 `DADOS_INVALIDOS`). Sem ele, a API usa os 12 meses que terminam no último `mes_referencia` da `gold.dim_mes`; o valor não é fixo no código, e a tela acompanha cada recarga da Gold. A janela usada volta em `periodo_referencia`. Janela sem dados da UC devolve 200 com valores null; o 404 fica para UC inexistente.
+- **Janela:** `periodo_atual` tem sempre 12 meses (outra duração: 422 `DADOS_INVALIDOS`). Sem ele, a API usa os 12 meses que terminam no último `mes_referencia` da `gold.dim_mes`; o valor não é fixo no código, e a tela acompanha cada recarga da Gold. A janela usada volta em `periodo_referencia`. Janela sem dados da UC devolve 200 com valores null; o 404 fica para UC inexistente. Com `GOLD_SOURCE=real` e a Gold não carregada (`gold.dim_mes` vazia), a resposta é 503 `GOLD_NAO_CARREGADA`, verificado antes da UC: um 404 faria parecer que o ID foi digitado errado.
 - Fontes na Gold: cadastro, medidor ativo e GD da `dim_uc`; faturas, última leitura e troca de medidor do `fato_uc_mes`; consumo, ano anterior, variação, `tipo_leitura` e conta alta da `uc_consumo_comparativo` (consumo = `consumo_kwh_valido`); interrupções da `uc_interrupcoes`; chamados da `uc_atendimentos`.
 - **Nulos medidos na Gold (27/10):** só são anuláveis `telefone` (não há fonte), `cep` (1.350 UCs), `data_ligacao` (90), `data_pagamento` (toda fatura `EM ABERTO`) e `nota_satisfacao` (9.566 chamados). Os demais campos do cadastro, medidor, faturas, interrupções e chamados não têm nulo e são obrigatórios. CPF/CNPJ vem mascarado. Nomes de município, bairro e classe vêm em maiúsculas, como na Gold.
 - `consumo`: **sempre os 12 meses da janela**, em ordem, cada um com o mesmo mês do ano anterior, ambos com unidade e referência, mais `tipo_leitura` (`REAL`, `ESTIMADA`, `MEDIA`, `AUTENTICADA` ou `NAO REALIZADA`). Como na série do `GET /dashboard`, mês sem dado da UC (UC ligada depois do início da janela, ou janela além da base) entra com `atual`, `ano_anterior` e `tipo_leitura` null, nunca some: o gráfico tem eixo fixo. Valores ausentes são null, nunca 0: o ano anterior não existe nos 12 primeiros meses da UC, e o consumo é null nos 30 meses com leitura negativa não recuperada (`consumo_kwh_valido`), que o diagnóstico trata como “sem consumo válido”.

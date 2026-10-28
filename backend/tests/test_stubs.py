@@ -4,7 +4,9 @@ import pytest
 
 from app.db.session import get_db
 from app.main import app
+from app.routers import unidades
 from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, exemplo
+from app.services.unidade_service import UnidadeService
 
 client = TestClient(app)
 PERIODOS = {'periodo_atual': PA, 'periodo_comparacao': PC}
@@ -54,6 +56,13 @@ class TestDashboard:
 
 
 class TestUnidades:
+    @pytest.fixture(autouse=True)
+    def modo_seed(self):
+        # Fixa o exemplo do contrato: a suíte passa com GOLD_SOURCE=seed ou real (real: test_unidades_db.py)
+        app.dependency_overrides[unidades.get_service] = lambda: UnidadeService(None, fonte='seed')
+        yield
+        app.dependency_overrides.pop(unidades.get_service, None)
+
     def test_busca_igual_ao_fixture(self):
         assert get('/unidades', busca='UC-DEMO') == exemplo('unidades')
 
