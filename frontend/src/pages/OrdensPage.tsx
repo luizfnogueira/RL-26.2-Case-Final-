@@ -22,9 +22,9 @@ import ErrorState from '@/components/ui/ErrorState'
 import Paginacao from '@/components/ui/Paginacao'
 import SeloFicticio from '@/components/ui/SeloFicticio'
 import Skeleton from '@/components/ui/Skeleton'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
+import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { listarInspecoes } from '@/services'
 import type { CampoFiltro } from '@/types/filtros'
@@ -216,6 +216,7 @@ function AcoesOrdem({
 }
 
 export default function OrdensPage() {
+  const opcoesFiltros = useOpcoesFiltros()
   const { filtros, limpar } = useFiltrosUrl(CAMPOS)
   const { municipio, bairro, classe } = filtros
   const [params, setParams] = useSearchParams()
@@ -357,7 +358,7 @@ export default function OrdensPage() {
         <div className="overflow-hidden rounded-[18px] border border-[#dfeaf0] bg-[#edf3f5] shadow-card">
           <BarraDeFiltros
             campos={CAMPOS}
-            opcoes={OPCOES_FILTROS_MOCK}
+            opcoes={opcoesFiltros}
             mostrarLimparSempre
             className="rounded-none border-b border-[#dfeaf0] bg-[#edf3f5] p-4 shadow-none"
           />

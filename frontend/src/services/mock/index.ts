@@ -2,6 +2,7 @@
 // demanda por services/http.ts quando VITE_USE_MOCKS=true.
 import type { Metodo, OpcoesRequisicao } from '../http'
 import { montarDashboard } from './dashboard'
+import { listarFiltros } from './filtros'
 import { gerarInsightMock, responderPergunta } from './ia'
 import { atualizarOrdem, criarOrdem, listarCandidatos, listarOrdens } from './ordens'
 import { montarOperacao } from './operacao'
@@ -40,6 +41,9 @@ export async function atenderMock(
     case 'dashboard':
       exigirMetodo(metodo, 'GET')
       return montarDashboard(consulta)
+    case 'filtros':
+      exigirMetodo(metodo, 'GET')
+      return listarFiltros()
     case 'unidades':
       exigirMetodo(metodo, 'GET')
       return segundo === undefined ? listarUnidades(consulta) : detalharUnidade(segundo, consulta)

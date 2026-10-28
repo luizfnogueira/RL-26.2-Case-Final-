@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/services', () => mocks)
+vi.mock('@/hooks/useOpcoesFiltros', () => ({
+  useOpcoesFiltros: () => ({
+    municipios: ['Recife', 'Jaboatão dos Guararapes', 'Olinda'],
+    classes: ['Comercial', 'Industrial', 'Residencial'],
+  }),
+}))
 
 afterEach(() => {
   cleanup()

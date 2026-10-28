@@ -9,9 +9,9 @@ import PonteDaReceita from '@/components/receita/PonteDaReceita'
 import ErrorState from '@/components/ui/ErrorState'
 import SeloFicticio from '@/components/ui/SeloFicticio'
 import Skeleton from '@/components/ui/Skeleton'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
+import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { buscarDashboard, gerarInsight } from '@/services'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
@@ -33,6 +33,7 @@ const LINHAS_POR_PAGINA = 10
 
 /** Tela 2: o que mudou na receita de energia entre dois períodos e onde o volume caiu. */
 export default function ReceitaPage() {
+  const opcoesFiltros = useOpcoesFiltros()
   const { filtros, definir } = useFiltrosUrl(CAMPOS, PADROES)
   const [params, setParams] = useSearchParams()
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '', 10) || 1)
@@ -119,7 +120,7 @@ export default function ReceitaPage() {
       titulo="Diagnóstico da receita"
       subtitulo="Decomposição da variação de preço e volume da receita de energia"
     >
-      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
+      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros} />
 
       {dashboard.erro && !dados ? (
         <ErrorState erro={dashboard.erro} aoTentarNovamente={dashboard.recarregar} />

@@ -2,9 +2,8 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-li
 import type { ReactNode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
-import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
+import type { CampoFiltro, FiltrosUrl, OpcoesFiltros } from '@/types/filtros'
 import BarraDeFiltros from './BarraDeFiltros'
 
 afterEach(cleanup)
@@ -19,6 +18,16 @@ const CAMPOS: readonly CampoFiltro[] = [
   'classe',
 ]
 const PADROES: FiltrosUrl = { periodo_atual: ATUAL, periodo_comparacao: COMPARACAO }
+const OPCOES: OpcoesFiltros = {
+  municipios: ['Recife', 'Jaboatão dos Guararapes', 'Olinda'],
+  bairros: {
+    Recife: ['Boa Viagem', 'Boa Vista', 'Casa Amarela'],
+    'Jaboatão dos Guararapes': ['Candeias', 'Piedade'],
+    Olinda: ['Casa Caiada', 'Rio Doce'],
+  },
+  classes: ['Comercial', 'Industrial', 'Residencial'],
+  alimentadores: ['ALM-DEMO-001', 'ALM-DEMO-002', 'ALM-DEMO-003', 'ALM-DEMO-004', 'ALM-DEMO-005'],
+}
 
 const emUrl = (url: string) =>
   function Roteador({ children }: { children: ReactNode }) {
@@ -103,7 +112,7 @@ describe('BarraDeFiltros', () => {
     let busca = ''
     const resultado = render(
       <MemoryRouter initialEntries={[url]}>
-        <BarraDeFiltros campos={campos} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
+        <BarraDeFiltros campos={campos} padroes={PADROES} opcoes={OPCOES} />
         <Sonda aoLer={(b) => (busca = b)} />
       </MemoryRouter>,
     )

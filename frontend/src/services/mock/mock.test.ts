@@ -4,6 +4,7 @@ import {
   atualizarInspecao,
   buscarCandidatos,
   buscarDashboard,
+  buscarFiltros,
   buscarOperacao,
   buscarUnidade,
   buscarUnidades,
@@ -119,6 +120,21 @@ describe('GET /dashboard', () => {
     a.serie_historica.length = 0
     const b = await buscarDashboard(DASH)
     expect(b.serie_historica).toHaveLength(48)
+  })
+})
+
+describe('GET /filtros', () => {
+  it('lista os nomes dos outros mocks, e um valor listado filtra o dashboard', async () => {
+    const filtros = await buscarFiltros()
+    expect(filtros.metadados.dados_ficticios).toBe(true)
+    expect(new Set(filtros.municipios).size).toBe(filtros.municipios.length)
+    for (const { municipio } of [...filtros.bairros, ...filtros.alimentadores]) {
+      expect(filtros.municipios).toContain(municipio)
+    }
+
+    const { municipio, bairro } = filtros.bairros[0]
+    const dash = await buscarDashboard({ ...DASH, municipio, bairro })
+    expect(dash.indicadores.receita_faturada.atual.valor).toBeGreaterThan(0)
   })
 })
 

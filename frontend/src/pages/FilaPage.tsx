@@ -7,9 +7,9 @@ import EmptyState from '@/components/ui/EmptyState'
 import ErrorState from '@/components/ui/ErrorState'
 import Modal from '@/components/ui/Modal'
 import Skeleton from '@/components/ui/Skeleton'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
+import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { buscarCandidatos, criarInspecao, normalizarErro } from '@/services'
 import type { Candidato } from '@/types/inspecoes'
@@ -36,6 +36,7 @@ function formatarMotivos(motivos: string[]) {
 }
 
 export default function FilaPage() {
+  const opcoesFiltros = useOpcoesFiltros()
   const navigate = useNavigate()
   const { filtros, limpar } = useFiltrosUrl(CAMPOS, PADROES)
   const periodoAtual = filtros.periodo_atual ?? PERIODO_ATUAL_PADRAO
@@ -236,7 +237,7 @@ export default function FilaPage() {
           <BarraDeFiltros
             campos={CAMPOS}
             padroes={PADROES}
-            opcoes={OPCOES_FILTROS_MOCK}
+            opcoes={opcoesFiltros}
             mostrarLimparSempre
             className="rounded-none border-b border-[#dfeaf0] bg-[#edf3f5] p-4 shadow-none"
           />
