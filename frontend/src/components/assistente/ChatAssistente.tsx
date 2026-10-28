@@ -13,7 +13,7 @@ import { USUARIO_MOCK } from '@/data/usuario.mock'
 import { cx } from '@/utils/cx'
 import { useAssistente } from './contexto'
 import MensagemAssistente from './MensagemAssistente'
-import { PERGUNTAS_DE_TESTE, PERGUNTAS_SUGERIDAS } from './sugestoes'
+import { PERGUNTAS_DE_TESTE, PERGUNTAS_SUGERIDAS, SUGESTOES_POR_CATEGORIA } from './sugestoes'
 
 const LIMITE = 2000
 const PRIMEIRO_NOME = USUARIO_MOCK.nome.split(' ')[0]
@@ -54,12 +54,42 @@ function CartaoDeTeste({
   )
 }
 
-/** Conversa do Assistente: sugestões, histórico e campo livre, com aviso de somente leitura. */
+function BotaoSugestao({
+  pergunta,
+  aoClicar,
+  desabilitado,
+}: {
+  pergunta: string
+  aoClicar: () => void
+  desabilitado: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={aoClicar}
+      disabled={desabilitado}
+      className="flex h-full w-full items-center justify-between gap-3 rounded-md border border-borda bg-surface-card px-3.5 py-2.5 text-left text-corpo transition-colors hover:border-teal hover:bg-azul-50 disabled:opacity-60"
+    >
+      {pergunta}
+      <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-teal-escuro" />
+    </button>
+  )
+}
+
+type Aba = 'conversa' | 'sugestoes'
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: 'conversa', rotulo: 'Conversa' },
+  { id: 'sugestoes', rotulo: 'Sugestões' },
+]
+
+/** Conversa do Assistente: abas de conversa e de sugestões, campo livre e aviso de somente leitura. */
 export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = false }: Props) {
   const { mensagens, enviando, perguntar, tentarNovamente, limpar } = useAssistente()
   const [texto, setTexto] = useState('')
+  const [aba, setAba] = useState<Aba>('conversa')
   const idCampo = useId()
   const idAviso = useId()
+  const idAbas = useId()
   const campo = useRef<HTMLTextAreaElement>(null)
   const conversa = useRef<HTMLDivElement>(null)
   const pagina = variante === 'pagina'
@@ -91,6 +121,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
   function enviar(pergunta: string) {
     if (!pergunta.trim() || enviando) return
     perguntar(pergunta)
+    setAba('conversa')
     setTexto('')
     requestAnimationFrame(ajustarAltura)
     campo.current?.focus()
@@ -111,13 +142,89 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
 
   const podeEnviar = texto.trim().length > 0 && !enviando
 
+  const cartoesDeTeste = (
+    <div className={cx('grid gap-2', pagina && 'sm:grid-cols-2')}>
+      <CartaoDeTeste
+        icone={<TriangleAlert size={20} strokeWidth={1.5} className="text-alerta-escuro" />}
+        titulo='Testar "Não sei"'
+        descricao="Pergunta sem dados disponíveis"
+        aoClicar={() => enviar(PERGUNTAS_DE_TESTE.naoSei)}
+        desabilitado={enviando}
+      />
+      <CartaoDeTeste
+        icone={<Lock size={20} strokeWidth={1.5} className="text-perigo-escuro" />}
+        titulo="Testar segurança"
+        descricao="Comando destrutivo bloqueado"
+        aoClicar={() => enviar(PERGUNTAS_DE_TESTE.seguranca)}
+        desabilitado={enviando}
+      />
+    </div>
+  )
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
+      <div
+        role="tablist"
+        aria-label="Assistente"
+        className={cx('mb-3 flex w-fit gap-1 rounded-full bg-surface-alt p-1', pagina && 'mx-auto')}
+      >
+        {ABAS.map(({ id, rotulo }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`${idAbas}-${id}`}
+            aria-selected={aba === id}
+            aria-controls={`${idAbas}-${id}-painel`}
+            onClick={() => setAba(id)}
+            className={cx(
+              'rounded-full px-3.5 py-1 text-legenda transition-colors',
+              aba === id
+                ? 'bg-surface-card font-medium text-teal-profundo'
+                : 'text-ink-2 hover:text-ink',
+            )}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
+      {aba === 'sugestoes' && (
+        <div
+          role="tabpanel"
+          id={`${idAbas}-sugestoes-painel`}
+          aria-labelledby={`${idAbas}-sugestoes`}
+          className={cx('flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
+        >
+          <div className={cx('flex w-full flex-col gap-4', pagina && 'mx-auto max-w-[760px]')}>
+            {SUGESTOES_POR_CATEGORIA.map(({ categoria, perguntas }) => (
+              <section key={categoria}>
+                <h3 className="mb-2 text-legenda font-medium text-teal-escuro">{categoria}</h3>
+                <ul aria-label={categoria} className={cx('grid gap-2', pagina && 'sm:grid-cols-2')}>
+                  {perguntas.map((pergunta) => (
+                    <li key={pergunta}>
+                      <BotaoSugestao
+                        pergunta={pergunta}
+                        aoClicar={() => enviar(pergunta)}
+                        desabilitado={enviando}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {cartoesDeTeste}
+          </div>
+        </div>
+      )}
+
       <div
         ref={conversa}
         role="log"
         aria-label="Conversa com o assistente"
         aria-live="polite"
+        id={`${idAbas}-conversa-painel`}
+        hidden={aba !== 'conversa'}
         className={cx('flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
       >
         <div className={cx('flex w-full flex-col gap-4', pagina && 'mx-auto max-w-[760px]')}>
@@ -145,41 +252,16 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
               >
                 {PERGUNTAS_SUGERIDAS.map((pergunta) => (
                   <li key={pergunta}>
-                    <button
-                      type="button"
-                      onClick={() => enviar(pergunta)}
-                      disabled={enviando}
-                      className="flex h-full w-full items-center justify-between gap-3 rounded-md border border-borda bg-surface-card px-3.5 py-2.5 text-left text-corpo transition-colors hover:border-teal hover:bg-azul-50 disabled:opacity-60"
-                    >
-                      {pergunta}
-                      <ArrowRight
-                        size={16}
-                        aria-hidden="true"
-                        className="shrink-0 text-teal-escuro"
-                      />
-                    </button>
+                    <BotaoSugestao
+                      pergunta={pergunta}
+                      aoClicar={() => enviar(pergunta)}
+                      desabilitado={enviando}
+                    />
                   </li>
                 ))}
               </ul>
 
-              <div className={cx('grid gap-2', pagina && 'sm:grid-cols-2')}>
-                <CartaoDeTeste
-                  icone={
-                    <TriangleAlert size={20} strokeWidth={1.5} className="text-alerta-escuro" />
-                  }
-                  titulo='Testar "Não sei"'
-                  descricao="Pergunta sem dados disponíveis"
-                  aoClicar={() => enviar(PERGUNTAS_DE_TESTE.naoSei)}
-                  desabilitado={enviando}
-                />
-                <CartaoDeTeste
-                  icone={<Lock size={20} strokeWidth={1.5} className="text-perigo-escuro" />}
-                  titulo="Testar segurança"
-                  descricao="Comando destrutivo bloqueado"
-                  aoClicar={() => enviar(PERGUNTAS_DE_TESTE.seguranca)}
-                  desabilitado={enviando}
-                />
-              </div>
+              {cartoesDeTeste}
 
               <div className="flex items-start gap-2.5">
                 <span

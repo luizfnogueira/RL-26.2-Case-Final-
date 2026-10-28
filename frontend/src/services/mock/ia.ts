@@ -44,6 +44,8 @@ async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
   const montar = (r: Pick<RespostaIA, 'resposta' | 'sql' | 'tabelas' | 'dados'>): RespostaIA => ({
     ...r,
     status: 'ok',
+    // Mesma regra do agente (GENAI-14): várias linhas vão em tabela
+    apresentacao: r.dados.linhas.length > 1 ? 'tabela' : 'texto',
     gerado_em: agoraIso(),
     metadados: {
       ...base.metadados,
@@ -117,10 +119,16 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
     throw invalido('pergunta deve ter de 1 a 2000 caracteres.')
   }
   // Como a API (extra='forbid'): o corpo é só {pergunta, conversa_id?}
-  const extras = Object.keys(corpo).filter((campo) => campo !== 'pergunta' && campo !== 'conversa_id')
+  const extras = Object.keys(corpo).filter(
+    (campo) => campo !== 'pergunta' && campo !== 'conversa_id',
+  )
   if (extras.length > 0) throw invalido(`Campo não permitido: ${extras.join(', ')}.`)
   const conversa = corpo.conversa_id
-  if (conversa !== undefined && conversa !== null && (typeof conversa !== 'string' || !UUID.test(conversa))) {
+  if (
+    conversa !== undefined &&
+    conversa !== null &&
+    (typeof conversa !== 'string' || !UUID.test(conversa))
+  ) {
     throw invalido('conversa_id deve ser um UUID.')
   }
 
@@ -132,7 +140,10 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
         ? await fixtures.respostaIa()
         : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
   // Como a API: devolve o id recebido ou cria um na primeira pergunta.
-  return { ...resposta, conversa_id: (conversa as string | null | undefined) ?? crypto.randomUUID() }
+  return {
+    ...resposta,
+    conversa_id: (conversa as string | null | undefined) ?? crypto.randomUUID(),
+  }
 }
 
 // ---------- POST /ia/insight ----------

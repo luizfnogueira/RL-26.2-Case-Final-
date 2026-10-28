@@ -4,6 +4,7 @@ import type { ApiError } from '@/services/erro-api'
 import { cx } from '@/utils/cx'
 import ComoCheguei from './ComoCheguei'
 import type { Mensagem } from './contexto'
+import TabelaResposta from './TabelaResposta'
 
 type MensagemDoAssistente = Extract<Mensagem, { autor: 'assistente' }>
 type Tom = 'neutro' | 'aviso' | 'perigo'
@@ -130,6 +131,7 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
         <Fala tom="perigo" icone={<Shield {...ICONE} />}>
           <p className="mb-1 font-medium">Pedido bloqueado</p>
           <p>{resposta.resposta}</p>
+          <ComoCheguei resposta={resposta} />
         </Fala>
         <p className="ml-[42px] inline-flex w-fit items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1 text-legenda text-ink">
           <Shield size={13} aria-hidden="true" />
@@ -144,6 +146,7 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
       <Fala tom="aviso" icone={<TriangleAlert {...ICONE} />}>
         <p className="mb-1 font-medium">{TITULO_NAO_SEI}</p>
         <p>{semTitulo(resposta.resposta, TITULO_NAO_SEI)}</p>
+        <ComoCheguei resposta={resposta} />
       </Fala>
     )
   }
@@ -151,6 +154,9 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
   return (
     <Fala icone={<Sparkles {...ICONE} />}>
       <TextoComDestaques texto={resposta.resposta} />
+      {resposta.apresentacao === 'tabela' && resposta.dados.linhas.length > 0 && (
+        <TabelaResposta dados={resposta.dados} />
+      )}
       <ComoCheguei resposta={resposta} />
     </Fala>
   )
