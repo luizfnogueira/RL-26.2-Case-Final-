@@ -4,6 +4,7 @@ import re
 from app.core.exceptions import AppException, UCInexistenteException
 from app.schemas.dashboard import FiltrosDashboard
 from app.schemas.ia import PedidoInsight, PerguntaIA
+from app.services.grafico_ia import ler_pedido
 from app.services.stub_dashboard import montar_dashboard
 from app.services.stubs import CAMPOS_REGIAO, exemplo, verificar_cenario
 
@@ -26,6 +27,10 @@ def responder(dados: PerguntaIA) -> dict:
         return exemplo('resposta_ia_bloqueado')
     if pergunta == PERGUNTA_OK:
         return exemplo('resposta_ia')
+    # Pedido de gráfico: um exemplo por tipo (barras P1 × P2, pizza, linhas), montados pelo grafico_ia
+    pedido, tipo = ler_pedido(dados.pergunta)
+    if pedido:
+        return exemplo(f'resposta_ia_grafico_{tipo or "barras"}')
     return exemplo('resposta_ia_nao_sei')
 
 

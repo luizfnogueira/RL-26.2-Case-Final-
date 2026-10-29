@@ -20,6 +20,7 @@ Só uma etapa usa o modelo para responder (o agente gerador). As outras são có
 | 5 | CG: plano → SQL → `consultar_gold` → corrige até 2× | `agent.py` | GENAI-9 | pronto |
 | 6 | Validação de saída: marcadores e números conferidos | `resposta.py` | GENAI-10 | pronto |
 | 7 | Apresentação: texto ou tabela | `resposta.py` | GENAI-14 | pronto |
+| 7b | Gráfico na conversa: barras, pizza ou linhas pela forma dos dados, sem tokens | `services/grafico_ia.py`, `components/graficos/` | extra | pronto |
 | 8 | Telemetria e gravação | `telemetria.py`, `interacao_repository.registrar` | GENAI-17, 20 | pronto |
 | — | Ponte com o `POST /ia`: memória, prazo, log | `services/ia_service.py` (`AgenteReal`) | GENAI-2 | pronto |
 | — | Insight da Tela 2 | `ai/insights.py`, `services/insight_service.py` (`GeradorIA`) | GENAI-25 | pronto |

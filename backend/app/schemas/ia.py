@@ -91,6 +91,41 @@ class DetalhesTecnicos(BlocoDetalhes):
     avaliacao: dict[str, Any] | None = None
 
 
+class SerieGrafico(Schema):
+    nome: str
+    # Um valor por categoria, na mesma ordem; null = sem dado (buraco na linha, barra ausente).
+    valores: list[float | None]
+
+
+class GraficoIA(Schema):
+    """Gráfico montado pelo backend a partir de `dados` (contrato, seção 9); os valores vêm do banco."""
+    tipo: Literal['barras', 'pizza', 'linhas']
+    titulo: str = Field(max_length=150)
+    # Como o front formata as categorias: nomes (formatarNome), meses (jul/2025) ou P1/P2 como estão.
+    eixo: Literal['categoria', 'tempo', 'periodo']
+    orientacao: Literal['horizontal', 'vertical'] | None = None
+    unidade: Literal['brl', 'kwh', 'pct', 'h'] | None = None
+    categorias: list[str] = Field(min_length=1, max_length=48)
+    series: list[SerieGrafico] = Field(min_length=1, max_length=4)
+    origem: Literal['automatico', 'pedido']
+    # Categorias ou séries que ficaram de fora do limite do gráfico (a tabela completa segue em dados).
+    omitidos: int = Field(default=0, ge=0)
+    nota: str | None = None
+
+    @model_validator(mode='after')
+    def validar_formato(self):
+        if any(len(s.valores) != len(self.categorias) for s in self.series):
+            raise ValueError('Cada série deve ter um valor por categoria')
+        if self.tipo == 'pizza':
+            if len(self.series) != 1 or len(self.categorias) > 5:
+                raise ValueError('Pizza tem uma série e até 5 fatias')
+            if any(v is None or v < 0 for v in self.series[0].valores):
+                raise ValueError('Fatias da pizza não podem ser negativas nem vazias')
+        if self.tipo == 'barras' and self.orientacao is None:
+            raise ValueError('Barras exigem orientação')
+        return self
+
+
 class RespostaIA(Schema):
     resposta: str
     sql: str | None
@@ -101,8 +136,15 @@ class RespostaIA(Schema):
     metadados: Metadados
     # Campos da sprint de GenAI, todos opcionais: o mock e respostas antigas continuam válidos (GENAI-3).
     conversa_id: UUID | None = None
-    apresentacao: Literal['texto', 'tabela'] | None = None
+    apresentacao: Literal['texto', 'tabela', 'grafico'] | None = None
     detalhes_tecnicos: DetalhesTecnicos | None = None
+    grafico: GraficoIA | None = None
+
+    @model_validator(mode='after')
+    def validar_grafico(self):
+        if (self.apresentacao == 'grafico') != (self.grafico is not None):
+            raise ValueError('apresentacao "grafico" e o campo grafico andam juntos')
+        return self
 
 
 class PedidoInsight(Schema):

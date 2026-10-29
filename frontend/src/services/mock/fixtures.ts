@@ -40,6 +40,11 @@ export const fixtures = {
   respostaIaNaoSei: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_nao_sei.json')),
   respostaIaBloqueado: () =>
     carregar<RespostaIA>(import('@/data/mocks/resposta_ia_bloqueado.json')),
+  respostaIaGrafico: {
+    barras: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_grafico_barras.json')),
+    pizza: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_grafico_pizza.json')),
+    linhas: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_grafico_linhas.json')),
+  },
   respostaInsight: () => carregar<RespostaInsight>(import('@/data/mocks/resposta_insight.json')),
   respostaInsightUnidade: () =>
     carregar<RespostaInsight>(import('@/data/mocks/resposta_insight_unidade.json')),

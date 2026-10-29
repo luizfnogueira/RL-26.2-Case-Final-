@@ -1,0 +1,207 @@
+{
+  "resposta": "No cenário fictício, a receita de energia mensal de P2 variou entre R$ 22,4 milhões (ago/2025) e R$ 25,2 milhões (dez/2025).",
+  "sql": "SELECT mes_referencia, SUM(receita_energia) AS receita_energia_brl FROM gold_receita_demo WHERE mes_referencia BETWEEN '2025-07' AND '2026-06' GROUP BY 1 ORDER BY 1",
+  "tabelas": [
+    "gold_receita_demo"
+  ],
+  "dados": {
+    "colunas": [
+      "mes_referencia",
+      "receita_energia_brl"
+    ],
+    "linhas": [
+      [
+        "2025-07",
+        23100000.0
+      ],
+      [
+        "2025-08",
+        22400000.0
+      ],
+      [
+        "2025-09",
+        23000000.0
+      ],
+      [
+        "2025-10",
+        23900000.0
+      ],
+      [
+        "2025-11",
+        24600000.0
+      ],
+      [
+        "2025-12",
+        25200000.0
+      ],
+      [
+        "2026-01",
+        24800000.0
+      ],
+      [
+        "2026-02",
+        23700000.0
+      ],
+      [
+        "2026-03",
+        23300000.0
+      ],
+      [
+        "2026-04",
+        22900000.0
+      ],
+      [
+        "2026-05",
+        23600000.0
+      ],
+      [
+        "2026-06",
+        24200000.0
+      ]
+    ]
+  },
+  "status": "ok",
+  "gerado_em": "2026-10-21T09:12:00-03:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Resposta pré-definida do stub; não há agente conectado nem SQL executado."
+    ]
+  },
+  "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d",
+  "apresentacao": "grafico",
+  "detalhes_tecnicos": {
+    "estrutura_pensamento": {
+      "pergunta_interpretada": "Receita de energia (sem tributos) mês a mês em P2 (jul/2025 a jun/2026)",
+      "plano": {
+        "tabelas": [
+          "gold_receita_demo"
+        ],
+        "colunas": [
+          "periodo",
+          "receita_faturada_brl"
+        ],
+        "filtros": [
+          "mes entre 2025-07 e 2026-06 ou entre 2022-07 e 2023-06"
+        ],
+        "agregacao": "SUM",
+        "ordenacao": "periodo DESC",
+        "limite": null,
+        "periodo": "P2 (2025-07 a 2026-06) e P1 (2022-07 a 2023-06)"
+      },
+      "skills": [
+        "receita"
+      ],
+      "premissas": [
+        "Receita faturada inclui tributos (soma de valor_total)."
+      ],
+      "justificativa": "Somei a receita faturada de cada janela padrão de comparação."
+    },
+    "acoes": [
+      {
+        "ordem": 1,
+        "ferramenta": "consultar_gold",
+        "argumentos": {
+          "sql": "SELECT CASE WHEN mes BETWEEN '2025-07' AND '2026-06' THEN '2025-07/2026-06' ELSE '2022-07/2023-06' END AS periodo,\n       SUM(receita_faturada) AS receita_faturada_brl\nFROM gold_receita_demo\nWHERE mes BETWEEN '2025-07' AND '2026-06'\n   OR mes BETWEEN '2022-07' AND '2023-06'\nGROUP BY 1\nORDER BY 1 DESC;"
+        },
+        "resumo_retorno": "2 linhas: periodo, receita_faturada_brl",
+        "sucesso": true
+      }
+    ],
+    "consulta": {
+      "sql_executado": "SELECT mes_referencia, SUM(receita_energia) AS receita_energia_brl FROM gold_receita_demo WHERE mes_referencia BETWEEN '2025-07' AND '2026-06' GROUP BY 1 ORDER BY 1",
+      "tentativas": 1,
+      "linhas": 12
+    },
+    "tokens_tempo": {
+      "tokens_entrada": 1840,
+      "tokens_saida": 212,
+      "tokens_raciocinio": 0,
+      "chamadas": 2,
+      "latencia_total_ms": 2350,
+      "etapas_ms": {
+        "ss_ms": 3,
+        "agente_ms": 2290,
+        "validacao_ms": 2
+      },
+      "modelo": "mock",
+      "provedor": "mock",
+      "cache": false
+    },
+    "verificacoes": {
+      "sql_validado": true,
+      "numeros_conferidos": true,
+      "confianca": "alta"
+    },
+    "avaliacao": {
+      "executado_em": "2026-10-30T18:00:00-03:00",
+      "n_perguntas": 40,
+      "configuracao": "skills por domínio · raciocínio baixo",
+      "acuracia_execucao": 0.85,
+      "taxa_invencao": 0.0,
+      "bloqueio_ataques": 1.0,
+      "f1_macro": 0.9,
+      "por_status": {
+        "ok": {
+          "precisao": 0.94,
+          "recall": 0.89,
+          "f1": 0.91
+        },
+        "nao_sei": {
+          "precisao": 0.8,
+          "recall": 0.89,
+          "f1": 0.84
+        },
+        "bloqueado": {
+          "precisao": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      }
+    }
+  },
+  "grafico": {
+    "tipo": "linhas",
+    "titulo": "Receita de energia (sem tributos) mês a mês em P2 (jul/2025 a jun/2026)",
+    "eixo": "tempo",
+    "orientacao": null,
+    "unidade": "brl",
+    "categorias": [
+      "2025-07",
+      "2025-08",
+      "2025-09",
+      "2025-10",
+      "2025-11",
+      "2025-12",
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06"
+    ],
+    "series": [
+      {
+        "nome": "Receita energia",
+        "valores": [
+          23100000.0,
+          22400000.0,
+          23000000.0,
+          23900000.0,
+          24600000.0,
+          25200000.0,
+          24800000.0,
+          23700000.0,
+          23300000.0,
+          22900000.0,
+          23600000.0,
+          24200000.0
+        ]
+      }
+    ],
+    "origem": "pedido",
+    "omitidos": 0,
+    "nota": null
+  }
+}

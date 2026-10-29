@@ -4,6 +4,7 @@ import type { ApiError } from '@/services/erro-api'
 import { cx } from '@/utils/cx'
 import ComoCheguei from './ComoCheguei'
 import type { Mensagem } from './contexto'
+import GraficoResposta from './GraficoResposta'
 import TabelaResposta from './TabelaResposta'
 
 type MensagemDoAssistente = Extract<Mensagem, { autor: 'assistente' }>
@@ -156,6 +157,9 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
       <TextoComDestaques texto={resposta.resposta} />
       {resposta.apresentacao === 'tabela' && resposta.dados.linhas.length > 0 && (
         <TabelaResposta dados={resposta.dados} />
+      )}
+      {resposta.apresentacao === 'grafico' && resposta.grafico && (
+        <GraficoResposta grafico={resposta.grafico} dados={resposta.dados} />
       )}
       <ComoCheguei resposta={resposta} />
     </Fala>

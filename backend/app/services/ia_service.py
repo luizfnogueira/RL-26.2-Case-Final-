@@ -15,8 +15,8 @@ from app.core.exceptions import AgenteIndisponivelException
 from app.db.session import SessionLocal
 from app.repositories import interacao_repository
 from app.repositories.gold_metadata import metadados_gold
-from app.schemas.ia import PerguntaIA, RespostaIA
-from app.services import stub_ia
+from app.schemas.ia import GraficoIA, PerguntaIA, RespostaIA
+from app.services import grafico_ia, stub_ia
 from app.ai.consulta import descrever_tabela, valores_distintos
 
 logger = logging.getLogger(__name__)
@@ -100,6 +100,21 @@ def resposta_sem_o_comeco_da_conversa(historico: list[dict], gold_atualizada_em:
     }
 
 
+def acrescentar_grafico(pergunta: str, resposta: dict) -> None:
+    """Gráfico na conversa a partir dos dados da resposta; um erro aqui só tira o gráfico, nunca vira 503."""
+    try:
+        grafico, nota = grafico_ia.montar_grafico(pergunta, resposta)
+        if grafico is not None:
+            GraficoIA.model_validate(grafico)
+            resposta["grafico"] = grafico
+            resposta["apresentacao"] = "grafico"
+        elif nota:
+            resposta["metadados"].setdefault("observacoes", []).append(nota)
+    except (ValidationError, KeyError, TypeError, ValueError) as erro:
+        logger.warning("Gráfico da resposta descartado (%s)", type(erro).__name__)
+        resposta.pop("grafico", None)
+
+
 class AgenteReal:
     """IA_MODO=real: o agente do Théo (`app.ai.agent.responder`) roda dentro do backend, sem HTTP (GENAI-2).
 
@@ -148,6 +163,7 @@ class AgenteReal:
             metadados["dados_ficticios"] = gold["dados_ficticios"]
             if gold["dados_ficticios"]:
                 metadados["observacoes"] = [*gold["observacoes"], *metadados.get("observacoes", [])]
+            acrescentar_grafico(dados.pergunta, resposta)
             RespostaIA.model_validate(resposta)
         except AgenteIndisponivelException:
             raise

@@ -19,7 +19,32 @@ export interface DadosIA {
   linhas: CelulaIA[][]
 }
 
-export type ApresentacaoIA = 'texto' | 'tabela'
+export type ApresentacaoIA = 'texto' | 'tabela' | 'grafico'
+
+export interface SerieGrafico {
+  nome: string
+  /** Um valor por categoria, na mesma ordem; null = sem dado (buraco na linha). */
+  valores: (number | null)[]
+}
+
+/**
+ * Gráfico montado pelo backend a partir de `dados` (contrato, seção 9). Os valores vêm do banco,
+ * já ordenados e cortados (até 20 barras, 5 fatias com "Outros", 4 séries).
+ */
+export interface GraficoIA {
+  tipo: 'barras' | 'pizza' | 'linhas'
+  titulo: string
+  /** Como formatar as categorias: nomes da Gold, meses (YYYY-MM) ou P1/P2. */
+  eixo: 'categoria' | 'tempo' | 'periodo'
+  orientacao: 'horizontal' | 'vertical' | null
+  unidade: 'brl' | 'kwh' | 'pct' | 'h' | null
+  categorias: string[]
+  series: SerieGrafico[]
+  origem: 'automatico' | 'pedido'
+  /** Categorias ou séries fora do limite do gráfico; a tabela completa segue em `dados`. */
+  omitidos: number
+  nota: string | null
+}
 
 export interface PlanoIA {
   tabelas: string[]
@@ -101,9 +126,11 @@ export interface RespostaIA {
   metadados: Metadados
   /** Campos da sprint de GenAI: opcionais, ausentes em respostas antigas. */
   conversa_id?: string | null
-  /** `tabela`: os `dados` aparecem como tabela no corpo da resposta. */
+  /** `tabela`: os `dados` aparecem como tabela no corpo da resposta; `grafico`: o `grafico` abaixo. */
   apresentacao?: ApresentacaoIA | null
   detalhes_tecnicos?: DetalhesTecnicos | null
+  /** Presente só com `apresentacao: "grafico"`. */
+  grafico?: GraficoIA | null
 }
 
 export type ContextoInsight = 'receita' | 'unidade'

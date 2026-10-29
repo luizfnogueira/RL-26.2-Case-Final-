@@ -289,8 +289,37 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | Campo | Tipo | Para quê |
 | --- | --- | --- |
 | `conversa_id` | UUID | Memória da conversa (ver acima). |
-| `apresentacao` | `"texto"` ou `"tabela"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. |
+| `apresentacao` | `"texto"`, `"tabela"` ou `"grafico"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. Com `grafico`, a Tela 7 desenha o campo `grafico` (abaixo). |
 | `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
+| `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
+
+**Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
+
+| Situação | Gráfico |
+| --- | --- |
+| Comparação P1 × P2 (colunas `..._p1`/`..._p2` ou coluna `periodo`), sem pedido | Barras: verticais com P1 e P2; horizontais com P1 e P2 lado a lado quando há uma categoria. Ordem natural (P1 → P2), categorias do maior para o menor pelo P2 |
+| Série no tempo (`mes_referencia`, `ano`, `mes`, `data_*`), sem pedido | Linhas com 3 meses ou mais, até 48 pontos e 4 linhas; 2 pontos viram barras verticais. Mês sem dado é `null` (buraco na linha) |
+| Pessoa pede "gráfico", "barras", "pizza" ou "linhas" | O tipo pedido quando faz sentido. Categorias viram barras horizontais, do maior para o menor (ou na ordem do SQL, quando já vem ordenada), até 20 |
+| Pizza pedida | Só com totais somáveis (receita, kWh, contagens), nunca médias, taxas, DEC ou percentuais; até 5 fatias, da maior para a menor, com "Outros" no fim. Fatias quase iguais, médias ou períodos viram barras, com a explicação em `nota` |
+| Linhas pedidas sem tempo | Barras, com a explicação em `nota` |
+| Ranking ou lista sem pedido, ou um número só | Sem gráfico (tabela ou texto). Com pedido e um número só, `metadados.observacoes` explica |
+
+Campos de `grafico`:
+
+| Campo | Valores | Para quê |
+| --- | --- | --- |
+| `tipo` | `barras`, `pizza`, `linhas` | Forma do gráfico |
+| `titulo` | texto (até 150) | A pergunta interpretada |
+| `eixo` | `categoria`, `tempo`, `periodo` | Como o front formata as categorias: nomes da Gold (`formatarNome`), meses (`2025-07` → `Jul/2025`) ou P1/P2 como estão |
+| `orientacao` | `horizontal`, `vertical` ou `null` | Obrigatória nas barras; `null` na pizza e nas linhas |
+| `unidade` | `brl`, `kwh`, `pct`, `h` ou `null` | Uma unidade por gráfico, pelo sufixo do alias do SQL; nunca dois eixos |
+| `categorias` | 1 a 48 textos | Eixo das barras e das linhas, ou as fatias |
+| `series` | 1 a 4 itens `{nome, valores[]}` | Um valor (número ou `null`) por categoria, na mesma ordem. Pizza: 1 série, sem negativos nem `null` |
+| `origem` | `automatico`, `pedido` | Se veio da forma dos dados ou de um pedido da pessoa |
+| `omitidos` | inteiro ≥ 0 | Categorias ou séries fora do limite; a tabela completa segue em `dados` e no CSV |
+| `nota` | texto ou `null` | Por que o tipo pedido não foi usado (ex.: pizza de média) |
+
+Exemplos completos (valores fictícios): [barras P1 × P2](../backend/app/services/fixtures/resposta_ia_grafico_barras.json), [pizza](../backend/app/services/fixtures/resposta_ia_grafico_pizza.json), [linhas](../backend/app/services/fixtures/resposta_ia_grafico_linhas.json). Um gráfico que não passe nessas regras é descartado e a resposta sai como tabela ou texto, nunca 503.
 
 Blocos de `detalhes_tecnicos`. Campos novos da telemetria são aceitos e o front os ignora:
 
@@ -312,10 +341,11 @@ Cenários demonstrativos:
 | Qual foi a receita no período? | ok — exemplo acima |
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
+| Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
-- `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
+- `mock` (padrão): os cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
 - `real`: a pergunta vai para o agente PydanticAI da Equipe 3, que roda dentro do backend, sem chamada HTTP. Ele gera e executa a consulta somente leitura na Gold, com o usuário do banco próprio do agente. A API carrega as últimas trocas da conversa e grava cada resposta, inclusive `bloqueado` e `nao_sei`, em `ia.interacao`, que também serve de log de auditoria.
 
 Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` (o agente tem 5 s a menos, para sobrar tempo de gravar) ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. A chave do modelo fica só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos.

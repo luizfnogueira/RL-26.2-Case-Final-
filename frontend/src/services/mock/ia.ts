@@ -38,6 +38,16 @@ function numero(valor: number, casas = 1): string {
 
 // ---------- POST /ia ----------
 
+/** Como `grafico_ia.ler_pedido` do backend: um exemplo por tipo (barras P1 × P2, pizza, linhas). */
+function tipoDeGraficoPedido(pergunta: string): 'barras' | 'pizza' | 'linhas' | null {
+  if (/\b(pizza|torta|rosca)\b/i.test(pergunta)) return 'pizza'
+  if (/\bbarras?\b/i.test(pergunta)) return 'barras'
+  const grafico = /\bgr[aá]fico/i.test(pergunta)
+  if (/\b(de|em)\s+linhas?\b/i.test(pergunta) || (grafico && /\blinhas?\b/i.test(pergunta)))
+    return 'linhas'
+  return grafico ? 'barras' : null
+}
+
 /** Respostas extras do mock do front (não fazem parte dos fixtures do contrato), montadas com os mesmos dados fictícios. */
 async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
   const base = await fixtures.respostaIa()
@@ -133,12 +143,15 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
   }
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
+  const grafico = tipoDeGraficoPedido(bruta)
   const resposta =
     pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta)
       ? await fixtures.respostaIaBloqueado()
       : pergunta === PERGUNTA_OK
         ? await fixtures.respostaIa()
-        : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
+        : grafico
+          ? await fixtures.respostaIaGrafico[grafico]()
+          : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
   // Como a API: devolve o id recebido ou cria um na primeira pergunta.
   return {
     ...resposta,
