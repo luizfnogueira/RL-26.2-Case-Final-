@@ -1,7 +1,8 @@
 """Pedir esclarecimento (contrato, seção 9): pergunta ambígua volta com opções, sem chamar o modelo.
 
 Dois casos, detectados por código e sem gastar tokens:
-- bairro que existe em mais de um município, sem o município na pergunta nem na troca anterior
+- bairro que existe em mais de um município, sem o município na pergunta (a troca anterior só vale numa
+  continuação "E no Centro?" depois de uma pergunta com um município só)
   ("Centro" existe em 10 municípios da Gold; somá-los daria um número sem sentido);
 - "este ano" sem ano nem período: a base termina em jun/2026, então 2026 tem só 6 meses e P2 é
   jul/2025 a jun/2026.
@@ -18,6 +19,8 @@ TODOS = "somando todos os municípios"
 _MINUSCULAS = {"de", "da", "do", "das", "dos", "e"}
 _ESTE_ANO = re.compile(r"\b(?:(n|d)?(?:este|esse)\s+ano|(no|do)\s+ano\s+atual)\b", re.IGNORECASE)
 _ANO_OU_PERIODO = re.compile(r"\b(20\d{2}|p[12])\b", re.IGNORECASE)
+# Continuação curta da troca anterior: "E no Centro?", "e o centro"
+_CONTINUACAO = re.compile(r"^E\b")
 
 
 def normalizar(texto: str) -> str:
@@ -47,7 +50,12 @@ def _bairro_ambiguo(pergunta: str, historico: list[dict], ambiguos: dict[str, se
             continue
         do_bairro = ambiguos[bairro]
         # Qualquer município citado resolve, mesmo um sem esse bairro: aí o agente responde que não há dados
-        if any(_menciona(texto, m) or _menciona(anterior, m) for m in do_bairro | municipios):
+        if any(_menciona(texto, m) for m in do_bairro | municipios):
+            return None
+        # A troca anterior só resolve em "E no Centro?" logo depois de uma pergunta com um município só;
+        # "Municípios fora Recife…" seguido de "Receita do Centro" pergunta de novo
+        citados_antes = {m for m in do_bairro | municipios if _menciona(anterior, m)}
+        if _CONTINUACAO.match(texto) and len(citados_antes) == 1:
             return None
         base = pergunta.strip().rstrip("?").strip()
         legivel = nome_legivel(bairro)

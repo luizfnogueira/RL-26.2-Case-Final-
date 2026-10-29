@@ -57,6 +57,18 @@ def test_municipio_da_troca_anterior_resolve_o_bairro():
     assert detectar("E no Centro?", historico, AMBIGUOS) is None
 
 
+@pytest.mark.parametrize("anterior, pergunta", [
+    # Casos reais do teste ao vivo: a pergunta anterior citava municípios e o agente somou os 10 Centros
+    ("Quais os municípios, fora Recife, com maior receita?", "Receita do Centro em 2026 (janeiro a junho)"),
+    ("Compare o consumo de 2025 de Recife e Olinda", "Me de o consumo medio de energia de 2025 do Centro"),
+    # Continuação, mas a anterior citou dois municípios: não dá para saber qual
+    ("Compare a receita de Recife e Olinda", "E no Centro?"),
+])
+def test_troca_anterior_nao_resolve_fora_da_continuacao_com_um_municipio(anterior, pergunta):
+    historico = [{"pergunta_interpretada": anterior, "resposta_resumo": ""}]
+    assert detectar(pergunta, historico, AMBIGUOS, {"RECIFE", "OLINDA", "PAULISTA"}) is not None
+
+
 def test_os_10_municipios_do_centro_viram_botao_mais_todos():
     # Caso real: na Gold o Centro existe em 10 municípios; com o limite antigo de 8, dois sumiam
     dez = {"CENTRO": {f"MUNICIPIO {i:02d}" for i in range(10)}}
