@@ -3,8 +3,10 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import unidadeFixture from '@/data/mocks/unidade.json'
 import UnidadePage from '@/pages/UnidadePage'
-import type { DiagnosticoConta } from '@/types/unidades'
+import type { DiagnosticoConta, Fatura, Medidor } from '@/types/unidades'
 import BlocoDiagnostico from './BlocoDiagnostico'
+import { BlocoMedidor } from './BlocosCadastrais'
+import { BlocoFaturas } from './BlocosHistorico'
 import { rotuloModalidadeGd } from './rotulos'
 
 afterEach(cleanup)
@@ -195,5 +197,90 @@ describe('diagnóstico "a conta veio alta?"', () => {
     render(<BlocoDiagnostico diagnostico={vazio} />)
     expect(screen.getByRole('heading', { name: 'Sem consumo nesta janela' })).toBeTruthy()
     expect(screen.queryByText('Último mês')).toBeNull()
+  })
+})
+
+describe('medidor: selo só para leitura estimada', () => {
+  it('leitura real não leva selo', () => {
+    const medidor = unidadeFixture.medidor as Medidor
+    render(
+      <BlocoMedidor
+        medidor={{
+          ...medidor,
+          ultima_leitura: { ...medidor.ultima_leitura!, tipo_leitura: 'REAL' },
+        }}
+      />,
+    )
+    expect(screen.getByText('18.452 kWh em 28/06/2026')).toBeTruthy()
+    expect(screen.queryByText('Real')).toBeNull()
+    expect(screen.queryByText('Estimada')).toBeNull()
+  })
+})
+
+describe('consumo, faturas, interrupções e chamados', () => {
+  const regiao = (nome: string) => within(screen.getByRole('region', { name: nome }))
+  const linhas = (nome: string) => regiao(nome).getAllByRole('row').slice(1)
+
+  it('UC completa: 12 meses, faturas, interrupções com hora de Recife e chamados com nota', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+
+    const consumo = linhas('Consumo dos últimos 12 meses')
+    expect(consumo).toHaveLength(12)
+    expect(within(consumo[0]).getByText('Jul/2025')).toBeTruthy()
+    expect(within(consumo[0]).getByText('305 kWh')).toBeTruthy()
+    expect(within(consumo[0]).getByText('312 kWh')).toBeTruthy()
+    expect(within(consumo[0]).getByText('Real')).toBeTruthy()
+    expect(within(consumo[11]).getByText('Estimada')).toBeTruthy()
+
+    const faturas = regiao('Faturas')
+    expect(faturas.getByText('R$ 486,00')).toBeTruthy() // em aberto
+    expect(faturas.getByText('12/07/2026')).toBeTruthy() // vencimento
+    expect(faturas.getByText('R$ 355,00')).toBeTruthy() // paga
+    expect(faturas.getByText('10/06/2026')).toBeTruthy() // pago em
+    expect(faturas.queryByText('Antes do período')).toBeNull()
+
+    const interrupcoes = regiao('Interrupções de energia')
+    expect(interrupcoes.getByText('2 mais recentes de 2 no período')).toBeTruthy()
+    expect(interrupcoes.getByText('14/06/2026, 19:20')).toBeTruthy()
+    expect(interrupcoes.getByText('1 h 45 min')).toBeTruthy()
+
+    const chamados = regiao('Chamados')
+    expect(chamados.getByText('02/07/2026, 10:05')).toBeTruthy()
+    expect(chamados.getByText('30,4 h')).toBeTruthy()
+    expect(chamados.getByText('3,0')).toBeTruthy()
+  })
+
+  it('UC recente: meses sem dado, nenhuma interrupção e chamado sem nota', async () => {
+    abrir('/unidades/UC-DEMO-007')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
+
+    const consumo = linhas('Consumo dos últimos 12 meses')
+    expect(consumo).toHaveLength(12) // eixo fixo, mês sem dado não some
+    expect(consumo.slice(0, 6).every((l) => within(l).queryByText('Sem dado'))).toBe(true)
+    expect(within(consumo[0]).getAllByText('—')).toHaveLength(2) // nunca 0
+
+    // Duas tabelas no bloco: conta as faturas pelo valor, um por linha (1 em aberto + 5 pagas).
+    expect(regiao('Faturas').getAllByText(/^R\$ /)).toHaveLength(6)
+    expect(regiao('Faturas').getByText('Em aberto')).toBeTruthy()
+    expect(
+      regiao('Interrupções de energia').getByRole('heading', {
+        name: 'Nenhuma interrupção no período',
+      }),
+    ).toBeTruthy()
+    expect(regiao('Chamados').getByText('Sem nota')).toBeTruthy()
+  })
+})
+
+describe('faturas em aberto antes do período', () => {
+  it('a dívida antiga aparece com o selo "Antes do período"; a do período, sem selo', () => {
+    const [aberta] = unidadeFixture.faturas_abertas as Fatura[]
+    const antiga: Fatura = { ...aberta, id_fatura: 'FT-ANTIGA', mes_referencia: '2024-11' }
+    render(<BlocoFaturas abertas={[aberta, antiga]} pagas={[]} periodo="2025-07/2026-06" />)
+    expect(screen.getAllByText('Antes do período')).toHaveLength(1)
+    expect(
+      within(screen.getByText('Nov/2024').closest('tr')!).getByText('Antes do período'),
+    ).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Nenhuma fatura paga no período' })).toBeTruthy()
   })
 })

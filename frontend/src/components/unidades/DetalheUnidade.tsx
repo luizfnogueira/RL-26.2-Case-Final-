@@ -13,6 +13,7 @@ import { formatarAtualizacao } from '@/utils/datas'
 import { formatarNome } from '@/utils/formatacao'
 import { formatarPeriodo } from '@/utils/periodos'
 import BlocoDiagnostico from './BlocoDiagnostico'
+import { BlocoChamados, BlocoConsumo, BlocoFaturas, BlocoInterrupcoes } from './BlocosHistorico'
 import { BlocoCadastro, BlocoGeracao, BlocoMedidor } from './BlocosCadastrais'
 
 const ESTILO_LINK =
@@ -68,11 +69,25 @@ export default function DetalheUnidade({ id }: { id: string }) {
     >
       <CabecalhoUnidade unidade={dados} />
       <BlocoDiagnostico diagnostico={dados.diagnostico_conta} />
+      {/* Primeiro o que explica a conta (consumo e faturas), depois cadastro e histórico de atendimento. */}
+      <div className="grid gap-4 md:gap-6 xl:grid-cols-2">
+        <BlocoConsumo consumo={dados.consumo} />
+        <BlocoFaturas
+          abertas={dados.faturas_abertas}
+          pagas={dados.faturas_pagas}
+          periodo={dados.periodo_referencia}
+        />
+      </div>
       <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <BlocoCadastro cadastro={dados.cadastro} />
         <BlocoMedidor medidor={dados.medidor} />
         <BlocoGeracao gd={dados.geracao_distribuida} />
       </div>
+      <BlocoInterrupcoes
+        recentes={dados.interrupcoes_recentes}
+        total={dados.total_interrupcoes.valor}
+      />
+      <BlocoChamados chamados={dados.chamados} />
     </div>
   )
 }

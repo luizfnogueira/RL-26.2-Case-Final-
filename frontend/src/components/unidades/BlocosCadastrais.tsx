@@ -72,9 +72,8 @@ export function BlocoMedidor({ medidor }: { medidor: Medidor | null }) {
               <span className="flex flex-wrap items-center gap-2">
                 {/* Valor exato do registrador, para conferir com o visor do medidor. */}
                 {`${leitura.format(ultima.leitura_kwh)} kWh em ${formatarData(ultima.data)}`}
-                <Badge variante={ultima.tipo_leitura === 'ESTIMADA' ? 'alerta' : 'neutro'}>
-                  {formatarNome(ultima.tipo_leitura)}
-                </Badge>
+                {/* Só a leitura estimada pede atenção; a real não leva selo. */}
+                {ultima.tipo_leitura === 'ESTIMADA' && <Badge variante="alerta">Estimada</Badge>}
               </span>
             ) : (
               'Sem leitura registrada'
