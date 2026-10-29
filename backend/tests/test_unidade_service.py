@@ -227,6 +227,7 @@ class TestSeed:
     def test_detalhe_e_busca_do_fixture(self):
         servico = UnidadeService(None, fonte='seed')
         assert servico.detalhar('UC-DEMO-001', FiltroUnidade()) == exemplo('unidade')
+        assert servico.detalhar('UC-DEMO-007', FiltroUnidade()) == exemplo('unidade_recente')
         assert servico.buscar(FiltrosUnidades(busca='UC-DEMO')) == exemplo('unidades')
 
     def test_outra_uc_ou_outra_janela(self):

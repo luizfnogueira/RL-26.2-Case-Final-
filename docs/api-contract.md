@@ -123,7 +123,7 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 - Medidor ativo (id, modelo, tipo, data de instalação e última leitura). `geracao_distribuida` é null **inteiro** para UC sem GD (os quatro `gd_*` da `dim_uc` são nulos exatamente nas 41.490 UCs sem painel); quando existe, potência, modalidade, data de conexão e média injetada vêm todos preenchidos. Média mensal injetada de GD não é geração medida no período.
 - O exemplo é um caso fictício que segue as regras acima: o diagnóstico do `unidade.json` é o que a API calcula sobre o consumo do próprio exemplo (`test_diagnostico_conta.py`).
 
-No mock (`GOLD_SOURCE=seed`), somente UC-DEMO-001 tem a visão detalhada e só a janela 2025-07/2026-06 é simulada; a leitura real usa `GOLD_SOURCE=real`. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
+No mock (`GOLD_SOURCE=seed`), duas UCs têm a visão detalhada e só a janela 2025-07/2026-06 é simulada: UC-DEMO-001 ([exemplo completo](../backend/app/services/fixtures/unidade.json), com conta alta e GD) e UC-DEMO-007 ([UC recente](../backend/app/services/fixtures/unidade_recente.json): ligada em jan/2026, com os 6 primeiros meses null, sem GD, leitura ESTIMADA no mês analisado, média de 5 meses e nenhuma interrupção). Os dois diagnósticos são calculados pela regra da API; a leitura real usa `GOLD_SOURCE=real`. IDs não disponíveis retornam 404. Nunca atribuir o cadastro de uma UC a outro ID.
 
 ## 6. GET /inspecoes/candidatos — Tela 4
 

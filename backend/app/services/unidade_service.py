@@ -17,7 +17,8 @@ LIMIAR_MEDIA_PCT = 20
 MESES_MEDIA = 12
 LIMITE_INTERRUPCOES = 10
 HORA_LOCAL = timezone(timedelta(hours=-3))   # Recife, sem horário de verão
-UC_EXEMPLO = 'UC-DEMO-001'                   # única UC com visão detalhada no fixture (GOLD_SOURCE=seed)
+# UCs com visão detalhada no fixture (GOLD_SOURCE=seed): uma completa e uma recente, sem GD e estimada.
+UC_EXEMPLOS = {'UC-DEMO-001': 'unidade', 'UC-DEMO-007': 'unidade_recente'}
 
 
 def _indicador(valor: Decimal | float | None, unidade: str, periodo: str) -> dict:
@@ -265,6 +266,6 @@ def _buscar_exemplo(filtros: FiltrosUnidades) -> dict:
 
 def _detalhar_exemplo(id_uc: str, filtros: FiltroUnidade) -> dict:
     verificar_cenario(filtros.periodo_atual)
-    if id_uc != UC_EXEMPLO:
+    if id_uc not in UC_EXEMPLOS:
         raise UCInexistenteException(f"Unidade Consumidora '{id_uc}' não disponível no cenário.")
-    return exemplo('unidade')
+    return exemplo(UC_EXEMPLOS[id_uc])
