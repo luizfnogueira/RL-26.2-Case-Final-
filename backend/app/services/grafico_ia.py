@@ -23,20 +23,37 @@ FATIAS_PARECIDAS = 0.05
 
 _GRAFICO = re.compile(r"\bgr[aá]fico", re.IGNORECASE)
 _PIZZA = re.compile(r"\b(pizza|torta|rosca)\b", re.IGNORECASE)
-_BARRAS = re.compile(r"\bbarras?\b", re.IGNORECASE)
-# "linha" sozinha aparece em "linha de distribuição": só vale perto de "gráfico" ou como "em linhas"
-_LINHAS = re.compile(r"\b(?:de|em)\s+linhas?\b", re.IGNORECASE)
+# "Barra" no singular é nome de bairro (Barra de Jangada): só "barras" ou "gráfico de barra"
+_BARRAS = re.compile(r"\bbarras\b|gr[aá]fico\s+(?:de\s+|em\s+)?barra\b", re.IGNORECASE)
+# "linha" aparece em "linhas de distribuição": só "em linhas" ou "gráfico de linhas", fora da rede elétrica
+_LINHAS = re.compile(r"(?:\bem|gr[aá]fico\s+(?:de|em))\s+linhas?\b(?!\s+(?:de\s+)?(?:distribui|transmiss|tens))",
+                     re.IGNORECASE)
+# O título é a pergunta interpretada, que às vezes cita o gráfico ("formatado para gráfico de pizza")
+_MENCAO_AO_GRAFICO = re.compile(
+    r"[,;]?\s*(?:(?:formatad|organizad|apresentad|estruturad|preparad)[oa]s?\s+)?(?:para|em|num|numa|no)\s+"
+    r"(?:a\s+|o\s+|um\s+|uma\s+)?(?:(?:visualiza|exibi|gera)[çc][ãa]o\s+(?:em|de|no|num)\s+(?:um\s+)?)?"
+    r"gr[aá]fico(?:\s+(?:de|em)\s+(?:pizza|barras?|linhas?|torta|rosca|colunas))?(?:\s+comparativo)?",
+    re.IGNORECASE)
+MAX_TITULO = 150
 
 _TEMPORAIS = {"mes_referencia", "mes", "ano", "trimestre", "data", "ano_mes", "periodo"}
 _DATA = re.compile(r"^\d{4}(-\d{2}){0,2}$")
 _PERIODO = {"P1", "P2"}
 _PAR_PERIODO = re.compile(r"(^|_)p([12])(?=_|$)")
 
-NOTA_PIZZA_NAO_SOMA = "Pizza mostra partes de um todo; para médias e percentuais, o gráfico é de barras."
-NOTA_PIZZA_PARECIDAS = "As fatias seriam quase iguais; em barras a diferença fica visível."
-NOTA_PIZZA_PERIODOS = "Comparação entre períodos fica em barras, não em pizza."
-NOTA_PIZZA_COLUNAS = "Pizza mostra partes de um todo; indicadores diferentes ficam em barras."
-NOTA_LINHAS_SEM_TEMPO = "Linhas são para séries no tempo; para categorias, o gráfico é de barras."
+# Quando o tipo pedido não serve, a nota começa dizendo isso: a Tela 7 a mostra acima do gráfico
+_PEDIU_PIZZA = "Você pediu pizza, mas o gráfico está em barras: "
+NOTA_PIZZA_NAO_SOMA = (_PEDIU_PIZZA + "a pizza mostra partes de um todo, e médias, taxas, percentuais e "
+                       "indicadores como DEC e FEC não somam entre si.")
+NOTA_PIZZA_NEGATIVO = (_PEDIU_PIZZA + "há valor negativo, que não cabe numa pizza; nas barras, ele fica à "
+                       "esquerda do zero.")
+NOTA_PIZZA_PARECIDAS = _PEDIU_PIZZA + "as fatias seriam quase iguais, e nas barras a diferença fica visível."
+NOTA_PIZZA_PERIODOS = (_PEDIU_PIZZA + "períodos (P1 e P2, meses) não são partes de um todo; lado a lado, a "
+                       "comparação fica clara.")
+NOTA_PIZZA_COLUNAS = (_PEDIU_PIZZA + "indicadores diferentes (como receita total e receita de energia, que está "
+                      "dentro dela) não são partes de um mesmo todo.")
+NOTA_LINHAS_SEM_TEMPO = ("Você pediu linhas, mas o gráfico está em barras: linhas são para séries no tempo, "
+                         "e estas categorias não seguem uma ordem no tempo.")
 NOTA_UM_NUMERO = "Gráfico: com um número só, a resposta fica em texto."
 NOTA_SEM_DADOS = "Gráfico: a consulta não trouxe valores numéricos para desenhar."
 
@@ -48,11 +65,20 @@ def ler_pedido(pergunta: str) -> tuple[bool, str | None]:
         return True, "pizza"
     if _BARRAS.search(texto):
         return True, "barras"
-    if _LINHAS.search(texto) or (_GRAFICO.search(texto) and re.search(r"\blinhas?\b", texto, re.I)):
+    if _LINHAS.search(texto):
         return True, "linhas"
     if _GRAFICO.search(texto):
         return True, None
     return False, None
+
+
+def titulo_do_grafico(texto: str) -> str:
+    """A pergunta interpretada sem "formatado para gráfico de pizza" (o tipo está no desenho), cortada
+    numa palavra inteira."""
+    titulo = _MENCAO_AO_GRAFICO.sub("", texto or "").strip().rstrip("?.,;: ").strip()
+    if len(titulo) > MAX_TITULO:
+        titulo = titulo[:MAX_TITULO - 1].rsplit(" ", 1)[0].rstrip(",;: ") + "…"
+    return titulo
 
 
 def unidade_da_coluna(coluna: str) -> str | None:
@@ -118,7 +144,7 @@ def _ordenadas(valores: list[float | None]) -> bool:
 def _grafico(tipo: str, titulo: str, eixo: str, categorias: list[str], series: list[dict], unidade: str | None,
              pedido: bool, *, orientacao: str | None = None, omitidos: int = 0, nota: str | None = None) -> dict:
     return {
-        "tipo": tipo, "titulo": titulo[:150], "eixo": eixo,
+        "tipo": tipo, "titulo": titulo[:MAX_TITULO], "eixo": eixo,
         "orientacao": orientacao if tipo == "barras" else None,
         "unidade": unidade, "categorias": categorias, "series": series,
         "origem": "pedido" if pedido else "automatico", "omitidos": omitidos, "nota": nota,
@@ -141,7 +167,9 @@ def _barras_por_categoria(titulo, categorias, series, unidade, pedido, nota=None
 def _pizza(titulo, categorias, serie, coluna, pedido) -> dict | str:
     """Pizza ou o motivo para não ser pizza."""
     valores = serie["valores"]
-    if not _somavel(coluna) or any(v is None or v < 0 for v in valores) or sum(valores) <= 0 or len(valores) < 2:
+    if any(v is not None and v < 0 for v in valores):
+        return NOTA_PIZZA_NEGATIVO
+    if not _somavel(coluna) or any(v is None for v in valores) or sum(valores) <= 0 or len(valores) < 2:
         return NOTA_PIZZA_NAO_SOMA
     pares = sorted(zip(categorias, valores), key=lambda p: -p[1])
     if len(pares) > MAX_FATIAS:
@@ -215,7 +243,7 @@ def montar_grafico(pergunta: str, resposta: dict) -> tuple[dict | None, str | No
     colunas: list[str] = resposta["dados"]["colunas"]
     linhas: list[list[Any]] = resposta["dados"]["linhas"]
     detalhes = resposta.get("detalhes_tecnicos") or {}
-    titulo = ((detalhes.get("estrutura_pensamento") or {}).get("pergunta_interpretada") or pergunta).rstrip("?")
+    titulo = titulo_do_grafico((detalhes.get("estrutura_pensamento") or {}).get("pergunta_interpretada") or pergunta)
     if not linhas:
         return None, NOTA_SEM_DADOS if pedido else None
 

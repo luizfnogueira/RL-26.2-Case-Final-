@@ -8,8 +8,8 @@ from pydantic import ValidationError
 from app.main import app
 from app.schemas.ia import RespostaIA
 from app.services import grafico_ia, ia_service
-from app.services.grafico_ia import (NOTA_LINHAS_SEM_TEMPO, NOTA_PIZZA_NAO_SOMA, NOTA_PIZZA_PARECIDAS,
-                                     NOTA_UM_NUMERO, ler_pedido, montar_grafico)
+from app.services.grafico_ia import (NOTA_LINHAS_SEM_TEMPO, NOTA_PIZZA_NAO_SOMA, NOTA_PIZZA_NEGATIVO,
+                                     NOTA_PIZZA_PARECIDAS, NOTA_UM_NUMERO, ler_pedido, montar_grafico)
 from app.services.ia_service import AgenteReal, obter_agente
 from app.services.stubs import exemplo
 
@@ -37,6 +37,13 @@ def grafico(pergunta, colunas, linhas):
     ("Faz um gráfico?", (True, None)),
     ("Qual o DEC da linha de distribuição ALM-REC-001?", (False, None)),
     ("Qual a receita de P2?", (False, None)),
+    # Casos reais: nome de bairro e rede elétrica não são pedido de gráfico
+    ("Consumo do bairro Barra de Jangada", (False, None)),
+    ("Interrupções em linhas de distribuição de Recife", (False, None)),
+    ("DEC da linha de distribuição ALM-REC-001 em gráfico", (True, None)),
+    ("agora em linhas", (True, "linhas")),
+    ("me dê isso em um grafico de barras", (True, "barras")),
+    ("gráfico de barra da receita", (True, "barras")),
 ])
 def test_le_o_pedido_de_grafico(pergunta, esperado):
     assert ler_pedido(pergunta) == esperado
@@ -176,6 +183,41 @@ def test_ponte_acrescenta_o_grafico_na_resposta_do_agente(monkeypatch):
     corpo = agente.perguntar(ia_service.PerguntaIA(pergunta="Faça um gráfico de barras disso"))
     assert corpo["apresentacao"] == "grafico" and corpo["grafico"]["tipo"] == "barras"
     RespostaIA.model_validate(corpo)
+
+
+# ---------- título e motivo do tipo ----------
+
+@pytest.mark.parametrize("interpretada, titulo", [
+    # Casos reais do teste ao vivo: o título dizia "formatado para gráfico de pizza" em cima de barras
+    ("Qual foi o DEC total (acumulado) por município no período P2 (julho de 2025 a junho de 2026), "
+     "formatado para visualização em gráfico de pizza?",
+     "Qual foi o DEC total (acumulado) por município no período P2 (julho de 2025 a junho de 2026)"),
+    ("Compare a receita total e a receita de energia entre P1 e P2 em um gráfico de pizza.",
+     "Compare a receita total e a receita de energia entre P1 e P2"),
+    ("Qual foi o consumo de Recife em junho de 2026, segmentado por classe para visualização em gráfico?",
+     "Qual foi o consumo de Recife em junho de 2026, segmentado por classe"),
+    ("Qual a receita por município em P2?", "Qual a receita por município em P2"),
+])
+def test_titulo_nao_cita_o_tipo_de_grafico(interpretada, titulo):
+    g, _ = montar_grafico("gráfico de barras", resposta(["municipio", "consumo_kwh"], MUNICIPIOS, interpretada))
+    assert g["titulo"] == titulo
+
+
+def test_titulo_longo_e_cortado_numa_palavra_inteira():
+    g, _ = montar_grafico("gráfico", resposta(["municipio", "consumo_kwh"], MUNICIPIOS, "Receita mensal " * 20))
+    assert len(g["titulo"]) <= 150 and g["titulo"].endswith(" Receita…")
+
+
+def test_pizza_com_valor_negativo_explica_o_motivo():
+    # Caso real: efeito preço (+) e efeito volume (−) em pizza
+    g, _ = grafico("Efeito preço e efeito volume em pizza", ["categoria", "valor_brl"],
+                   [["Efeito Preço", 14425857.02], ["Efeito Volume", -4993655.75]])
+    assert g["tipo"] == "barras" and g["nota"] == NOTA_PIZZA_NEGATIVO
+
+
+def test_pizza_recusada_comeca_dizendo_que_foi_pedida():
+    g, _ = grafico("DEC por município em pizza", ["municipio", "dec_total_horas_uc"], MUNICIPIOS)
+    assert g["nota"].startswith("Você pediu pizza, mas o gráfico está em barras: ")
 
 
 # ---------- o que fica fora do desenho vai na nota ----------

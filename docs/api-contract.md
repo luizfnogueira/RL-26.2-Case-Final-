@@ -323,8 +323,8 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | --- | --- |
 | Comparação P1 × P2 (colunas `..._p1`/`..._p2` ou coluna `periodo`), sem pedido | Barras: verticais com P1 e P2; horizontais com P1 e P2 lado a lado quando há uma categoria. Ordem natural (P1 → P2), categorias do maior para o menor pelo P2 |
 | Série no tempo (`mes_referencia`, `ano`, `mes`, `data_*`), sem pedido | Linhas com 3 meses ou mais, até 48 pontos e 4 linhas; 2 pontos viram barras verticais (até 24). O eixo mensal vai do primeiro ao último mês, ou até a faixa `BETWEEN` do SQL; mês que a consulta não trouxe é `null` (buraco na linha) e é citado em `nota` |
-| Pessoa pede "gráfico", "barras", "pizza" ou "linhas" | O tipo pedido quando faz sentido. Categorias viram barras horizontais, do maior para o menor (ou na ordem do SQL, quando já vem ordenada), até 20 |
-| Pizza pedida | Só com totais somáveis (receita, kWh, contagens), nunca médias, taxas, DEC ou percentuais; até 5 fatias, da maior para a menor, com "Outros" no fim. Fatias quase iguais, médias ou períodos viram barras, com a explicação em `nota` |
+| Pessoa pede "gráfico", "barras", "pizza" ou "linhas" | O tipo pedido quando faz sentido. Categorias viram barras horizontais, do maior para o menor (ou na ordem do SQL, quando já vem ordenada), até 20. "Barra" no singular (bairro Barra de Jangada) e "linhas de distribuição" não contam como pedido |
+| Pizza pedida | Só com totais somáveis (receita, kWh, contagens), nunca médias, taxas, DEC ou percentuais; até 5 fatias, da maior para a menor, com "Outros" no fim. Fatias quase iguais, médias, valores negativos, períodos ou indicadores diferentes viram barras, e a `nota` começa com "Você pediu pizza, mas o gráfico está em barras:" seguido do motivo |
 | Linhas pedidas sem tempo | Barras, com a explicação em `nota` |
 | Ranking ou lista sem pedido, ou um número só | Sem gráfico (tabela ou texto). Com pedido e um número só, `metadados.observacoes` explica |
 
@@ -333,7 +333,7 @@ Campos de `grafico`:
 | Campo | Valores | Para quê |
 | --- | --- | --- |
 | `tipo` | `barras`, `pizza`, `linhas` | Forma do gráfico |
-| `titulo` | texto (até 150) | A pergunta interpretada |
+| `titulo` | texto (até 150) | A pergunta interpretada, sem a menção ao gráfico ("formatado para gráfico de pizza") e cortada numa palavra inteira |
 | `eixo` | `categoria`, `tempo`, `periodo` | Como o front formata as categorias: nomes da Gold (`formatarNome`), meses (`2025-07` → `Jul/2025`) ou P1/P2 como estão |
 | `orientacao` | `horizontal`, `vertical` ou `null` | Obrigatória nas barras; `null` na pizza e nas linhas |
 | `unidade` | `brl`, `kwh`, `pct`, `h` ou `null` | Uma unidade por gráfico, pelo sufixo do alias do SQL; nunca dois eixos |
