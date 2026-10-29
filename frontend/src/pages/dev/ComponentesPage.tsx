@@ -1,6 +1,8 @@
 import { Download, Plus } from 'lucide-react'
 import { useState } from 'react'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
+import SeletorDeItens from '@/components/filtros/SeletorDeItens'
+import { selecaoValida, type SelecaoItens } from '@/components/filtros/selecaoItens'
 import Badge, { type VarianteBadge } from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -12,8 +14,8 @@ import SeloFicticio from '@/components/ui/SeloFicticio'
 import Select from '@/components/ui/Select'
 import Skeleton from '@/components/ui/Skeleton'
 import Tabela, { type Coluna } from '@/components/ui/Tabela'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
+import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { ApiError } from '@/services/erro-api'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
@@ -84,10 +86,12 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
 }
 
 export default function ComponentesPage() {
+  const opcoesFiltros = useOpcoesFiltros()
   const [modal, setModal] = useState(false)
   const [pagina, setPagina] = useState(1)
   const [classe, setClasse] = useState('')
   const [nome, setNome] = useState('')
+  const [selecao, setSelecao] = useState<SelecaoItens>({ nivel: 'municipio', itens: [] })
   const { filtros } = useFiltrosUrl(CAMPOS, PADROES)
 
   return (
@@ -95,7 +99,7 @@ export default function ComponentesPage() {
       titulo="Componentes comuns"
       subtitulo="Galeria de desenvolvimento (F2). Não aparece no build de produção."
     >
-      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
+      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros.opcoes} />
       <Card titulo="Estado dos filtros na URL" subtitulo="Recarregue a página: os filtros ficam.">
         <pre className="overflow-x-auto rounded-md bg-surface-alt p-3 text-legenda">
           {JSON.stringify(filtros, null, 2)}
@@ -148,7 +152,7 @@ export default function ComponentesPage() {
           valor={classe}
           aoMudar={setClasse}
           vazio="Todas"
-          opcoes={(OPCOES_FILTROS_MOCK.classes ?? []).map((c) => ({ valor: c, rotulo: c }))}
+          opcoes={(opcoesFiltros.opcoes.classes ?? []).map((c) => ({ valor: c, rotulo: c }))}
           className="w-60"
         />
       </Secao>
@@ -190,6 +194,16 @@ export default function ComponentesPage() {
           />
         </Card>
       </div>
+
+      <Card
+        titulo="Seletor de itens"
+        subtitulo="Comparação de recortes: de 2 a 4 itens do mesmo nível."
+      >
+        <SeletorDeItens opcoes={opcoesFiltros.opcoes} valor={selecao} aoMudar={setSelecao} />
+        <pre className="mt-3 overflow-x-auto rounded-md bg-surface-alt p-3 text-legenda">
+          {JSON.stringify({ ...selecao, valida: selecaoValida(selecao) }, null, 2)}
+        </pre>
+      </Card>
 
       <Secao titulo="Modal">
         <Button onClick={() => setModal(true)}>Abrir modal</Button>

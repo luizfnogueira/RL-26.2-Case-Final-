@@ -61,3 +61,16 @@ export function mesNoPeriodo(mes: string, periodo: Periodo): boolean {
   const limites = limitesDoPeriodo(periodo)
   return limites !== null && limites.inicio <= mes && mes <= limites.fim
 }
+
+/**
+ * Últimos `quantidade` meses, do mais recente para o mais antigo, em YYYY-MM.
+ * Usado em telas cujo `periodo_atual` é o mês de criação (ordens), não uma janela da Gold.
+ */
+export function mesesRecentes(quantidade: number, referencia: Date = new Date()): string[] {
+  const meses: string[] = []
+  for (let i = 0; i < quantidade; i += 1) {
+    const data = new Date(referencia.getFullYear(), referencia.getMonth() - i, 1)
+    meses.push(`${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`)
+  }
+  return meses
+}

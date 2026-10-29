@@ -2,9 +2,8 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-li
 import type { ReactNode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { OPCOES_FILTROS_MOCK } from '@/data/filtros.mock'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
-import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
+import type { CampoFiltro, FiltrosUrl, OpcoesFiltros } from '@/types/filtros'
 import BarraDeFiltros from './BarraDeFiltros'
 
 afterEach(cleanup)
@@ -19,6 +18,16 @@ const CAMPOS: readonly CampoFiltro[] = [
   'classe',
 ]
 const PADROES: FiltrosUrl = { periodo_atual: ATUAL, periodo_comparacao: COMPARACAO }
+const OPCOES: OpcoesFiltros = {
+  municipios: ['Recife', 'Jaboatão dos Guararapes', 'Olinda'],
+  bairros: {
+    Recife: ['Boa Viagem', 'Boa Vista', 'Casa Amarela'],
+    'Jaboatão dos Guararapes': ['Candeias', 'Piedade'],
+    Olinda: ['Casa Caiada', 'Rio Doce'],
+  },
+  classes: ['Comercial', 'Industrial', 'Residencial'],
+  alimentadores: ['ALM-DEMO-001', 'ALM-DEMO-002', 'ALM-DEMO-003', 'ALM-DEMO-004', 'ALM-DEMO-005'],
+}
 
 const emUrl = (url: string) =>
   function Roteador({ children }: { children: ReactNode }) {
@@ -64,10 +73,13 @@ describe('useFiltrosUrl', () => {
     expect(busca.has('page')).toBe(false)
   })
 
-  it('trocar o município limpa o bairro, mas escolher os dois juntos mantém ambos', () => {
-    const { result } = usarFiltros('/receita?municipio=Recife&bairro=Boa%20Vista')
+  it('trocar o município limpa o bairro e o alimentador, mas escolher os dois juntos mantém ambos', () => {
+    const { result } = usarFiltros(
+      '/receita?municipio=Recife&bairro=Boa%20Vista&alimentador=ALM-REC-001',
+    )
     act(() => result.current.definir({ municipio: 'Olinda' }))
     expect(buscaAtual(result.current.local).has('bairro')).toBe(false)
+    expect(buscaAtual(result.current.local).has('alimentador')).toBe(false)
 
     act(() => result.current.definir({ municipio: 'Recife', bairro: 'Boa Vista' }))
     expect(result.current.filtros).toMatchObject({ municipio: 'Recife', bairro: 'Boa Vista' })
@@ -99,11 +111,15 @@ function Sonda({ aoLer }: { aoLer: (busca: string) => void }) {
 }
 
 describe('BarraDeFiltros', () => {
-  const renderizar = (url: string, campos: readonly CampoFiltro[] = CAMPOS) => {
+  const renderizar = (
+    url: string,
+    campos: readonly CampoFiltro[] = CAMPOS,
+    opcoes = OPCOES,
+  ) => {
     let busca = ''
     const resultado = render(
       <MemoryRouter initialEntries={[url]}>
-        <BarraDeFiltros campos={campos} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
+        <BarraDeFiltros campos={campos} padroes={PADROES} opcoes={opcoes} />
         <Sonda aoLer={(b) => (busca = b)} />
       </MemoryRouter>,
     )
@@ -143,6 +159,23 @@ describe('BarraDeFiltros', () => {
     expect(lista('Bairro').disabled).toBe(false)
     const opcoes = [...lista('Bairro').options].map((o) => o.textContent)
     expect(opcoes).toEqual(['Todos', 'Casa Caiada', 'Rio Doce'])
+  })
+
+  it('alimentador mostra todos sem município e só os do município escolhido', () => {
+    renderizar('/receita', ['municipio', 'alimentador'], {
+      municipios: ['RECIFE', 'OLINDA'],
+      alimentadores: {
+        RECIFE: ['ALM-REC-001', 'ALM-REC-002'],
+        OLINDA: ['ALM-OLI-001'],
+      },
+    })
+
+    const opcoesTodos = [...lista('Alimentador').options].map((o) => o.value)
+    expect(opcoesTodos).toEqual(['', 'ALM-REC-001', 'ALM-REC-002', 'ALM-OLI-001'])
+
+    fireEvent.change(lista('Município'), { target: { value: 'RECIFE' } })
+    const opcoesRecife = [...lista('Alimentador').options].map((o) => o.value)
+    expect(opcoesRecife).toEqual(['', 'ALM-REC-001', 'ALM-REC-002'])
   })
 
   it('não deixa escolher o mesmo período nos dois filtros', () => {

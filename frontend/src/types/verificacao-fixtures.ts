@@ -13,6 +13,7 @@ import concluirInspecao from '@/data/mocks/concluir_inspecao.json'
 import criarInspecao from '@/data/mocks/criar_inspecao.json'
 import dashboard from '@/data/mocks/dashboard.json'
 import erro from '@/data/mocks/erro.json'
+import filtros from '@/data/mocks/filtros.json'
 import iniciarInspecao from '@/data/mocks/iniciar_inspecao.json'
 import inspecoes from '@/data/mocks/inspecoes.json'
 import operacao from '@/data/mocks/operacao.json'
@@ -28,6 +29,7 @@ import unidade from '@/data/mocks/unidade.json'
 import unidades from '@/data/mocks/unidades.json'
 import type { ErroApiCorpo } from './comum'
 import type { Dashboard } from './dashboard'
+import type { OpcoesFiltrosApi } from './filtros'
 import type { PedidoInsight, PerguntaIA, RespostaIA, RespostaInsight } from './ia'
 import type {
   CancelarInspecao,
@@ -53,6 +55,7 @@ type Largo<T> = T extends string
 
 export const fixturesConferidos = {
   dashboard: dashboard satisfies Largo<Dashboard>,
+  filtros: filtros satisfies Largo<OpcoesFiltrosApi>,
   unidades: unidades satisfies Largo<Unidades>,
   unidade: unidade satisfies Largo<Unidade360>,
   candidatos: candidatos satisfies Largo<Candidatos>,
