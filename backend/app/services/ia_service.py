@@ -24,6 +24,8 @@ from app.ai.consulta import descrever_tabela, valores_distintos
 logger = logging.getLogger(__name__)
 
 OBSERVACAO_SEED = "Dados fictícios do seed, com as regras da Gold."
+# Chave interna da ponte (e do cache de respostas) com todas as linhas; sai antes de validar o contrato
+CHAVE_LINHAS_COMPLETAS = "_linhas_completas"
 # A rota desiste no prazo; a thread termina sozinha quando o provedor responde ou estoura o LLM_TIMEOUT_S.
 _THREADS_IA = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ia")
 
@@ -113,14 +115,45 @@ def cache_ligado() -> bool:
     return os.getenv("AI_CACHE_ENABLED", "1").strip() != "0"
 
 
-def acrescentar_grafico(pergunta: str, resposta: dict) -> None:
-    """Gráfico na conversa a partir dos dados da resposta; um erro aqui só tira o gráfico, nunca vira 503."""
+# Avisos do corte de 50 linhas da tabela (agent.py, resposta.py); com gráfico, `dados` vai completo
+_AVISO_50_NO_TEXTO = re.compile(r"\s*\(Mostrando os primeiros 50 de \d+ registros no total\.\)")
+_AVISO_50 = re.compile(r"^Exibindo as primeiras 50 linhas de um total de \d+ registros encontrados\.$")
+
+
+def resultado_completo(resposta: dict, resultados: list) -> list[list[Any]] | None:
+    """Todas as linhas da consulta que virou `dados` (a resposta leva só as 50 primeiras).
+
+    É a última consulta com as mesmas colunas e o mesmo começo; truncada no limite da ferramenta, não serve.
+    """
+    dados = resposta.get("dados") or {}
+    colunas, linhas = dados.get("colunas") or [], dados.get("linhas") or []
+    for resultado in reversed(resultados):
+        if (resultado.colunas == colunas and not resultado.truncado
+                and [list(l) for l in resultado.linhas[:len(linhas)]] == linhas):
+            return [list(l) for l in resultado.linhas] if len(resultado.linhas) > len(linhas) else None
+    return None
+
+
+def acrescentar_grafico(pergunta: str, resposta: dict, linhas_completas: list[list[Any]] | None = None) -> None:
+    """Gráfico na conversa a partir dos dados da resposta; um erro aqui só tira o gráfico, nunca vira 503.
+
+    Com `linhas_completas`, o gráfico usa todas as linhas (12 meses × 14 municípios passam de 50) e
+    `dados` passa a levá-las, para o "Ver como tabela" mostrar o que ficou fora do desenho.
+    """
     try:
-        grafico, nota = grafico_ia.montar_grafico(pergunta, resposta)
+        base = resposta
+        if linhas_completas:
+            base = {**resposta, "dados": {**resposta["dados"], "linhas": linhas_completas}}
+        grafico, nota = grafico_ia.montar_grafico(pergunta, base)
         if grafico is not None:
             GraficoIA.model_validate(grafico)
             resposta["grafico"] = grafico
             resposta["apresentacao"] = "grafico"
+            if linhas_completas:
+                resposta["dados"]["linhas"] = linhas_completas
+                resposta["resposta"] = _AVISO_50_NO_TEXTO.sub("", resposta["resposta"])
+                metadados = resposta["metadados"]
+                metadados["observacoes"] = [o for o in metadados.get("observacoes", []) if not _AVISO_50.match(o)]
         elif nota:
             resposta["metadados"].setdefault("observacoes", []).append(nota)
     except (ValidationError, KeyError, TypeError, ValueError) as erro:
@@ -172,6 +205,13 @@ class AgenteReal:
                 reaproveitada = (cache_respostas.buscar(db, dados.pergunta, gold["gold_atualizada_em"], nomes)
                                  if usa_cache else None)
             para_o_cache = None
+            # Cada consulta do agente, completa: a resposta só leva 50 linhas e o gráfico precisa de todas
+            resultados: list = []
+
+            def executar_e_guardar(sql: str):
+                resultado = executar_sql(sql)
+                resultados.append(resultado)
+                return resultado
             if esclarecer:
                 resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
             elif sem_o_comeco:
@@ -184,20 +224,25 @@ class AgenteReal:
                     historico=historico,
                     resumo_conversa=resumo,
                     conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
-                    executar_sql_fn=executar_sql,
+                    executar_sql_fn=executar_e_guardar,
                     **extras,
                     gold_atualizada_em=gold["gold_atualizada_em"],
                     # Com o executor injetado o agente desliga o cache; aqui vale a chave dele (GENAI-24).
                     usar_cache=cache_ligado(),
                 ), self.prazo_s or prazo_ia_s())
-                # Cópia antes dos ajustes da ponte (proveniência, gráfico), que são refeitos a cada uso
+                # Cópia antes dos ajustes da ponte (proveniência, gráfico), que são refeitos a cada uso;
+                # as linhas completas vão junto, para o gráfico reaproveitado também ter todas
+                completas = resultado_completo(resposta, resultados)
                 para_o_cache = copy.deepcopy(resposta) if usa_cache else None
+                if para_o_cache is not None and completas:
+                    para_o_cache[CHAVE_LINHAS_COMPLETAS] = completas
+                resposta[CHAVE_LINHAS_COMPLETAS] = completas
             # O agente não sabe se a Gold é o seed: a proveniência vem da carga, como no resto da API.
             metadados = resposta["metadados"]
             metadados["dados_ficticios"] = gold["dados_ficticios"]
             if gold["dados_ficticios"]:
                 metadados["observacoes"] = [*gold["observacoes"], *metadados.get("observacoes", [])]
-            acrescentar_grafico(dados.pergunta, resposta)
+            acrescentar_grafico(dados.pergunta, resposta, resposta.pop(CHAVE_LINHAS_COMPLETAS, None))
             RespostaIA.model_validate(resposta)
         except AgenteIndisponivelException:
             raise

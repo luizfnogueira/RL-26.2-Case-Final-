@@ -99,6 +99,20 @@ describe('tabela, notas e segurança', () => {
     expect(within(figura).getByRole('button', { name: 'Ver gráfico' })).toBeTruthy()
   })
 
+  it('"Ver como tabela" mostra a resposta inteira, inclusive a coluna que ficou fora do gráfico', () => {
+    // Caso real: receita (R$) e consumo (kWh) por município; o consumo não cabe no eixo em R$
+    const r = resposta(exemploBarras)
+    r.dados = {
+      colunas: [...r.dados.colunas, 'consumo_kwh'],
+      linhas: r.dados.linhas.map((linha, i) => [...linha, 1000 * (i + 1)]),
+    }
+    const figura = desenhar(r)
+    fireEvent.click(within(figura).getByRole('button', { name: 'Ver como tabela' }))
+    const tabela = within(figura).getByRole('table')
+    expect(within(tabela).getByText('Consumo (kWh)')).toBeTruthy()
+    expect(within(tabela).getByText('1.000 kWh')).toBeTruthy()
+  })
+
   it('mostra a nota e quantos itens ficaram de fora', () => {
     const figura = desenhar(resposta(exemploBarras), {
       nota: 'Pizza mostra partes de um todo; para médias e percentuais, o gráfico é de barras.',

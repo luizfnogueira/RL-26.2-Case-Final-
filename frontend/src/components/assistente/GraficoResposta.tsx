@@ -6,9 +6,9 @@ import Pizza from '@/components/graficos/Pizza'
 import type { DadosIA, GraficoIA } from '@/types/ia'
 import { baixarCsv } from './csv'
 import { formatosDoGrafico } from './formatosGrafico'
+import TabelaResposta from './TabelaResposta'
 
 const NOME_DO_TIPO = { barras: 'barras', pizza: 'pizza', linhas: 'linhas' }
-const NOME_DO_EIXO = { categoria: 'Categoria', tempo: 'Mês', periodo: 'Período' }
 
 /**
  * Gráfico da resposta (contrato, seção 9), quando a API devolve `apresentacao: "grafico"`. O
@@ -35,35 +35,8 @@ export default function GraficoResposta({ grafico, dados }: { grafico: GraficoIA
       </div>
 
       {comoTabela ? (
-        <table className="w-full border-collapse text-corpo">
-          <caption className="sr-only">{descricao}</caption>
-          <thead className="bg-azul-100 text-left">
-            <tr>
-              <th scope="col" className="px-3 py-2 font-medium">
-                {NOME_DO_EIXO[grafico.eixo]}
-              </th>
-              {grafico.series.map((serie) => (
-                <th key={serie.nome} scope="col" className="px-3 py-2 text-right font-medium">
-                  {formatos.serie(serie.nome)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {grafico.categorias.map((categoria, i) => (
-              <tr key={categoria} className="border-b border-borda-leve last:border-b-0">
-                <th scope="row" className="px-3 py-2 text-left font-normal">
-                  {formatos.categoria(categoria)}
-                </th>
-                {grafico.series.map((serie) => (
-                  <td key={serie.nome} className="px-3 py-2 text-right tabular-nums">
-                    {serie.valores[i] === null ? '—' : formatos.valorCompleto(serie.valores[i] as number)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        // A tabela da resposta inteira: todas as colunas e linhas, inclusive o que ficou fora do desenho
+        <TabelaResposta dados={dados} embutida />
       ) : (
         <Grafico grafico={grafico} formatos={formatos} descricao={descricao} />
       )}
@@ -73,7 +46,7 @@ export default function GraficoResposta({ grafico, dados }: { grafico: GraficoIA
           {grafico.nota}
           {grafico.nota && grafico.omitidos > 0 && ' '}
           {grafico.omitidos > 0 &&
-            `Mais ${grafico.omitidos} ${grafico.omitidos === 1 ? 'item ficou' : 'itens ficaram'} de fora do gráfico; a tabela completa está em “Como cheguei nisso” e no CSV.`}
+            `Mais ${grafico.omitidos} ${grafico.omitidos === 1 ? 'item ficou' : 'itens ficaram'} de fora do gráfico; estão em “Ver como tabela” e no CSV.`}
         </p>
       )}
       <button

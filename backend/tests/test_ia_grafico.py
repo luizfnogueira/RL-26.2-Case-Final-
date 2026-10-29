@@ -176,6 +176,59 @@ def test_ponte_acrescenta_o_grafico_na_resposta_do_agente(monkeypatch):
     RespostaIA.model_validate(corpo)
 
 
+# ---------- todas as linhas da consulta (a resposta leva só 50) ----------
+
+MESES_P2 = [f"{a}-{m:02d}" for a, m in [(2025, m) for m in range(7, 13)] + [(2026, m) for m in range(1, 7)]]
+CIDADES = ["RECIFE", "JABOATAO DOS GUARARAPES", "OLINDA", "PAULISTA"] + [f"CIDADE {i:02d}" for i in range(10)]
+
+
+def test_ponte_monta_o_grafico_com_todas_as_linhas_e_manda_a_tabela_completa(monkeypatch):
+    # Caso real: 14 municípios × 12 meses = 168 linhas; com as 50 primeiras, o gráfico parava em out/2025
+    from app.ai.contratos import ResultadoConsulta
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, c: [])
+    monkeypatch.setattr(ia_service.interacao_repository, "registrar", lambda *a: None)
+    monkeypatch.setattr("app.repositories.gold_metadata.GOLD_SOURCE", "seed")
+    colunas = ["mes_referencia", "municipio", "receita_total_brl"]
+    linhas = [[mes, cidade, 1000.0 * (14 - i)] for mes in MESES_P2 for i, cidade in enumerate(CIDADES)]
+
+    def executar(sql):
+        return ResultadoConsulta(colunas=colunas, linhas=linhas, n_linhas=len(linhas))
+
+    def responder(pergunta, executar_sql_fn, **k):
+        executar_sql_fn("SELECT ... (outra consulta)")
+        resultado = executar_sql_fn("SELECT ...")
+        r = resposta(colunas, resultado.linhas[:50])
+        r["resposta"] = "Evolução mensal. (Mostrando os primeiros 50 de 168 registros no total.)"
+        r["metadados"]["observacoes"] = ["Exibindo as primeiras 50 linhas de um total de 168 registros encontrados."]
+        return r
+
+    agente = AgenteReal(responder=responder, executar_sql=executar, sessao=nullcontext)
+    corpo = agente.perguntar(ia_service.PerguntaIA(pergunta="Receita mensal por município em P2 em gráfico de linhas"))
+    RespostaIA.model_validate(corpo)
+    assert corpo["grafico"]["tipo"] == "linhas" and len(corpo["grafico"]["categorias"]) == 12
+    assert len(corpo["dados"]["linhas"]) == 168
+    assert corpo["resposta"] == "Evolução mensal."
+    assert not any("primeiras 50" in o for o in corpo["metadados"]["observacoes"])
+
+
+def test_resultado_completo_so_vale_para_a_consulta_da_resposta_e_sem_corte():
+    from app.ai.contratos import ResultadoConsulta
+    r = resposta(["municipio", "consumo_kwh"], [["RECIFE", 1.0]])
+    outra = ResultadoConsulta(colunas=["municipio", "receita_brl"], linhas=[["RECIFE", 1.0], ["OLINDA", 2.0]])
+    certa = ResultadoConsulta(colunas=["municipio", "consumo_kwh"], linhas=[["RECIFE", 1.0], ["OLINDA", 2.0]])
+    cortada = certa.model_copy(update={"truncado": True})
+    assert ia_service.resultado_completo(r, [certa, outra]) == [["RECIFE", 1.0], ["OLINDA", 2.0]]
+    assert ia_service.resultado_completo(r, [cortada]) is None
+    assert ia_service.resultado_completo(r, [outra]) is None
+
+
+def test_sem_grafico_a_tabela_continua_com_50_linhas():
+    linhas = [[f"CIDADE {i:03d}", float(i)] for i in range(60)]
+    r = resposta(["municipio", "consumo_kwh"], linhas[:50])
+    ia_service.acrescentar_grafico("Consumo por município", r, linhas)
+    assert "grafico" not in r and len(r["dados"]["linhas"]) == 50
+
+
 def test_erro_ao_montar_o_grafico_so_tira_o_grafico(monkeypatch):
     monkeypatch.setattr(grafico_ia, "montar_grafico", lambda p, r: ({"tipo": "radar"}, None))
     r = resposta(["municipio", "consumo_kwh"], MUNICIPIOS)

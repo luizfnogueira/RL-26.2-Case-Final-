@@ -289,7 +289,7 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | Campo | Tipo | Para quê |
 | --- | --- | --- |
 | `conversa_id` | UUID | Memória da conversa (ver acima). |
-| `apresentacao` | `"texto"`, `"tabela"` ou `"grafico"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. Com `grafico`, a Tela 7 desenha o campo `grafico` (abaixo). |
+| `apresentacao` | `"texto"`, `"tabela"` ou `"grafico"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. Com `grafico`, a Tela 7 desenha o campo `grafico` (abaixo) e `dados` leva todas as linhas da consulta (até 500). |
 | `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
 | `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
 | `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
@@ -317,7 +317,7 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 
 `opcoes` tem de 2 a 11 itens. Cada `pergunta` já vem completa: o front a envia como uma pergunta nova, na mesma conversa, e ela não pede esclarecimento de novo. A troca `esclarecer` vai para o log em `ia.interacao`, mas não entra na memória da conversa. [Exemplo completo (bairro)](../backend/app/services/fixtures/resposta_ia_esclarecer.json), [exemplo do ano](../backend/app/services/fixtures/resposta_ia_esclarecer_ano.json).
 
-**Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
+**Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Com gráfico, `dados` leva todas as linhas da consulta (até 500, o limite da ferramenta), não só as 50 da tabela: o gráfico é montado com todas, e o "Ver como tabela" da Tela 7 mostra `dados` inteiro, com as colunas e linhas que ficaram fora do desenho. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
 
 | Situação | Gráfico |
 | --- | --- |
@@ -340,7 +340,7 @@ Campos de `grafico`:
 | `categorias` | 1 a 48 textos | Eixo das barras e das linhas, ou as fatias |
 | `series` | 1 a 4 itens `{nome, valores[]}` | Um valor (número ou `null`) por categoria, na mesma ordem. Pizza: 1 série, sem negativos nem `null` |
 | `origem` | `automatico`, `pedido` | Se veio da forma dos dados ou de um pedido da pessoa |
-| `omitidos` | inteiro ≥ 0 | Categorias ou séries fora do limite; a tabela completa segue em `dados` e no CSV |
+| `omitidos` | inteiro ≥ 0 | Categorias ou séries fora do limite; a tabela completa segue em `dados` ("Ver como tabela") e no CSV |
 | `nota` | texto ou `null` | Por que o tipo pedido não foi usado (ex.: pizza de média) |
 
 Exemplos completos (valores fictícios): [barras P1 × P2](../backend/app/services/fixtures/resposta_ia_grafico_barras.json), [pizza](../backend/app/services/fixtures/resposta_ia_grafico_pizza.json), [linhas](../backend/app/services/fixtures/resposta_ia_grafico_linhas.json). Um gráfico que não passe nessas regras é descartado e a resposta sai como tabela ou texto, nunca 503.

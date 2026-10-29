@@ -44,8 +44,9 @@ type Linha = { i: number; valores: CelulaIA[] }
 /**
  * Resposta em tabela no corpo da conversa (GENAI-15), quando a API devolve `apresentacao: "tabela"`.
  * Ordena todas as linhas e pagina de 10 em 10 aqui mesmo; a minitabela do "Como cheguei nisso" continua.
+ * `embutida`: dentro do cartão do gráfico ("Ver como tabela"), sem moldura nem CSV próprios.
  */
-export default function TabelaResposta({ dados }: { dados: DadosIA }) {
+export default function TabelaResposta({ dados, embutida = false }: { dados: DadosIA; embutida?: boolean }) {
   const [ordenacao, setOrdenacao] = useState<Ordenacao | null>(null)
   const [pagina, setPagina] = useState(1)
 
@@ -80,7 +81,11 @@ export default function TabelaResposta({ dados }: { dados: DadosIA }) {
   const visiveis = ordenadas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-md border border-borda bg-surface-card p-2">
+    <div
+      className={
+        embutida ? 'flex flex-col gap-2' : 'mt-3 flex flex-col gap-2 rounded-md border border-borda bg-surface-card p-2'
+      }
+    >
       <Tabela
         colunas={colunas}
         linhas={visiveis}
@@ -97,14 +102,16 @@ export default function TabelaResposta({ dados }: { dados: DadosIA }) {
             : undefined
         }
       />
-      <button
-        type="button"
-        onClick={() => baixarCsv(dados)}
-        className="inline-flex w-fit items-center gap-1.5 self-end text-legenda text-teal-escuro hover:underline"
-      >
-        <Download size={13} aria-hidden="true" />
-        Exportar CSV
-      </button>
+      {!embutida && (
+        <button
+          type="button"
+          onClick={() => baixarCsv(dados)}
+          className="inline-flex w-fit items-center gap-1.5 self-end text-legenda text-teal-escuro hover:underline"
+        >
+          <Download size={13} aria-hidden="true" />
+          Exportar CSV
+        </button>
+      )}
     </div>
   )
 }
