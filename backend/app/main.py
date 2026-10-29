@@ -14,8 +14,8 @@ app = FastAPI(
     description=(
         "API do case V-Energy — contrato V2 (docs/api-contract.md). As ordens de inspeção "
         "(GET/POST/PATCH /inspecoes) persistem no schema portal; a fila de candidatos lê a Gold/seed "
-        "e as ordens ativas do portal. Dashboard, filtros, unidades (Visão 360) e números do insight "
-        "de receita usam a fonte selecionada por GOLD_SOURCE; operação ainda tem respostas simuladas."
+        "e as ordens ativas do portal. Dashboard, filtros, unidades (Visão 360), operação e números "
+        "do insight de receita usam a fonte selecionada por GOLD_SOURCE."
     ),
 )
 register_error_handlers(app)

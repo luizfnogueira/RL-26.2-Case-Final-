@@ -79,7 +79,9 @@ export function useFiltrosUrl(
             'municipio' in parcial && (parcial.municipio ?? '') !== (atual.get('municipio') ?? '')
           if (trocouMunicipio && !('bairro' in parcial)) proximo.delete('bairro')
           if (trocouMunicipio && !('alimentador' in parcial)) proximo.delete('alimentador')
-          if (!proximo.get('municipio')) {
+          // Alimentador também pode ser consultado sozinho. Só apagar os dependentes
+          // quando o usuário remover explicitamente o município.
+          if ('municipio' in parcial && !proximo.get('municipio')) {
             proximo.delete('bairro')
             proximo.delete('alimentador')
           }

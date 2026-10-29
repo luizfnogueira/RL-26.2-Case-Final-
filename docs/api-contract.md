@@ -1,6 +1,6 @@
 # Contrato da API — V-Energy — V2 (proposta para revisão; alinhada à Gold em 23/10)
 
-Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) persistem no PostgreSQL. Dashboard, filtros, fila de candidatos, unidades (Visão 360) e números do insight de receita usam a fonte selecionada por `GOLD_SOURCE`: `seed` para desenvolvimento ou `real` para a Gold importada (no `seed`, unidades devolvem o exemplo fictício do contrato). Operação ainda usa respostas simuladas. A geração de texto da IA é configurada separadamente por `IA_MODO`.
+Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) persistem no PostgreSQL. Dashboard, filtros, fila de candidatos, unidades (Visão 360), Operação e números do insight de receita usam a fonte selecionada por `GOLD_SOURCE`: `seed` para desenvolvimento ou `real` para a Gold importada (no `seed`, unidades devolvem o exemplo fictício do contrato). A geração de texto da IA é configurada separadamente por `IA_MODO`.
 
 **A Gold é a fonte de verdade.** Quando este contrato e a Gold divergem, quem se adapta é a API: o contrato e o código mudam, os dados não. As adaptações estão na seção 16; tabelas, colunas e regras da Gold estão no *Contrato de dados Gold → API* (v2).
 
@@ -31,11 +31,13 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /filtros | sem parâmetros |
 | POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
 
-Os parâmetros sem indicação de obrigatoriedade são opcionais. Classe não está disponível no mock operacional e retorna erro explícito se enviada. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
+Os parâmetros sem indicação de obrigatoriedade são opcionais. O filtro `classe` não é suportado por `GET /operacao`, pois a continuidade é agregada por alimentador, e retorna **422 `DADOS_INVALIDOS`** se enviado. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
 
 ### Limites dos stubs
 
 Os cenários analíticos estão preparados para as duas janelas anuais acima. Outros intervalos sintaticamente válidos — inclusive um mês isolado (`YYYY-MM`) — retornam **422 `CENARIO_STUB_INDISPONIVEL`**, em vez de devolver números de outro período. Isso é limite do stub, não do formato: `YYYY-MM` continua válido no contrato (por exemplo, no filtro `periodo_atual` de GET /inspecoes, que não depende de cenário) e a integração real deverá atender os intervalos, mensais ou não, disponíveis na Gold.
+
+Esses limites de cenário não se aplicam a `GET /operacao`: a API consulta o PostgreSQL nos modos `seed` e `real`, aceita qualquer período válido e retorna apenas os meses disponíveis na fonte. Um recorte sem dados retorna 200 com séries e rankings vazios.
 
 Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeção, que são lidas do schema `portal`. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH das demais rotas usam snapshot: alterações não persistem entre chamadas. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
 
@@ -265,6 +267,7 @@ GET /operacao?periodo_atual=2025-07/2026-06&ordenar_por=dec&page=1&page_size=20
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/operacao.json)**
 
+- O JSON vinculado é um exemplo fictício; a API lê o PostgreSQL conforme `GOLD_SOURCE`. Em `real`, a série vem de `gold.agg_dec_fec_mensal` e os bairros vêm de `gold.dim_uc`. Em `seed`, os índices sem dias críticos são `null`, com aviso nos metadados; não são convertidos em zero.
 - DEC e FEC seguem a `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais, sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva; o denominador são as UCs atendidas pelo alimentador no mês. No período, DEC/FEC são a soma dos meses.
 - `dec_sem_dia_critico` / `fec_sem_dia_critico`: os mesmos indicadores sem os dias críticos (`flag_dia_critico`, como o expurgo do PRODIST; na base, julho de 2025).
 - `horas_interrupcao`: o CHI (consumidor-hora interrompido), total de horas sem energia somadas nas UCs. Mostra onde mais gente sofreu, já que o DEC favorece alimentadores pequenos.

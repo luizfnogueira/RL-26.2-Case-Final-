@@ -1,4 +1,5 @@
 from typing import Literal
+from pydantic import model_validator
 
 from app.schemas.common import FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema
 
@@ -11,6 +12,12 @@ class FiltrosOperacao(FiltrosRegiao, Paginacao):
     periodo_atual: Periodo
     ordenar_por: OrdenarPor = 'dec'
     nivel_regional: NivelRegional = 'municipio'
+
+    @model_validator(mode='after')
+    def rejeitar_classe(self):
+        if self.classe is not None:
+            raise ValueError('Operação é agregada por alimentador; filtro classe indisponível.')
+        return self
 
 
 class PontoOperacao(Schema):
