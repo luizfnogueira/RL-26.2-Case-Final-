@@ -69,11 +69,14 @@ function BarrasHorizontais({ grafico, formatos, descricao }: Props) {
   const alturaBarra = n === 1 ? 18 : 12
   const alturaGrupo = n * alturaBarra + (n - 1) * 2
   const passo = alturaGrupo + 12
-  const larguraRotulo = Math.min(150, Math.round(largura * 0.36))
-  const espacoValor = 84
-  const altura = grafico.categorias.length * passo + 8
   const [minimo, maximo] = dominioComZero(grafico.series.flatMap((s) => s.valores))
-  const inicio = larguraRotulo + 8
+  const larguraRotulo = Math.min(150, Math.round(largura * (minimo < 0 ? 0.26 : 0.36)))
+  // O valor fica fora da ponta da barra: à direita dos positivos e, com negativo (efeito volume), num
+  // espaço próprio à esquerda, para não cair em cima do nome da categoria
+  const espacoValor = maximo > 0 ? 84 : 8
+  const espacoNegativo = minimo < 0 ? 84 : 0
+  const altura = grafico.categorias.length * passo + 8
+  const inicio = larguraRotulo + 8 + espacoNegativo
   const larguraPlot = Math.max(40, largura - inicio - espacoValor)
   const x = (valor: number) => inicio + ((valor - minimo) / (maximo - minimo)) * larguraPlot
   const caracteres = Math.max(8, Math.floor(larguraRotulo / 6.6))
@@ -164,13 +167,20 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
   const n = grafico.series.length
   const quantidade = grafico.categorias.length
   const faixaEstimada = (largura - 16) / Math.max(1, quantidade)
+  // Largura do maior valor escrito ("R$ 157,1 mi"): cada barra do grupo precisa desse espaço
+  const larguraTexto =
+    Math.max(0, ...grafico.series.flatMap((s) => s.valores.map((v) => (v === null ? 0 : formatos.valor(v).length)))) *
+      6.6 +
+    8
   // Valor escrito na barra quando cabe; se não couber, o eixo com linhas de grade volta
-  const comRotulos = faixaEstimada / n >= 40
+  const comRotulos = (faixaEstimada * 0.9) / n >= Math.max(40, larguraTexto)
   const margem = { esq: comRotulos ? 8 : 56, dir: 8, topo: 24, base: 40 }
   const larguraPlot = largura - margem.esq - margem.dir
   const alturaPlot = ALTURA_VERTICAL - margem.topo - margem.base
   const faixa = larguraPlot / Math.max(1, quantidade)
   const larguraBarra = Math.min(LARGURA_MAX_BARRA, (faixa * 0.7) / n)
+  // Distância entre as barras de um grupo: com rótulo, a do texto, para um valor não cobrir o vizinho
+  const passoBarra = comRotulos ? Math.max(larguraBarra, Math.min(larguraTexto, (faixa * 0.9) / n)) : larguraBarra
   const [minimo, maximoBruto] = dominioComZero(grafico.series.flatMap((s) => s.valores))
   const maximo = comRotulos ? maximoBruto : tetoDoEixo(maximoBruto)
   const y = (valor: number) => margem.topo + alturaPlot * (1 - (valor - minimo) / (maximo - minimo))
@@ -223,7 +233,7 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
             {grafico.series.map((serie, k) => {
               const valor = serie.valores[i]
               if (valor === null) return null
-              const esquerda = centro(i) - (n * larguraBarra) / 2 + k * larguraBarra
+              const esquerda = centro(i) - (n * passoBarra) / 2 + k * passoBarra + (passoBarra - larguraBarra) / 2
               const topo = Math.min(y(0), y(valor))
               return (
                 <g key={serie.nome}>

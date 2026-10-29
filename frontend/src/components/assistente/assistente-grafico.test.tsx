@@ -43,6 +43,37 @@ describe('barras', () => {
     expect(within(figura).getAllByText('P1').length).toBeGreaterThan(0) // legenda
   })
 
+  it('valor negativo fica à esquerda da barra sem cobrir o nome da categoria', () => {
+    // Caso real: efeito preço (+) e efeito volume (−); "−R$ 5,0 mi" caía em cima de "Efeito Volume"
+    const figura = desenhar(resposta(exemploBarras), {
+      categorias: ['Efeito Preço', 'Efeito Volume'],
+      series: [{ nome: 'Valor', valores: [14425857.02, -4993655.75] }],
+      eixo: 'categoria',
+    })
+    const textos = [...figura.querySelectorAll('text')]
+    const nome = textos.find((t) => t.textContent === 'Efeito Volume') as SVGTextElement
+    const valor = textos.find((t) => t.textContent?.includes('5,0 mi')) as SVGTextElement
+    const larguraDoValor = (valor.textContent ?? '').length * 6.6
+    expect(Number(valor.getAttribute('x')) - larguraDoValor).toBeGreaterThan(Number(nome.getAttribute('x')))
+  })
+
+  it('barras agrupadas afastam as barras para os valores não se encostarem', () => {
+    // Caso real: receita total e receita de energia em P1 e P2; "R$ 117,8 mi" cobria a barra vizinha
+    const figura = desenhar(resposta(exemploBarras), {
+      orientacao: 'vertical',
+      eixo: 'periodo',
+      categorias: ['P1', 'P2'],
+      series: [
+        { nome: 'Receita total', valores: [157107191.43, 169683458.59] },
+        { nome: 'Receita energia', valores: [117830394.38, 127300000] },
+      ],
+    })
+    const valores = [...figura.querySelectorAll('text')].filter((t) => t.textContent?.startsWith('R$'))
+    const [total, energia] = valores.slice(0, 2).map((t) => Number(t.getAttribute('x')))
+    const larguraDoTexto = (valores[0].textContent ?? '').length * 6.6
+    expect(energia - total).toBeGreaterThanOrEqual(larguraDoTexto)
+  })
+
   it('não arredonda os cantos e sai do zero', () => {
     const figura = desenhar(resposta(exemploBarras))
     const retangulos = [...figura.querySelectorAll('rect[class*="fill-"]')]
