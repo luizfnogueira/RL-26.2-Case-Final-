@@ -1,8 +1,10 @@
 """Ponte do POST /ia com o agente de IA: escolhe o agente pelo IA_MODO e confere a resposta antes do front."""
 import logging
 import os
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as PrazoEsgotado
+from datetime import datetime, timezone
 from typing import Any, Callable, Protocol
 
 from pydantic import ValidationError
@@ -73,6 +75,31 @@ def _executor_sql() -> Callable:
     return executar
 
 
+# "O primeiro município que eu perguntei?": com mais de 3 trocas, o agente não vê o começo da conversa
+_COMECO = re.compile(r"\b(?:primeir[oa]s?|in[ií]cio|come[cç]o)\b", re.IGNORECASE)
+_FALA_DA_PESSOA = re.compile(
+    r"\b(?:perguntei|consultei|pedi|falei|citei|mencionei)\b|\bprimeira\s+pergunta\b", re.IGNORECASE)
+
+
+def pede_o_comeco_da_conversa(pergunta: str) -> bool:
+    return bool(_COMECO.search(pergunta) and _FALA_DA_PESSOA.search(pergunta))
+
+
+def resposta_sem_o_comeco_da_conversa(historico: list[dict], gold_atualizada_em: Any) -> dict:
+    """Resposta `nao_sei` sem chamar o modelo, que chutaria a troca mais antiga que vê (GENAI-13)."""
+    mais_antiga = historico[0]["pergunta_interpretada"] if historico else None
+    texto = (f"Eu só lembro das últimas {interacao_repository.MAX_TROCAS} perguntas respondidas desta conversa, "
+             "e o começo dela já saiu da minha memória.")
+    if mais_antiga:
+        texto += f" A mais antiga de que lembro é: “{mais_antiga}”."
+    texto += " Se quiser consultar de novo, é só repetir o município, a classe ou o período."
+    return {
+        "resposta": texto, "sql": None, "tabelas": [], "dados": {"colunas": [], "linhas": []},
+        "status": "nao_sei", "gerado_em": datetime.now(timezone.utc).isoformat(), "apresentacao": "texto",
+        "metadados": {"dados_ficticios": False, "gold_atualizada_em": gold_atualizada_em, "observacoes": []},
+    }
+
+
 class AgenteReal:
     """IA_MODO=real: o agente do Théo (`app.ai.agent.responder`) roda dentro do backend, sem HTTP (GENAI-2).
 
@@ -101,16 +128,21 @@ class AgenteReal:
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
-            resposta = executar_com_prazo(lambda: responder(
-                dados.pergunta,
-                historico=historico,
-                conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
-                executar_sql_fn=executar_sql,
-                **extras,
-                gold_atualizada_em=gold["gold_atualizada_em"],
-                # Com o executor injetado o agente desliga o cache; aqui vale a chave dele (GENAI-24).
-                usar_cache=os.getenv("AI_CACHE_ENABLED", "1").strip() != "0",
-            ), self.prazo_s or prazo_ia_s())
+                sem_o_comeco = (pede_o_comeco_da_conversa(dados.pergunta)
+                                and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico))
+            if sem_o_comeco:
+                resposta = resposta_sem_o_comeco_da_conversa(historico, gold["gold_atualizada_em"])
+            else:
+                resposta = executar_com_prazo(lambda: responder(
+                    dados.pergunta,
+                    historico=historico,
+                    conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
+                    executar_sql_fn=executar_sql,
+                    **extras,
+                    gold_atualizada_em=gold["gold_atualizada_em"],
+                    # Com o executor injetado o agente desliga o cache; aqui vale a chave dele (GENAI-24).
+                    usar_cache=os.getenv("AI_CACHE_ENABLED", "1").strip() != "0",
+                ), self.prazo_s or prazo_ia_s())
             # O agente não sabe se a Gold é o seed: a proveniência vem da carga, como no resto da API.
             metadados = resposta["metadados"]
             metadados["dados_ficticios"] = gold["dados_ficticios"]

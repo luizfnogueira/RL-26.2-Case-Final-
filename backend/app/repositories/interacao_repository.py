@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.ia import Interacao
@@ -84,6 +84,15 @@ def carregar_historico(db: Session, conversa_id: uuid.UUID) -> list[dict]:
         "sql_executado": t.sql_executado,
         "filtros": t.filtros or {},
     } for t in reversed(trocas)]
+
+
+def contar_trocas(db: Session, conversa_id: uuid.UUID) -> int:
+    """Trocas `ok` da conversa nas últimas 2 h; acima de MAX_TROCAS, o começo dela já saiu da memória do agente."""
+    desde = datetime.now(timezone.utc) - JANELA_CONVERSA
+    return db.scalar(
+        select(func.count()).select_from(Interacao)
+        .where(Interacao.conversa_id == conversa_id, Interacao.status == "ok", Interacao.criado_em >= desde)
+    ) or 0
 
 
 def apagar_antigas(db: Session) -> int:

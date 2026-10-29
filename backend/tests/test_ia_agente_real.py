@@ -39,6 +39,12 @@ def sem_cache(monkeypatch):
     monkeypatch.setenv("AI_CACHE_ENABLED", "0")
 
 
+@pytest.fixture(autouse=True)
+def metadados_do_seed(monkeypatch):
+    # Os testes simulam o banco com sessao=nullcontext; com GOLD_SOURCE=real no .env, a leitura do _carga_metadata quebraria.
+    monkeypatch.setattr("app.repositories.gold_metadata.GOLD_SOURCE", "seed")
+
+
 @pytest.fixture
 def memoria(monkeypatch):
     """Memória em lista, para os testes que não usam o PostgreSQL."""
@@ -180,6 +186,36 @@ def test_ferramenta_que_devolve_dicionario_e_adaptada(monkeypatch):
     resultado = ia_service._executor_sql()("SELECT 1")
     assert isinstance(resultado, ResultadoConsulta) and resultado.linhas == [[1]]
     assert resultado.sql_executado == "SELECT 1"
+
+
+# ---------- memória cheia: o começo da conversa já saiu (GENAI-13) ----------
+
+HISTORICO_CHEIO = [{"pergunta_interpretada": p, "resposta_resumo": "", "sql_executado": None, "filtros": {}}
+                   for p in ("Receita comercial de Olinda em P2", "Receita residencial de Olinda em P2", "Olinda P1 x P2")]
+
+
+@pytest.mark.parametrize("pergunta", ["E o primeiro município que eu perguntei?",
+                                      "Qual foi a primeira pergunta?", "O que eu perguntei no início?"])
+def test_pergunta_sobre_o_comeco_com_a_memoria_cheia_nao_chama_o_modelo(memoria, monkeypatch, pergunta):
+    # Caso real: depois de Recife, Olinda, residencial e P1, o modelo respondia "Olinda" (Recife já tinha saído)
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, conversa: HISTORICO_CHEIO)
+    monkeypatch.setattr(ia_service.interacao_repository, "contar_trocas", lambda db, conversa: 4)
+    agente = AgenteReal(responder=falhar(AssertionError("não deveria chamar o modelo")),
+                        executar_sql=executar_sql, sessao=nullcontext)
+    corpo = agente.perguntar(ia_service.PerguntaIA(pergunta=pergunta, conversa_id=uuid.uuid4()))
+    RespostaIA.model_validate(corpo)
+    assert corpo["status"] == "nao_sei"
+    assert "últimas 3 perguntas" in corpo["resposta"] and "Receita comercial de Olinda em P2" in corpo["resposta"]
+    assert memoria[0][2]["status"] == "nao_sei"   # também vai para o log
+
+
+def test_com_a_conversa_inteira_na_memoria_quem_responde_e_o_modelo(memoria, monkeypatch):
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, conversa: HISTORICO_CHEIO)
+    monkeypatch.setattr(ia_service.interacao_repository, "contar_trocas", lambda db, conversa: 3)
+    corpo = AgenteReal(responder=lambda *a, **k: exemplo("resposta_ia"), executar_sql=executar_sql,
+                       sessao=nullcontext).perguntar(
+        ia_service.PerguntaIA(pergunta="E o primeiro município que eu perguntei?", conversa_id=uuid.uuid4()))
+    assert corpo["status"] == "ok"
 
 
 # ---------- memória no PostgreSQL ----------

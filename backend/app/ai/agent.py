@@ -90,6 +90,8 @@ REGRAS_CRITICAS_TOPO = """
    - Se a pergunta contiver uma premissa contrária aos dados (ex.: "Quanto a receita comercial cresceu em Jaboatão?", quando na verdade caiu 2,09% de P1 para P2), corrija a premissa de forma explícita no texto informando que houve queda/redução.
 5. CONTINUAÇÃO DE CONVERSA / FOLLOW-UP (GENAI-13):
    - Quando houver histórico na conversa (ex.: usuário pergunta "E só comercial?", "E em Olinda?", "E no ano anterior?"), herde da troca anterior os filtros não repetidos (métrica, município, bairro, classe ou período), registre essa herança em `premissas` e escreva a `pergunta_interpretada` completa e autossuficiente.
+   - Você só recebe as últimas 3 trocas respondidas da conversa (das últimas 2 horas); perguntas mais antigas, recusadas ou sem resposta não chegam até você. A troca mais antiga que você vê NÃO é necessariamente a primeira da conversa.
+   - Se a pessoa perguntar por algo de antes dessas trocas (ex.: "a primeira pergunta que eu fiz", "o primeiro município que perguntei", "o que perguntei no início"), não presuma: responda com `status="nao_sei"`, diga que você só lembra das últimas 3 perguntas, cite a mais antiga que você vê e peça para a pessoa repetir o que quer consultar.
 6. ALIASES SQL E TABELAS (GENAI-14):
    - Use aliases legíveis e com unidade nas colunas do SQL (ex.: `receita_energia_brl`, `consumo_valido_kwh`, `dec_horas_uc`, `variacao_pct`).
    - Quando o resultado for um ranking ou lista (várias linhas), mencione no texto o período, a unidade e o destaque do 1º lugar.
