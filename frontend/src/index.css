@@ -56,6 +56,17 @@
   --color-sucesso-texto: #4f7a12;
   --color-sucesso-suave: #effbc8;
 
+  /*
+   * Gráficos: par de séries "atual × anterior" (ex.: consumo do mês × mesmo mês do ano anterior).
+   * Teal-profundo e teal da marca, um pouco mais saturados, validados com o validador de paleta da
+   * diretriz de visualização (fundo #ffffff): luminosidade e saturação na faixa, separação ΔE 19,3 em
+   * daltonismo (deuteranopia/protanopia/tritanopia) e 19,1 em visão normal (mínimos 8 e 15), contraste
+   * ≥ 3:1. Os tons originais (#1b607a e #4696ad) reprovam no piso de saturação. Um tema escuro
+   * precisa de passos próprios, revalidados contra a superfície escura.
+   */
+  --color-grafico-atual: #005e90;
+  --color-grafico-anterior: #3a9cc0;
+
   /* Raios */
   --radius-xs: 4px;
   --radius-sm: 6px;

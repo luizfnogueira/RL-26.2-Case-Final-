@@ -1,13 +1,22 @@
-import { CalendarCheck, Headset, ZapOff } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarCheck, ChartColumn, Headset, Table2, ZapOff } from 'lucide-react'
+import BarrasComparadas from '@/components/graficos/BarrasComparadas'
 import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
 import Tabela, { type Coluna } from '@/components/ui/Tabela'
 import type { Periodo } from '@/types/comum'
 import type { Chamado, ConsumoMes, Fatura, Interrupcao } from '@/types/unidades'
 import { formatarData, formatarDataHora, formatarDuracao } from '@/utils/datas'
-import { formatarIndicador, formatarNome, formatarReaisCompleto } from '@/utils/formatacao'
+import {
+  formatarEnergia,
+  formatarIndicador,
+  formatarNome,
+  formatarReaisCompleto,
+} from '@/utils/formatacao'
 import { formatarMes, limitesDoPeriodo } from '@/utils/periodos'
+import { pontosDoConsumo } from './consumo'
 
 const uma = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
@@ -34,20 +43,47 @@ const COLUNAS_CONSUMO: readonly Coluna<ConsumoMes>[] = [
   { id: 'leitura', cabecalho: 'Leitura', celula: (m) => <SeloLeitura tipo={m.tipo_leitura} /> },
 ]
 
-/** Bloco 2: os 12 meses lado a lado com o ano anterior (tabela até o gráfico entrar). */
+/** Bloco 2: os 12 meses lado a lado com o ano anterior, em gráfico ou tabela. */
 export function BlocoConsumo({ consumo }: { consumo: readonly ConsumoMes[] }) {
+  const [comoTabela, setComoTabela] = useState(false)
   return (
     <Card
       titulo="Consumo dos últimos 12 meses"
       subtitulo="Cada mês ao lado do mesmo mês do ano anterior"
       aria-label="Consumo dos últimos 12 meses"
+      acoes={
+        <Button
+          variante="fantasma"
+          tamanho="sm"
+          aria-pressed={comoTabela}
+          onClick={() => setComoTabela(!comoTabela)}
+          icone={comoTabela ? <ChartColumn size={16} /> : <Table2 size={16} />}
+        >
+          {comoTabela ? 'Ver gráfico' : 'Ver como tabela'}
+        </Button>
+      }
     >
-      <Tabela
-        legenda="Consumo mensal comparado ao mesmo mês do ano anterior"
-        colunas={COLUNAS_CONSUMO}
-        linhas={consumo}
-        chaveLinha={(m) => m.mes}
-      />
+      {comoTabela ? (
+        <Tabela
+          legenda="Consumo mensal comparado ao mesmo mês do ano anterior"
+          colunas={COLUNAS_CONSUMO}
+          linhas={consumo}
+          chaveLinha={(m) => m.mes}
+        />
+      ) : (
+        <BarrasComparadas
+          pontos={pontosDoConsumo(consumo)}
+          nomeAtual="Consumo do mês"
+          nomeAnterior="Mesmo mês do ano anterior"
+          formatarValor={formatarEnergia}
+          descricao="Consumo de cada um dos 12 meses ao lado do mesmo mês do ano anterior, em kWh"
+          legendaAviso={
+            consumo.some((m) => m.tipo_leitura === 'ESTIMADA')
+              ? '“estimada”: leitura estimada no mês'
+              : undefined
+          }
+        />
+      )}
     </Card>
   )
 }

@@ -3,10 +3,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import unidadeFixture from '@/data/mocks/unidade.json'
 import UnidadePage from '@/pages/UnidadePage'
-import type { DiagnosticoConta, Fatura, Medidor } from '@/types/unidades'
+import type { DiagnosticoConta, Fatura, Medidor, Unidade360 } from '@/types/unidades'
 import BlocoDiagnostico from './BlocoDiagnostico'
 import { BlocoMedidor } from './BlocosCadastrais'
 import { BlocoFaturas } from './BlocosHistorico'
+import { caminhoBarra } from '@/components/graficos/geometria'
+import { pontosDoConsumo } from './consumo'
 import { rotuloModalidadeGd } from './rotulos'
 
 afterEach(cleanup)
@@ -225,6 +227,9 @@ describe('consumo, faturas, interrupções e chamados', () => {
     abrir('/unidades/UC-DEMO-001')
     await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
 
+    fireEvent.click(
+      regiao('Consumo dos últimos 12 meses').getByRole('button', { name: 'Ver como tabela' }),
+    )
     const consumo = linhas('Consumo dos últimos 12 meses')
     expect(consumo).toHaveLength(12)
     expect(within(consumo[0]).getByText('Jul/2025')).toBeTruthy()
@@ -255,6 +260,9 @@ describe('consumo, faturas, interrupções e chamados', () => {
     abrir('/unidades/UC-DEMO-007')
     await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
 
+    fireEvent.click(
+      regiao('Consumo dos últimos 12 meses').getByRole('button', { name: 'Ver como tabela' }),
+    )
     const consumo = linhas('Consumo dos últimos 12 meses')
     expect(consumo).toHaveLength(12) // eixo fixo, mês sem dado não some
     expect(consumo.slice(0, 6).every((l) => within(l).queryByText('Sem dado'))).toBe(true)
@@ -282,5 +290,66 @@ describe('faturas em aberto antes do período', () => {
       within(screen.getByText('Nov/2024').closest('tr')!).getByText('Antes do período'),
     ).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Nenhuma fatura paga no período' })).toBeTruthy()
+  })
+})
+
+describe('gráfico de consumo de 12 meses', () => {
+  const regiaoConsumo = () =>
+    within(screen.getByRole('region', { name: 'Consumo dos últimos 12 meses' }))
+  const barras = (serie: 'atual' | 'anterior') =>
+    document.querySelectorAll(`[data-serie="${serie}"]`).length
+
+  it('UC completa: 12 meses com as duas barras, legenda, aviso de estimada e um só rótulo de valor', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    const c = regiaoConsumo()
+    expect(document.querySelectorAll('[data-ponto]')).toHaveLength(12)
+    expect([barras('atual'), barras('anterior')]).toEqual([12, 12])
+    expect(c.getByText('Consumo do mês')).toBeTruthy()
+    expect(c.getByText('Mesmo mês do ano anterior')).toBeTruthy()
+    expect(c.getAllByText('estimada')).toHaveLength(1) // só jun/2026
+    expect(c.getByText('“estimada”: leitura estimada no mês')).toBeTruthy()
+    expect(c.getByText('412 kWh')).toBeTruthy() // rótulo só no último mês
+    expect(
+      c.getByRole('img', {
+        name: 'Jun/2026; Consumo do mês: 412 kWh; Mesmo mês do ano anterior: 298 kWh; estimada',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('UC recente: meses sem dado viram lacuna, nunca barra zero', async () => {
+    abrir('/unidades/UC-DEMO-007')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
+    expect(regiaoConsumo().getAllByText('sem dado')).toHaveLength(6)
+    expect([barras('atual'), barras('anterior')]).toEqual([6, 0]) // sem ano anterior
+    expect(
+      regiaoConsumo().getByRole('img', {
+        name: 'Jul/2025; Consumo do mês: sem dado; Mesmo mês do ano anterior: sem dado',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('alterna entre gráfico e tabela', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    fireEvent.click(regiaoConsumo().getByRole('button', { name: 'Ver como tabela' }))
+    expect(regiaoConsumo().getByRole('table')).toBeTruthy()
+    expect(document.querySelectorAll('[data-ponto]')).toHaveLength(0)
+    fireEvent.click(regiaoConsumo().getByRole('button', { name: 'Ver gráfico' }))
+    expect(document.querySelectorAll('[data-ponto]')).toHaveLength(12)
+  })
+
+  it('o ano aparece no primeiro mês e em janeiro', () => {
+    const pontos = pontosDoConsumo((unidadeFixture as Unidade360).consumo)
+    expect(pontos.map((p) => p.rotuloSecundario).filter(Boolean)).toEqual(['2025', '2026'])
+    expect(pontos[0]).toMatchObject({ rotulo: 'Jul', rotuloCompleto: 'Jul/2025', aviso: null })
+    expect(pontos[11].aviso).toBe('estimada')
+  })
+})
+
+describe('geometria da barra', () => {
+  it('topo arredondado em até 4 px e base reta na linha do zero', () => {
+    expect(caminhoBarra(10, 20, 12, 100)).toBe('M10,120 V24 Q10,20 14,20 H18 Q22,20 22,24 V120 Z')
+    expect(caminhoBarra(0, 0, 12, 2)).toBe('M0,2 V2 Q0,0 2,0 H10 Q12,0 12,2 V2 Z') // barra baixa
   })
 })

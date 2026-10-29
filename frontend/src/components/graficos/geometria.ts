@@ -64,3 +64,18 @@ export function quebrarRotulo(rotulo: string, max = 14): string[] {
   if (atual) linhas.push(atual)
   return linhas
 }
+
+/** Barra com o topo arredondado (raio de até 4 px) e a base reta, presa à linha do zero. */
+export function caminhoBarra(x: number, y: number, largura: number, altura: number): string {
+  const r = Math.min(4, altura, largura / 2)
+  const base = y + altura
+  return [
+    `M${x},${base}`,
+    `V${y + r}`,
+    `Q${x},${y} ${x + r},${y}`,
+    `H${x + largura - r}`,
+    `Q${x + largura},${y} ${x + largura},${y + r}`,
+    `V${base}`,
+    'Z',
+  ].join(' ')
+}
