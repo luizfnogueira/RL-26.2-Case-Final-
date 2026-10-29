@@ -36,6 +36,29 @@ def test_soma_ponderacao_ou_pedido_de_media_mensal_passam(sql, pergunta):
     validar_regra_dec_fec_no_sql(sql, pergunta)
 
 
+@pytest.mark.parametrize("sql", [
+    # Caso real da Tela 7: DEC por município em P2 somava os 48 alimentadores de Recife (182,95 h; o certo é 3,74 h)
+    "SELECT municipio, SUM(dec) AS dec_total_horas_uc FROM agg_dec_fec_mensal WHERE periodo = 'P2' "
+    "GROUP BY municipio ORDER BY dec_total_horas_uc DESC",
+    "SELECT SUM(a.fec) AS fec_p2 FROM agg_dec_fec_mensal a WHERE municipio = 'RECIFE' AND periodo = 'P2'",
+])
+def test_soma_simples_de_alimentadores_diferentes_e_barrada(sql):
+    with pytest.raises(ErroConsulta, match="cada linha é um alimentador"):
+        validar_regra_dec_fec_no_sql(sql, "DEC por município em P2")
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT alimentador, SUM(dec) AS dec_horas_uc FROM agg_dec_fec_mensal WHERE periodo = 'P2' GROUP BY alimentador",
+    "SELECT alimentador, SUM(dec) FROM agg_dec_fec_mensal GROUP BY 1 ORDER BY 2 DESC LIMIT 5",
+    "SELECT SUM(dec) FROM agg_dec_fec_mensal WHERE alimentador = 'ALM-REC-001' AND periodo = 'P2'",
+    "SELECT municipio, SUM(dec_mes) FROM (SELECT municipio, mes_referencia, SUM(dec * ucs_atendidas) / "
+    "SUM(ucs_atendidas) AS dec_mes FROM agg_dec_fec_mensal GROUP BY 1, 2) m GROUP BY municipio",
+    SQL_SOMA,
+])
+def test_soma_por_alimentador_ou_ponderada_passa(sql):
+    validar_regra_dec_fec_no_sql(sql, "DEC por município em P2")
+
+
 def test_agente_troca_a_media_pela_soma_antes_de_consultar_o_banco() -> None:
     sqls_no_banco: list[str] = []
 

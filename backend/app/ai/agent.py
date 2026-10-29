@@ -221,14 +221,34 @@ def validar_regra_consumo_negativo_no_sql(sql: str, consumo_negativo_solicitado:
 PEDIDO_MEDIA_MENSAL = re.compile(r"por\s+m[eê]s|mensal|m[eê]s\s+a\s+m[eê]s|cada\s+m[eê]s", re.IGNORECASE)
 
 
+_SOMA_SIMPLES_DEC_FEC = re.compile(r"\bsum\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?\s*\)")
+# Uma linha por alimentador: agrupar ou filtrar por alimentador mantém a soma dos meses de um alimentador só
+_POR_ALIMENTADOR = re.compile(
+    r"\bgroup\s+by\b[^;]*\balimentador\b|\balimentador\s*(?:=|\bin\b)|^\s*select\s+(?:\w+\.)?alimentador\b")
+
+
 def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
-    """DEC/FEC de um período é a soma dos meses (contrato de dados, seção 4); a média só com pedido explícito."""
-    usa_media = re.search(r"\bavg\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?\s*\)", (sql or "").lower())
+    """DEC/FEC de um período é a soma dos meses (contrato de dados, seção 4); a média só com pedido explícito.
+
+    Em `agg_dec_fec_mensal` (uma linha por alimentador), o DEC de um município é ponderado pelas UCs: o
+    `SUM(dec)` por município somava os 48 alimentadores de Recife (182,95 h em P2; o certo é 3,74 h).
+    """
+    sql_lower = (sql or "").lower()
+    usa_media = re.search(r"\bavg\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?\s*\)", sql_lower)
     if usa_media and not PEDIDO_MEDIA_MENSAL.search(pergunta or ""):
         raise ErroConsulta(
             "Regra de negócio violada: o DEC/FEC de um período é a SOMA dos meses (`SUM(dec)`), nunca `AVG(dec)`. "
             "O DEC mensal já é uma média por UC. Para um grupo de alimentadores, pondere pelas UCs em cada mês "
             "(`SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)`) e depois some os meses."
+        )
+    if ("agg_dec_fec_mensal" in sql_lower and _SOMA_SIMPLES_DEC_FEC.search(sql_lower)
+            and "ucs_atendidas" not in sql_lower and not _POR_ALIMENTADOR.search(sql_lower)):
+        raise ErroConsulta(
+            "Regra de negócio violada: em `agg_dec_fec_mensal` cada linha é um alimentador, e `SUM(dec)` por "
+            "município, bairro ou sem agrupar soma o DEC de alimentadores diferentes. Pondere pelas UCs em cada "
+            "mês e depois some os meses: `SELECT municipio, SUM(dec_mes) FROM (SELECT municipio, mes_referencia, "
+            "SUM(dec * ucs_atendidas) / SUM(ucs_atendidas) AS dec_mes FROM agg_dec_fec_mensal WHERE ... GROUP BY "
+            "municipio, mes_referencia) m GROUP BY municipio`."
         )
 
 
