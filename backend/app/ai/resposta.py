@@ -25,8 +25,12 @@ from app.ai.contratos import (
     ResultadoConsulta,
 )
 
-REGEX_MARCADOR_NO_TEXTO = re.compile(r"\{(v\d+|[a-zA-Z_][a-zA-Z0-9_]*)\}")
-REGEX_NUMERO_SOLTO = re.compile(r"(?<![a-zA-Z0-9_{])[-−]?\d+(?:[.,]\d+)?(?![a-zA-Z0-9_}])")
+# Aceita também o formato do Python que o modelo às vezes escreve ({v1:,.2f}); a formatação é sempre a pt-BR
+REGEX_MARCADOR_NO_TEXTO = re.compile(r"\{(v\d+|[a-zA-Z_][a-zA-Z0-9_]*)(?::[^{}]*)?\}")
+# "1.234.567,89" é um número só; sem o milhar, "9.88" e "12,5" também
+REGEX_NUMERO_SOLTO = re.compile(
+    r"(?<![a-zA-Z0-9_{.,])[-−]?(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)(?![a-zA-Z0-9_}])"
+)
 
 # Números estruturais/contextuais permitidos fora de marcadores (anos da base, P1/P2, limites regulatórios citados)
 NUMEROS_CONTEXTUAIS_PERMITIDOS = {
@@ -79,16 +83,17 @@ def substituir_marcadores_pt_br(texto: str, marcadores: dict[str, str | int | fl
     if not texto or not marcadores:
         return texto
 
-    texto_final = texto
-    for chave, valor in marcadores.items():
-        chave_limpa = str(chave).strip("{}")
-        placeholder = "{" + chave_limpa + "}"
+    valores = {str(chave).strip("{}"): valor for chave, valor in marcadores.items()}
+
+    def preencher(marcador: re.Match) -> str:
+        if marcador.group(1) not in valores:
+            return marcador.group(0)
+        valor = valores[marcador.group(1)]
         if isinstance(valor, (int, float, Decimal)) and not isinstance(valor, bool):
-            valor_str = formatar_numero_pt_br(valor)
-        else:
-            valor_str = str(valor)
-        texto_final = texto_final.replace(placeholder, valor_str)
-    return texto_final
+            return formatar_numero_pt_br(valor)
+        return str(valor)
+
+    return REGEX_MARCADOR_NO_TEXTO.sub(preencher, texto)
 
 
 def extrair_numeros_do_resultado(resultado: ResultadoConsulta | None) -> list[float]:
@@ -160,6 +165,32 @@ def _numero_bate_com_dados(valor: float, numeros_banco: list[float], tolerancia_
         if math.isclose(abs(valor), abs(ref), rel_tol=tolerancia_rel, abs_tol=0.05):
             return True
     return False
+
+
+# Valor numérico com unidade opcional, como o modelo às vezes escreve num marcador: "9,88 horas", "R$ 1.200,50", "12,5%"
+REGEX_VALOR_COM_UNIDADE = re.compile(r"^\s*(?:R\$\s*)?([-−]?\d[\d.,]*)\s*(?:%|[a-zA-ZÀ-ÿ/²]+(?:\s+[a-zA-ZÀ-ÿ/²]+)*)?\s*$")
+# Códigos de UC e alimentador (UC-0010, ALM-ABR-001) e rótulos como P1, B3, A4: não são números da resposta
+REGEX_CODIGO = re.compile(r"\b(?:UC|ALM|P|B|A)(?:[-_][A-Z]+)*[-_]?\d+(?:[-_]\d+)?\b", re.IGNORECASE)
+
+
+def _leituras_do_numero(token: str) -> list[float]:
+    """Leituras possíveis de um número escrito: "1.234,56" é pt-BR; "9.88" é decimal; "1.234" pode ser os dois."""
+    t = token.replace("−", "-").rstrip(".,")
+    if "." in t and "," in t:
+        candidatos = [t.replace(".", "").replace(",", ".")]
+    elif "," in t:
+        candidatos = [t.replace(",", ".")]
+    elif re.fullmatch(r"-?\d{1,3}(?:\.\d{3})+", t):
+        candidatos = [t.replace(".", ""), t]
+    else:
+        candidatos = [t]
+    leituras = []
+    for candidato in candidatos:
+        try:
+            leituras.append(float(candidato))
+        except ValueError:
+            pass
+    return leituras
 
 
 def _extrair_numeros_da_pergunta(pergunta: str) -> set[float]:
@@ -234,6 +265,7 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
     numeros_pergunta |= _extrair_numeros_da_pergunta(deps.ultimo_sql or "")
 
     # 3. Conferência dos valores dentro de `saida.marcadores` contra os dados retornados
+    marcadores_normalizados = dict(saida.marcadores or {})
     for m_key, m_val in (saida.marcadores or {}).items():
         if isinstance(m_val, (int, float, Decimal)) and not isinstance(m_val, bool):
             val_float = float(m_val)
@@ -243,41 +275,40 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
                     f"(valores disponíveis: {numeros_banco[:10]}). Nunca invente números."
                 )
         elif isinstance(m_val, str):
-            limpo = m_val.strip().replace("R$", "").replace("%", "").strip()
-            try:
-                val_float = float(limpo.replace(".", "").replace(",", "."))
-                if not _numero_bate_com_dados(val_float, numeros_banco):
+            valor_com_unidade = REGEX_VALOR_COM_UNIDADE.match(m_val)
+            if valor_com_unidade:
+                leituras = [v for v in _leituras_do_numero(valor_com_unidade.group(1))
+                            if _numero_bate_com_dados(v, numeros_banco)]
+                if not leituras:
                     raise ViolacaoFidelidadeSaida(
-                        f"O valor numérico `{m_val}` do marcador `{m_key}` não consta no resultado da consulta."
+                        f"O valor numérico `{m_val}` do marcador `{m_key}` não consta no resultado da consulta. "
+                        "Preencha os marcadores numéricos com o número da célula, sem unidade (ex.: 9.88)."
                     )
-            except ValueError:
-                if m_val.strip().upper() not in textos_banco and textos_banco:
-                    raise ViolacaoFidelidadeSaida(
-                        f"O texto `{m_val}` do marcador `{m_key}` não consta no resultado da consulta."
-                    )
+                # Número puro em texto ("9.88") vira número para sair formatado em pt-BR ("9,88")
+                if re.fullmatch(r"\s*[-−]?\d[\d.,]*\s*", m_val):
+                    marcadores_normalizados[m_key] = leituras[0]
+            elif m_val.strip().upper() not in textos_banco and textos_banco:
+                raise ViolacaoFidelidadeSaida(
+                    f"O texto `{m_val}` do marcador `{m_key}` não consta no resultado da consulta."
+                )
 
     # 4. Conferência de números soltos fora dos marcadores no texto
-    texto_sem_marcadores = REGEX_MARCADOR_NO_TEXTO.sub(" ", saida.texto or "")
-    # Remove códigos identificadores como UC-0010, ALM-REC-001, P1, P2, B1, B2, B3, A4
-    texto_limpo = re.sub(r"\b(?:UC|ALM|P|B|A)[-_]?\d+(?:[-_]\d+)?\b", " ", texto_sem_marcadores, flags=re.IGNORECASE)
+    texto_limpo = REGEX_MARCADOR_NO_TEXTO.sub(" ", saida.texto or "")
+    # Textos que vieram do banco (ALM-ABR-007, nomes de bairro com número) não são números inventados
+    for valor_texto in sorted(textos_banco, key=len, reverse=True):
+        if any(c.isdigit() for c in valor_texto):
+            texto_limpo = re.sub(re.escape(valor_texto), " ", texto_limpo, flags=re.IGNORECASE)
+    texto_limpo = REGEX_CODIGO.sub(" ", texto_limpo)
     # Remove datas ISO YYYY-MM
     texto_limpo = re.sub(r"\b202[2-6]-(?:0[1-9]|1[0-2])\b", " ", texto_limpo)
 
     for token_num in REGEX_NUMERO_SOLTO.findall(texto_limpo):
-        token_norm = token_num.replace("−", "-")
-        # Se tem ponto de milhar e vírgula decimal (ex.: 1.234,56)
-        if "." in token_norm and "," in token_norm:
-            token_norm = token_norm.replace(".", "").replace(",", ".")
-        elif "," in token_norm:
-            token_norm = token_norm.replace(",", ".")
-        try:
-            num_solto = float(token_norm)
-        except ValueError:
+        leituras = _leituras_do_numero(token_num)
+        if not leituras:
             continue
-
-        if abs(num_solto) in NUMEROS_CONTEXTUAIS_PERMITIDOS or abs(num_solto) in numeros_pergunta:
+        if any(abs(v) in NUMEROS_CONTEXTUAIS_PERMITIDOS or abs(v) in numeros_pergunta for v in leituras):
             continue
-        if not _numero_bate_com_dados(num_solto, numeros_banco):
+        if not any(_numero_bate_com_dados(v, numeros_banco) for v in leituras):
             raise ViolacaoFidelidadeSaida(
                 f"Número `{token_num}` escrito fora dos marcadores não foi encontrado no resultado da consulta. "
                 "Coloque todos os números vindos do banco em `marcadores` ({v1}, {v2}) e use apenas valores reais."
@@ -318,6 +349,8 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
                             "Corrija explicitamente a premissa falsa no texto informando que houve queda/redução."
                         )
 
+    if marcadores_normalizados != saida.marcadores:
+        return saida.model_copy(update={"marcadores": marcadores_normalizados})
     return saida
 
 
