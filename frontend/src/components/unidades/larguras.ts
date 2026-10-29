@@ -34,6 +34,3 @@ export const TABELA_PROPORCIONAL = '[&_table]:table-fixed [&_table]:min-w-[52rem
  * à direita: o valor não encosta no texto seguinte. Classe literal para o Tailwind encontrá-la.
  */
 export const RECUO_QUARTA_COLUNA = '[&_th:nth-child(4)]:pl-8 [&_td:nth-child(4)]:pl-8'
-
-/** Recuo da bandeira nas faturas (4ª coluna, depois do valor), um pouco maior que o do consumo. */
-export const RECUO_BANDEIRA = '[&_th:nth-child(4)]:pl-9 [&_td:nth-child(4)]:pl-9'

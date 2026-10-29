@@ -442,8 +442,14 @@ describe('tabelas na largura do cartão com colunas proporcionais', () => {
         .getAllByRole('columnheader')
         .map((th) => th.textContent)
       expect(cabecalhos.slice(2)).toEqual(['Valor total', 'Bandeira'])
-      expect(conteinerComClasse(tabela, '[&_td:nth-child(4)]:pl-9')).toBeTruthy() // recuo da bandeira
-      expect(conteinerComClasse(tabela, '[&_th:nth-child(4)]:pl-9')).toBeTruthy()
+      // Bandeira centralizada (cabeçalho e selos), sem recuo na 4ª coluna.
+      expect(within(tabela).getByRole('columnheader', { name: 'Bandeira' }).className).toContain(
+        'text-center',
+      )
+      for (const linha of within(tabela).getAllByRole('row').slice(1)) {
+        expect(within(linha).getAllByRole('cell')[3].className).toContain('text-center')
+      }
+      expect(conteinerComClasse(tabela, '[&_td:nth-child(4)]:pl-8')).toBeNull()
     }
     expect(larguras(abertas)).toEqual(['26%', '20%', '16%', '38%'])
     expect(larguras(pagas)).toEqual(larguras(abertas)) // colunas alinhadas uma embaixo da outra
@@ -493,13 +499,13 @@ describe('tabelas na largura do cartão com colunas proporcionais', () => {
       expect(tabela.className).toContain('w-full') // barra do cabeçalho de ponta a ponta
       expect(conteinerComClasse(tabela, '[&_table]:table-fixed')).toBeTruthy()
     }
-    // Recuo só onde um número alinhado à direita vem antes de texto: consumo (8) e faturas (9).
-    const recuo = (t: HTMLElement) =>
-      conteinerComClasse(t, '[&_td:nth-child(4)]:pl-8')
-        ? 'pl-8'
-        : conteinerComClasse(t, '[&_td:nth-child(4)]:pl-9')
-          ? 'pl-9'
-          : null
-    expect(tabelas.map(recuo)).toEqual(['pl-8', 'pl-9', 'pl-9', null, null])
+    // Recuo só no consumo (leitura depois de número à direita); nas faturas a bandeira é centralizada.
+    expect(tabelas.map((t) => Boolean(conteinerComClasse(t, '[&_td:nth-child(4)]:pl-8')))).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ])
   })
 })
