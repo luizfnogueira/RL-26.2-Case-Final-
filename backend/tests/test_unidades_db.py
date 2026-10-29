@@ -70,7 +70,8 @@ with TestClient(app) as client:
     [interrupcao] = uc['interrupcoes_recentes']
     assert interrupcao['data_abertura'] == '2026-06-14T19:20:00-03:00'          # relógio mantido
     assert interrupcao['duracao_min'] == 30                                       # efetiva, como no DEC
-    assert uc['total_interrupcoes']['valor'] == 1
+    assert uc['total_interrupcoes']['valor'] == 1 and type(uc['total_interrupcoes']['valor']) is int
+    assert type(interrupcao['duracao_min']) is int                                # contagens: inteiro
     assert uc['chamados'][0]['nota_satisfacao'] == 12.3
 
     r = client.get('/unidades/UC-NAO-EXISTE')

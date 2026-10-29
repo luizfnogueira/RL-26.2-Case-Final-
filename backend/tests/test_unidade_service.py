@@ -155,6 +155,15 @@ def test_monta_os_blocos_no_formato_do_contrato():
     assert r['metadados'] == METADADOS
 
 
+def test_contagens_saem_como_inteiro_no_json():
+    # Contagem é inteiro no contrato: "valor": 3, nunca 3.0 (medidas seguem decimais).
+    corpo = Unidade360.model_validate(detalhar()).model_dump(mode='json')
+    assert type(corpo['total_interrupcoes']['valor']) is int and corpo['total_interrupcoes']['valor'] == 3
+    assert type(corpo['interrupcoes_recentes'][0]['duracao_min']) is int
+    assert type(corpo['diagnostico_conta']['meses_media']) is int
+    assert type(corpo['consumo'][-1]['atual']['valor']) is float          # kWh continua decimal
+
+
 def test_horarios_de_negocio_mantem_o_relogio_e_ganham_rotulo_local():
     r = detalhar()
     interrupcao, chamado = r['interrupcoes_recentes'][0], r['chamados'][0]

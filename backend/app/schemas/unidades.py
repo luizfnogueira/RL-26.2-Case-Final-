@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, Field, StringConstraints, model_validator
 
 from app.schemas.common import (
-    FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema, duracao,
+    FiltrosRegiao, Indicador, IndicadorContagem, Mes, Metadados, Pagina, Paginacao, Periodo, Schema, duracao,
 )
 
 # Domínio de tipo_leitura na Silver/Gold (silver_medicao)
@@ -115,7 +115,7 @@ class Interrupcao(Schema):
     causa: str
     data_abertura: AwareDatetime
     data_encerramento: AwareDatetime
-    duracao_min: float
+    duracao_min: int                           # minutos inteiros (duracao_efetiva_min da Gold)
 
 
 class Chamado(Schema):
@@ -139,6 +139,6 @@ class Unidade360(Schema):
     medidor: Medidor | None
     geracao_distribuida: GeracaoDistribuida | None   # bloco inteiro null para UC sem GD
     interrupcoes_recentes: list[Interrupcao]   # até 10, as mais recentes da janela
-    total_interrupcoes: Indicador              # todas as da janela, sem oscilação e sem anteriores à ligação
+    total_interrupcoes: IndicadorContagem      # todas as da janela, sem oscilação e sem anteriores à ligação
     chamados: list[Chamado]
     metadados: Metadados

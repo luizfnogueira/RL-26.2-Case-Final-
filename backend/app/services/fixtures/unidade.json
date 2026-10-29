@@ -274,7 +274,7 @@
       "causa": "NAO INFORMADA",
       "data_abertura": "2026-06-14T19:20:00-03:00",
       "data_encerramento": "2026-06-14T21:05:00-03:00",
-      "duracao_min": 105.0
+      "duracao_min": 105
     },
     {
       "id_ocorrencia": "OC-DEMO-001",
@@ -283,7 +283,7 @@
       "causa": "DESCARGA ATMOSFERICA",
       "data_abertura": "2026-05-03T15:40:00-03:00",
       "data_encerramento": "2026-05-03T16:25:00-03:00",
-      "duracao_min": 45.0
+      "duracao_min": 45
     }
   ],
   "total_interrupcoes": {

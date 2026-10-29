@@ -186,7 +186,7 @@ def _gd(ficha: FichaUC, periodo: str) -> dict | None:
 def _interrupcao(i: InterrupcaoUC) -> dict:
     return {'id_ocorrencia': i.id_ocorrencia, 'alimentador': i.alimentador, 'tipo': i.tipo, 'causa': i.causa,
             'data_abertura': hora_local(i.data_abertura), 'data_encerramento': hora_local(i.data_encerramento),
-            'duracao_min': _numero(i.duracao_min)}
+            'duracao_min': int(i.duracao_min)}
 
 
 def _chamado(c: ChamadoUC) -> dict:
@@ -244,7 +244,9 @@ class UnidadeService:
             'medidor': _medidor(ficha, repo.ultima_leitura(id_uc)),
             'geracao_distribuida': _gd(ficha, periodo),
             'interrupcoes_recentes': [_interrupcao(i) for i in interrupcoes],
-            'total_interrupcoes': _indicador(total_interrupcoes, 'interrupcoes', periodo),
+            # Contagem: inteiro, sem o round(float()) das medidas.
+            'total_interrupcoes': {'valor': total_interrupcoes, 'unidade': 'interrupcoes',
+                                   'periodo_referencia': periodo},
             'chamados': [_chamado(ch) for ch in repo.chamados(id_uc)],
             'metadados': repo.metadados(),
         }
