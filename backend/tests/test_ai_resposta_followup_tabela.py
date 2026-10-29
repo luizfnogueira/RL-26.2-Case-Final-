@@ -292,7 +292,10 @@ def test_historico_followup_como_mensagens_do_pydantic_ai(
 def test_apresentacao_tabela_e_limite_de_50_linhas() -> None:
     """GENAI-14: Rankings/listas retornam apresentacao='tabela', truncam em 50 linhas e informam total real."""
     linhas_simuladas = [[f"BAIRRO-{i:03d}", float(1000 - i)] for i in range(65)]
-    sql_ranking = "SELECT bairro, SUM(consumo_kwh) AS consumo_kwh FROM agg_receita_mensal GROUP BY bairro"
+    sql_ranking = (
+        "SELECT bairro, SUM(consumo_kwh) AS consumo_kwh FROM agg_receita_mensal "
+        "WHERE mes_referencia BETWEEN '2025-07' AND '2026-06' GROUP BY bairro"
+    )
 
     def executar_sql_ranking(sql: str) -> ResultadoConsulta:
         return ResultadoConsulta(

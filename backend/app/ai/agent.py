@@ -100,6 +100,9 @@ REGRAS_CRITICAS_TOPO = """
    - "DEC médio de P2" é o DEC de P2: responda com a soma dos meses e explique que o DEC já é uma média por UC. Só use a média mensal se a pergunta pedir "por mês", "mensal" ou "média mensal".
    - Sistema inteiro: some os meses de `agg_kpis_mensal`. Por alimentador: some os meses de `agg_dec_fec_mensal` agrupando por `alimentador`.
    - Nunca some o DEC de alimentadores diferentes no mesmo mês: o DEC de um grupo de alimentadores (ex.: um município) é `SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)` em cada mês, e depois a soma dos meses.
+9. P1 E P2 SÃO PERÍODOS FIXOS:
+   - P1 = 2022-07 a 2023-06 e P2 = 2025-07 a 2026-06, sempre esses meses ("P1" não é "o ano anterior ao P2").
+   - Nas tabelas com coluna `periodo` (`dim_mes`, `agg_kpis_mensal`, `agg_dec_fec_mensal`), filtre `periodo = 'P1'`; nas outras, use `mes_referencia BETWEEN '2022-07' AND '2023-06'` (P1) ou `BETWEEN '2025-07' AND '2026-06'` (P2).
 """.strip()
 
 REGRAS_CRITICAS_RODAPE = """
@@ -218,6 +221,23 @@ def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
         )
 
 
+MESES_DOS_PERIODOS = {"p1": ("2022-07", "2023-06"), "p2": ("2025-07", "2026-06")}
+
+
+def validar_regra_periodo_no_sql(sql: str, pergunta: str) -> None:
+    """P1/P2 citado na pergunta tem de aparecer no SQL como `periodo = 'P1'` ou pelos meses exatos do período."""
+    sql_lower = (sql or "").lower()
+    if "agg_preco_volume" in sql_lower:  # já vem com colunas por período (receita_energia_p1, kwh_p2)
+        return
+    for periodo in sorted(set(re.findall(r"\bp[12]\b", (pergunta or "").lower()))):
+        inicio, fim = MESES_DOS_PERIODOS[periodo]
+        if f"'{periodo}'" not in sql_lower and not (inicio in sql_lower and fim in sql_lower):
+            raise ErroConsulta(
+                f"Regra de negócio violada: {periodo.upper()} é de {inicio} a {fim}. Filtre "
+                f"`periodo = '{periodo.upper()}'` ou `mes_referencia BETWEEN '{inicio}' AND '{fim}'`."
+            )
+
+
 def descrever_tabela_padrao(tabela: str) -> str:
     """Retorna as colunas e chaves da tabela a partir do contrato oficial da Gold."""
     nome_limpo = tabela.strip().lower().removeprefix("gold.").removeprefix("agente.")
@@ -308,6 +328,7 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
         try:
             validar_regra_consumo_negativo_no_sql(sql, ctx.deps.consumo_negativo_solicitado)
             validar_regra_dec_fec_no_sql(sql, ctx.deps.pergunta_original)
+            validar_regra_periodo_no_sql(sql, ctx.deps.pergunta_original)
             if ctx.deps.executar_sql_fn is None:
                 raise ErroConsulta("Função de consulta ao banco não configurada.")
             resultado = ctx.deps.executar_sql_fn(sql)
