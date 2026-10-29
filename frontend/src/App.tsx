@@ -10,6 +10,17 @@ import ReceitaPage from '@/pages/ReceitaPage'
 import UnidadePage from '@/pages/UnidadePage'
 
 const router = createBrowserRouter([
+  ...(import.meta.env.DEV
+    ? [
+        { path: 'dev/auth', element: <Navigate to="/dev/auth/login" replace /> },
+        {
+          path: 'dev/auth/:etapa',
+          lazy: async () => ({
+            Component: (await import('@/pages/dev/auth/PrototipoAuthPage')).default,
+          }),
+        },
+      ]
+    : []),
   {
     element: <AppLayout />,
     children: [
