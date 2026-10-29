@@ -322,7 +322,7 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | Situação | Gráfico |
 | --- | --- |
 | Comparação P1 × P2 (colunas `..._p1`/`..._p2` ou coluna `periodo`), sem pedido | Barras: verticais com P1 e P2; horizontais com P1 e P2 lado a lado quando há uma categoria. Ordem natural (P1 → P2), categorias do maior para o menor pelo P2 |
-| Série no tempo (`mes_referencia`, `ano`, `mes`, `data_*`), sem pedido | Linhas com 3 meses ou mais, até 48 pontos e 4 linhas; 2 pontos viram barras verticais. Mês sem dado é `null` (buraco na linha) |
+| Série no tempo (`mes_referencia`, `ano`, `mes`, `data_*`), sem pedido | Linhas com 3 meses ou mais, até 48 pontos e 4 linhas; 2 pontos viram barras verticais (até 24). O eixo mensal vai do primeiro ao último mês, ou até a faixa `BETWEEN` do SQL; mês que a consulta não trouxe é `null` (buraco na linha) e é citado em `nota` |
 | Pessoa pede "gráfico", "barras", "pizza" ou "linhas" | O tipo pedido quando faz sentido. Categorias viram barras horizontais, do maior para o menor (ou na ordem do SQL, quando já vem ordenada), até 20 |
 | Pizza pedida | Só com totais somáveis (receita, kWh, contagens), nunca médias, taxas, DEC ou percentuais; até 5 fatias, da maior para a menor, com "Outros" no fim. Fatias quase iguais, médias ou períodos viram barras, com a explicação em `nota` |
 | Linhas pedidas sem tempo | Barras, com a explicação em `nota` |
@@ -341,7 +341,7 @@ Campos de `grafico`:
 | `series` | 1 a 4 itens `{nome, valores[]}` | Um valor (número ou `null`) por categoria, na mesma ordem. Pizza: 1 série, sem negativos nem `null` |
 | `origem` | `automatico`, `pedido` | Se veio da forma dos dados ou de um pedido da pessoa |
 | `omitidos` | inteiro ≥ 0 | Categorias ou séries fora do limite; a tabela completa segue em `dados` ("Ver como tabela") e no CSV |
-| `nota` | texto ou `null` | Por que o tipo pedido não foi usado (ex.: pizza de média) |
+| `nota` | texto ou `null` | Por que o tipo pedido não foi usado (ex.: pizza de média) e o que ficou fora do desenho: meses além do limite ("aparecem os últimos 24"), municípios além de 4 linhas, colunas de outra unidade ("Consumo ficou fora do gráfico, que tem um eixo só"), meses que a consulta não trouxe e consulta cortada por `LIMIT`. A Tela 7 mostra a nota acima do gráfico |
 
 Exemplos completos (valores fictícios): [barras P1 × P2](../backend/app/services/fixtures/resposta_ia_grafico_barras.json), [pizza](../backend/app/services/fixtures/resposta_ia_grafico_pizza.json), [linhas](../backend/app/services/fixtures/resposta_ia_grafico_linhas.json). Um gráfico que não passe nessas regras é descartado e a resposta sai como tabela ou texto, nunca 503.
 

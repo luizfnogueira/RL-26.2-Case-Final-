@@ -13,13 +13,15 @@ from app.services.grafico_ia import (NOTA_LINHAS_SEM_TEMPO, NOTA_PIZZA_NAO_SOMA,
 from app.services.ia_service import AgenteReal, obter_agente
 from app.services.stubs import exemplo
 
+MESES_P2 = [f"{a}-{m:02d}" for a, m in [(2025, m) for m in range(7, 13)] + [(2026, m) for m in range(1, 7)]]
+CIDADES = ["RECIFE", "JABOATAO DOS GUARARAPES", "OLINDA", "PAULISTA"] + [f"CIDADE {i:02d}" for i in range(10)]
 MUNICIPIOS = [["RECIFE", 182.4], ["OLINDA", 165.1], ["PAULISTA", 158.9], ["JABOATAO DOS GUARARAPES", 171.0]]
 
 
-def resposta(colunas, linhas, interpretada="Pergunta interpretada"):
+def resposta(colunas, linhas, interpretada="Pergunta interpretada", sql="SELECT ..."):
     r = exemplo("resposta_ia")
     r.pop("grafico", None)
-    r.update(dados={"colunas": colunas, "linhas": linhas}, apresentacao="tabela")
+    r.update(dados={"colunas": colunas, "linhas": linhas}, apresentacao="tabela", sql=sql)
     r["detalhes_tecnicos"]["estrutura_pensamento"]["pergunta_interpretada"] = interpretada
     return r
 
@@ -176,10 +178,72 @@ def test_ponte_acrescenta_o_grafico_na_resposta_do_agente(monkeypatch):
     RespostaIA.model_validate(corpo)
 
 
-# ---------- todas as linhas da consulta (a resposta leva só 50) ----------
+# ---------- o que fica fora do desenho vai na nota ----------
 
-MESES_P2 = [f"{a}-{m:02d}" for a, m in [(2025, m) for m in range(7, 13)] + [(2026, m) for m in range(1, 7)]]
-CIDADES = ["RECIFE", "JABOATAO DOS GUARARAPES", "OLINDA", "PAULISTA"] + [f"CIDADE {i:02d}" for i in range(10)]
+MESES_4_ANOS = [f"{a}-{m:02d}" for a in range(2022, 2027) for m in range(1, 13)
+                if "2022-07" <= f"{a}-{m:02d}" <= "2026-06"]
+
+
+def test_barras_no_tempo_mostram_24_meses_e_avisam_os_anteriores():
+    # Caso real: consumo de jul/2022 a jun/2026 em barras mostrava só os últimos 24, sem aviso
+    g, _ = grafico("Consumo mensal de jul/2022 a jun/2026 em barras", ["mes_referencia", "consumo_kwh"],
+                   [[m, 1.0e6] for m in MESES_4_ANOS])
+    assert g["tipo"] == "barras" and len(g["categorias"]) == 24 and g["omitidos"] == 24
+    assert g["nota"].startswith("Barras mostram até 24 meses: aparecem os últimos 24 (jul/2024 a jun/2026); "
+                                "os 24 anteriores estão em “Ver como tabela”.")
+
+
+def test_linhas_por_municipio_mostram_4_e_avisam_os_outros():
+    g, _ = grafico("Receita mensal por município em P2", ["mes_referencia", "municipio", "receita_total_brl"],
+                   [[mes, cidade, 1000.0 * (14 - i)] for mes in MESES_P2 for i, cidade in enumerate(CIDADES)])
+    assert g["tipo"] == "linhas" and len(g["categorias"]) == 12 and [s["nome"] for s in g["series"]] == CIDADES[:4]
+    assert g["nota"] == "O gráfico mostra os 4 municípios de maior valor; os outros 10 estão em “Ver como tabela”."
+
+
+def test_coluna_de_outra_unidade_fica_fora_com_aviso():
+    # Caso real: receita (R$) e consumo (kWh) por município; o consumo sumia sem aviso
+    g, _ = grafico("Receita e consumo por município em gráfico", ["municipio", "receita_energia_brl", "consumo_kwh"],
+                   [[c, v, v * 2] for c, v in MUNICIPIOS])
+    assert [s["nome"] for s in g["series"]] == ["Receita energia"] and g["unidade"] == "brl"
+    assert g["nota"] == "Consumo ficou fora do gráfico, que tem um eixo só (em R$); os valores estão em “Ver como tabela”."
+
+
+def test_mes_que_a_consulta_nao_trouxe_fica_em_branco_e_e_avisado():
+    meses = [m for m in MESES_P2 if m not in ("2025-08", "2026-05", "2026-06")]
+    g, _ = grafico("Consumo mensal em P2", ["mes_referencia", "consumo_kwh"], [[m, 1.0] for m in meses])
+    assert len(g["categorias"]) == 10  # sem SQL, o eixo vai do primeiro ao último mês que veio
+    r = resposta(["mes_referencia", "consumo_kwh"], [[m, 1.0] for m in meses],
+                 sql="SELECT ... WHERE mes_referencia BETWEEN '2025-07' AND '2026-06'")
+    g, _ = montar_grafico("Consumo mensal em P2", r)
+    assert g["categorias"] == MESES_P2 and g["series"][0]["valores"][1] is None
+    assert g["nota"] == ("A consulta não trouxe 3 meses (ago/2025, mai/2026 a jun/2026); no gráfico, ficam em branco.")
+
+
+def test_p1_e_p2_no_tempo_deixam_o_intervalo_em_branco():
+    p1 = [m for m in MESES_4_ANOS if m <= "2023-06"]
+    r = resposta(["mes_referencia", "consumo_kwh"], [[m, 1.0] for m in p1 + MESES_P2],
+                 sql="SELECT ... WHERE mes_referencia BETWEEN '2022-07' AND '2023-06' "
+                     "OR mes_referencia BETWEEN '2025-07' AND '2026-06'")
+    g, _ = montar_grafico("Consumo mensal de P1 e P2", r)
+    assert g["tipo"] == "linhas" and len(g["categorias"]) == 48
+    assert "A consulta não trouxe 24 meses (jul/2023 a jun/2025)" in g["nota"]
+
+
+def test_consulta_cortada_pelo_limit_avisa_que_o_grafico_pode_estar_incompleto():
+    linhas = [[mes, cidade, 1.0] for mes in MESES_P2 for cidade in CIDADES][:100]
+    r = resposta(["mes_referencia", "municipio", "consumo_kwh"], linhas,
+                 sql="SELECT ... WHERE mes_referencia BETWEEN '2025-07' AND '2026-06' ORDER BY 1 LIMIT 100;")
+    g, _ = montar_grafico("Consumo mensal por município em P2 em gráfico", r)
+    assert g["nota"].startswith("A consulta parou no limite de 100 linhas (LIMIT)")
+    assert "não trouxe" not in g["nota"]
+
+
+def test_barras_por_categoria_acima_de_20_avisam_quantas_ficaram_de_fora():
+    g, _ = grafico("gráfico de barras", ["municipio", "consumo_kwh"], [[f"CIDADE {i:02d}", 100.0 - i] for i in range(25)])
+    assert g["nota"] == "Aparecem os 20 primeiros municípios; os outros 5 estão em “Ver como tabela”."
+
+
+# ---------- todas as linhas da consulta (a resposta leva só 50) ----------
 
 
 def test_ponte_monta_o_grafico_com_todas_as_linhas_e_manda_a_tabela_completa(monkeypatch):

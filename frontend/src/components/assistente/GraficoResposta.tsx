@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Download, Info } from 'lucide-react'
 import { useState } from 'react'
 import Barras from '@/components/graficos/Barras'
 import Linhas from '@/components/graficos/Linhas'
@@ -34,6 +34,17 @@ export default function GraficoResposta({ grafico, dados }: { grafico: GraficoIA
         </button>
       </div>
 
+      {/* Antes do desenho: por que o tipo pedido não foi usado e o que ficou de fora (o backend explica) */}
+      {(grafico.nota || grafico.omitidos > 0) && (
+        <p className="flex items-start gap-1.5 rounded-md bg-azul-50 px-2.5 py-2 text-legenda text-ink">
+          <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-teal-escuro" />
+          <span>
+            {grafico.nota ??
+              `Mais ${grafico.omitidos} ${grafico.omitidos === 1 ? 'item ficou' : 'itens ficaram'} de fora do gráfico; estão em “Ver como tabela” e no CSV.`}
+          </span>
+        </p>
+      )}
+
       {comoTabela ? (
         // A tabela da resposta inteira: todas as colunas e linhas, inclusive o que ficou fora do desenho
         <TabelaResposta dados={dados} embutida />
@@ -41,14 +52,6 @@ export default function GraficoResposta({ grafico, dados }: { grafico: GraficoIA
         <Grafico grafico={grafico} formatos={formatos} descricao={descricao} />
       )}
 
-      {(grafico.nota || grafico.omitidos > 0) && (
-        <p className="text-legenda text-ink-2">
-          {grafico.nota}
-          {grafico.nota && grafico.omitidos > 0 && ' '}
-          {grafico.omitidos > 0 &&
-            `Mais ${grafico.omitidos} ${grafico.omitidos === 1 ? 'item ficou' : 'itens ficaram'} de fora do gráfico; estão em “Ver como tabela” e no CSV.`}
-        </p>
-      )}
       <button
         type="button"
         onClick={() => baixarCsv(dados)}

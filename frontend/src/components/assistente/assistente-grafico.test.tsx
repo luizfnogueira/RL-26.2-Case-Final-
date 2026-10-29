@@ -113,12 +113,16 @@ describe('tabela, notas e segurança', () => {
     expect(within(tabela).getByText('1.000 kWh')).toBeTruthy()
   })
 
-  it('mostra a nota e quantos itens ficaram de fora', () => {
-    const figura = desenhar(resposta(exemploBarras), {
-      nota: 'Pizza mostra partes de um todo; para médias e percentuais, o gráfico é de barras.',
-      omitidos: 3,
-    })
-    expect(within(figura).getByText(/Pizza mostra partes de um todo.*Mais 3 itens ficaram de fora/)).toBeTruthy()
+  it('mostra a nota do backend antes do gráfico', () => {
+    const nota = 'O gráfico mostra os 4 municípios de maior valor; os outros 10 estão em “Ver como tabela”.'
+    const figura = desenhar(resposta(exemploBarras), { nota, omitidos: 10 })
+    const aviso = within(figura).getByText(nota)
+    expect(aviso.compareDocumentPosition(within(figura).getAllByRole('img')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('sem nota, diz quantos itens ficaram de fora', () => {
+    const figura = desenhar(resposta(exemploBarras), { nota: null, omitidos: 3 })
+    expect(within(figura).getByText(/Mais 3 itens ficaram de fora do gráfico; estão em “Ver como tabela”/)).toBeTruthy()
   })
 
   it('rótulo vindo da resposta é texto, nunca HTML', () => {
