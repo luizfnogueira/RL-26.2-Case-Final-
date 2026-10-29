@@ -31,6 +31,8 @@ const UNIDADES: Record<Medias | Totais, string> = {
   horas_interrupcao: 'h',
 }
 const CAMPO_ORDENACAO = { dec: 'dec', fec: 'fec', chi: 'horas_interrupcao' } as const
+const mesmoNome = (a: string, b: string) =>
+  a.toLocaleLowerCase('pt-BR') === b.toLocaleLowerCase('pt-BR')
 
 function ordenar<T extends { posicao: number } & Record<Medias | Totais, { valor: number | null }>>(
   items: T[],
@@ -66,7 +68,7 @@ function regional(
     if (nivel === 'municipio') adicionar(a.municipio, null, a)
     else
       for (const bairro of a.bairros_atendidos)
-        if (!bairroFiltro || bairroFiltro === bairro) adicionar(a.municipio, bairro, a)
+        if (!bairroFiltro || mesmoNome(bairroFiltro, bairro)) adicionar(a.municipio, bairro, a)
   }
   return [...grupos.values()].map(({ municipio, bairro, itens }) => {
     const ucs = itens.reduce((s, a) => s + a.ucs_atendidas, 0)
@@ -121,8 +123,8 @@ export async function montarOperacao(parametros: ParamsOperacao | Registro): Pro
   const alimentadores = base.ranking_alimentadores.items.filter(
     (a) =>
       (!filtros.alimentador || filtros.alimentador === a.alimentador) &&
-      (!filtros.municipio || filtros.municipio === a.municipio) &&
-      (!filtros.bairro || a.bairros_atendidos.includes(filtros.bairro)),
+      (!filtros.municipio || mesmoNome(filtros.municipio, a.municipio)) &&
+      (!filtros.bairro || a.bairros_atendidos.some((b) => mesmoNome(filtros.bairro!, b))),
   )
   if (alimentadores.length === 0) {
     throw erroApi(
