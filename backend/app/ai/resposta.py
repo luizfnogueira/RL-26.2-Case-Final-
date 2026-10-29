@@ -2,11 +2,11 @@
 
 Garante que:
 1. Todo marcador `{v1}`, `{v2}` usado no texto exista em `saida.marcadores` e corresponda a um valor
-   presente no `ultimo_resultado` do banco (tolerância para arredondamento de até 2 casas decimais).
+   presente nos resultados consultados no banco (tolerância para arredondamento de até 2 casas decimais).
 2. Nenhum número inventado apareça fora dos marcadores no texto da resposta.
 3. Nenhum consumo negativo seja exibido para perguntas normais de consumo.
-4. Premissas falsas (ex.: 'Quanto a receita comercial cresceu em Jaboatão?' quando o dado mostra queda)
-   sejam obrigatoriamente corrigidas no texto.
+4. Premissas falsas (ex.: 'Quanto a receita comercial cresceu em Jaboatão?' quando o dado mostra queda,
+   ou 'Por que a receita despencou?' quando o dado mostra aumento) sejam obrigatoriamente corrigidas no texto.
 5. Avisos obrigatórios de interpretação (fila de perdas, peso de jul/2025 no DEC) sejam anexados.
 6. A apresentação ('texto' vs 'tabela') e o limite de 50 linhas sigam a regra determinística (GENAI-14).
 """
@@ -96,13 +96,31 @@ def substituir_marcadores_pt_br(texto: str, marcadores: dict[str, str | int | fl
     return REGEX_MARCADOR_NO_TEXTO.sub(preencher, texto)
 
 
+def _adicionar_derivados_entre_pares(numeros: list[float], valores: list[float]) -> None:
+    """Adiciona diferenças, somas e variações percentuais entre pares de números (ex.: P2 vs P1)."""
+    for i in range(len(valores)):
+        for j in range(len(valores)):
+            if i != j:
+                dif = valores[j] - valores[i]
+                numeros.append(dif)
+                if abs(dif) >= 1_000_000:
+                    numeros.append(dif / 1_000_000.0)
+                if abs(dif) >= 1_000:
+                    numeros.append(dif / 1_000.0)
+                if abs(valores[i]) > 1e-9:
+                    numeros.append((dif / valores[i]) * 100.0)
+                    numeros.append((valores[j] / valores[i]) * 100.0)
+
+
 def extrair_numeros_do_resultado(resultado: ResultadoConsulta | None) -> list[float]:
     """Coleta todos os valores numéricos presentes nas células do ResultadoConsulta (e variações de escala)."""
     if resultado is None or not resultado.linhas:
         return []
 
     numeros: list[float] = []
-    for linha in resultado.linhas:
+    todos_valores_curtos: list[float] = []
+    for idx_linha, linha in enumerate(resultado.linhas):
+        vals_linha: list[float] = []
         for celula in linha:
             if isinstance(celula, bool) or celula is None:
                 continue
@@ -110,6 +128,9 @@ def extrair_numeros_do_resultado(resultado: ResultadoConsulta | None) -> list[fl
                 val = float(celula)
                 if math.isfinite(val):
                     numeros.append(val)
+                    vals_linha.append(val)
+                    if idx_linha < 6:
+                        todos_valores_curtos.append(val)
                     # Suporta conversão automática em milhões (mi) ou milhares (mil) ou GWh (kWh / 1e6)
                     if abs(val) >= 1_000_000:
                         numeros.append(val / 1_000_000.0)
@@ -120,24 +141,19 @@ def extrair_numeros_do_resultado(resultado: ResultadoConsulta | None) -> list[fl
                     val = float(celula.replace(",", "."))
                     if math.isfinite(val):
                         numeros.append(val)
+                        vals_linha.append(val)
+                        if idx_linha < 6:
+                            todos_valores_curtos.append(val)
                 except ValueError:
                     pass
-    # Inclui diferenças e variações percentuais derivadas entre pares da mesma linha (ex.: P2 vs P1)
-    for linha in resultado.linhas[:10]:
-        vals_linha = [
-            float(c) for c in linha
-            if isinstance(c, (int, float, Decimal)) and not isinstance(c, bool) and math.isfinite(float(c))
-        ]
-        for i in range(len(vals_linha)):
-            for j in range(len(vals_linha)):
-                if i != j:
-                    dif = vals_linha[j] - vals_linha[i]
-                    numeros.append(dif)
-                    if abs(dif) >= 1_000_000:
-                        numeros.append(dif / 1_000_000.0)
-                    if abs(vals_linha[i]) > 1e-9:
-                        numeros.append((dif / vals_linha[i]) * 100.0)
-                        numeros.append((vals_linha[j] / vals_linha[i]) * 100.0)
+        if idx_linha < 10 and len(vals_linha) > 1:
+            _adicionar_derivados_entre_pares(numeros, vals_linha)
+
+    # Se a consulta retornou poucas linhas (ex.: 2 linhas para P1 e P2 no GROUP BY periodo),
+    # inclui também as diferenças e variações percentuais entre linhas!
+    if 1 < len(resultado.linhas) <= 6 and len(todos_valores_curtos) <= 12:
+        _adicionar_derivados_entre_pares(numeros, todos_valores_curtos)
+
     # Inclui também o total de linhas retornadas como número válido de contagem
     numeros.append(float(resultado.n_linhas))
     numeros.append(float(len(resultado.linhas)))
@@ -205,11 +221,10 @@ def _extrair_numeros_da_pergunta(pergunta: str) -> set[float]:
 
 
 def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> RespostaAgente:
-    """Valida determinísticamente a saída do agente contra `deps.ultimo_resultado` (GENAI-10.2).
+    """Valida determinísticamente a saída do agente contra os resultados de `consultar_gold` (GENAI-10.2).
 
     Levanta `ViolacaoFidelidadeSaida` se detectar:
     - Resposta `ok` sem execução de SQL ou com resultado vazio.
-    - SQL em `saida.sql` divergente de `deps.ultimo_sql`.
     - Marcador `{v1}` no texto ausente de `saida.marcadores` ou valor de marcador ausente dos dados.
     - Número solto no texto fora de `saida.marcadores` que não exista nos dados.
     - Consumo negativo exibido sem que o usuário tenha pedido explicitamente.
@@ -234,20 +249,14 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
         )
 
     # 0. Conferência de texto não vazio
-    if not (saida.texto or '').strip() or len((saida.texto or '').strip()) < 10:
+    if not (saida.texto or "").strip() or len((saida.texto or "").strip()) < 10:
         raise ViolacaoFidelidadeSaida(
-            'O campo 	exto está vazio ou curto demais. Escreva uma resposta completa em português explicando os números retornados pela consulta.'
+            "O campo `texto` está vazio ou curto demais. Escreva uma resposta completa em português explicando os números retornados pela consulta."
         )
 
-    # 1. Conferência do SQL executado vs declarado
-    if deps.ultimo_sql and saida.sql:
-        sql_declarado_norm = " ".join(saida.sql.strip().rstrip(";").split()).lower()
-        sql_executado_norm = " ".join(deps.ultimo_sql.strip().rstrip(";").split()).lower()
-        if sql_declarado_norm != sql_executado_norm:
-            raise ViolacaoFidelidadeSaida(
-                "O campo `sql` da resposta difere do último SQL executado em `consultar_gold`. "
-                "Use exatamente o SQL executado."
-            )
+    # 1. Conferência do SQL executado vs declarado:
+    # Se o modelo executou mais de uma query na mesma rodada, ou reformatou o SQL, sincronizamos `saida.sql`
+    # automaticamente em `agent.py` sem gastar retry desnecessário.
 
     # 2. Conferência de marcadores no texto
     marcadores_no_texto = REGEX_MARCADOR_NO_TEXTO.findall(saida.texto or "")
@@ -257,10 +266,16 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
                 f"O texto usa o marcador `{{{m_key}}}`, mas `{m_key}` não foi preenchido em `marcadores`."
             )
 
+    # Coleta todos os números e textos retornados por TODAS as consultas executadas nesta pergunta
     numeros_banco = extrair_numeros_do_resultado(ultimo_res)
     textos_banco = extrair_textos_do_resultado(ultimo_res)
+    for res_hist in (deps.historico_resultados or []):
+        if res_hist is not ultimo_res and not res_hist.bloqueado:
+            numeros_banco.extend(extrair_numeros_do_resultado(res_hist))
+            textos_banco |= extrair_textos_do_resultado(res_hist)
+
     numeros_pergunta = _extrair_numeros_da_pergunta(deps.pergunta_original)
-    
+
     # Limites que o próprio SQL executado usa (ex.: > 0, < -30) estão no "Como cheguei nisso"; não são invenção.
     numeros_pergunta |= _extrair_numeros_da_pergunta(deps.ultimo_sql or "")
 
@@ -334,7 +349,9 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
                             "Filtre `flag_consumo_negativo = FALSE AND consumo_kwh_valido >= 0`."
                         )
 
-    # 6. Verificação de Premissa Falsa (GENAI-10.4): pergunta fala em "cresceu/aumento" mas variação é < 0
+    # 6. Verificação de Premissa Falsa (GENAI-10.4):
+    # - Pergunta fala em "cresceu/aumentou" mas variação é < 0
+    # - Pergunta fala em "despencou/caiu/diminuiu" mas variação é > 0
     pergunta_lower = (deps.pergunta_original or "").lower()
     if any(p in pergunta_lower for p in ("cresceu", "crescimento", "subiu", "aumentou")):
         for col_idx, nome_col in enumerate(ultimo_res.colunas):
@@ -347,6 +364,18 @@ def validar_fidelidade_saida(deps: DepsAgente, saida: RespostaAgente) -> Respost
                         raise ViolacaoFidelidadeSaida(
                             "A pergunta assume crescimento, mas os dados mostram queda/variação negativa. "
                             "Corrija explicitamente a premissa falsa no texto informando que houve queda/redução."
+                        )
+    elif any(p in pergunta_lower for p in ("despencou", "caiu", "queda", "diminuiu", "reduziu", "encolheu")):
+        for col_idx, nome_col in enumerate(ultimo_res.colunas):
+            if any(k in nome_col.lower() for k in ("variacao", "crescimento", "delta", "dif")):
+                val_cel = ultimo_res.linhas[0][col_idx] if ultimo_res.linhas[0] else None
+                if isinstance(val_cel, (int, float, Decimal)) and float(val_cel) > 0:
+                    texto_check = (saida.texto or "").lower()
+                    palavras_alta = ("cresceu", "crescimento", "aumentou", "aumento", "subiu", "alta", "positiv", "+")
+                    if not any(pa in texto_check for pa in palavras_alta):
+                        raise ViolacaoFidelidadeSaida(
+                            "A pergunta assume queda, mas os dados mostram crescimento/aumento. "
+                            "Corrija explicitamente a premissa falsa no texto informando que houve aumento/crescimento."
                         )
 
     if marcadores_normalizados != saida.marcadores:
