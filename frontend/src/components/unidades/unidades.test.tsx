@@ -73,7 +73,7 @@ describe('busca de unidades (/unidades)', () => {
   it('com o código completo e um único resultado, vai direto para o detalhe', async () => {
     const { caminho } = abrir()
     buscar('uc-demo-007')
-    expect(await screen.findByText(/Visão 360 da unidade UC-DEMO-007/)).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Titular de exemplo 007' })).toBeTruthy()
     expect(caminho()).toBe('/unidades/UC-DEMO-007')
   })
 
@@ -103,5 +103,41 @@ describe('busca de unidades (/unidades)', () => {
     abrir('/unidades?busca=titular')
     await screen.findByText('5 unidades encontradas para “titular”')
     expect(screen.getByText(/dado fictício/i)).toBeTruthy()
+  })
+})
+
+describe('detalhe da unidade (/unidades/:id)', () => {
+  it('mostra o cabeçalho, o cadastro, o medidor e a GD da UC completa', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    expect(await screen.findByRole('heading', { name: 'Titular de exemplo 001' })).toBeTruthy()
+    expect(screen.getByText(/Período analisado: Jul\/2025 – Jun\/2026/)).toBeTruthy()
+    expect(screen.getByText(/dado fictício/i)).toBeTruthy()
+
+    const cadastro = within(screen.getByRole('region', { name: 'Cadastro' }))
+    expect(cadastro.getByText('***.456.789-**')).toBeTruthy()
+    expect(cadastro.queryByText('Telefone')).toBeNull() // sem fonte na Gold: campo não exibido
+    expect(cadastro.getByText('Rua de Exemplo, 100 · Boa Vista, Recife – PE')).toBeTruthy()
+    expect(cadastro.getByText('12/03/2018')).toBeTruthy() // data sem passar por fuso
+
+    const medidor = within(screen.getByRole('region', { name: 'Medidor' }))
+    expect(medidor.getByText('18.452 kWh em 28/06/2026')).toBeTruthy() // valor exato
+    expect(medidor.getByText('Estimada')).toBeTruthy()
+
+    const gd = within(screen.getByRole('region', { name: 'Geração distribuída' }))
+    expect(gd.getByText('5,0 kWp')).toBeTruthy()
+    expect(gd.getByText('GERACAO NA PROPRIA UC')).toBeTruthy()
+  })
+
+  it('UC sem GD mostra o estado próprio do bloco', async () => {
+    abrir('/unidades/UC-DEMO-007')
+    expect(await screen.findByRole('heading', { name: 'Sem geração distribuída' })).toBeTruthy()
+  })
+
+  it('UC inexistente mostra "UC não encontrada" com volta para a busca', async () => {
+    const { caminho } = abrir('/unidades/UC-DEMO-002')
+    expect(await screen.findByRole('heading', { name: 'UC não encontrada' })).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull() // não é erro
+    fireEvent.click(screen.getByRole('link', { name: 'Voltar para a busca' }))
+    expect(caminho()).toBe('/unidades')
   })
 })

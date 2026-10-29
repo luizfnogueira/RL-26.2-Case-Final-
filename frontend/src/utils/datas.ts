@@ -1,4 +1,13 @@
 /**
+ * Data do contrato ("YYYY-MM-DD") → "28/06/2026". Não passa por `new Date()`: a data sem hora
+ * seria lida como meia-noite UTC e, no fuso de Recife, viraria o dia anterior.
+ */
+export function formatarData(data: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : data
+}
+
+/**
  * Formata o instante da última carga da Gold ("gold_atualizada_em" no contrato da API).
  * Mesmo dia → "hoje, 06:15"; outro dia → "20/10, 06:15".
  */
