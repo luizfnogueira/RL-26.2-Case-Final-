@@ -36,7 +36,7 @@ DATABASE_URL_AGENTE = os.getenv("DATABASE_URL_AGENTE", "")
 IA_MODO = os.getenv("IA_MODO", "mock")
 if IA_MODO not in ("mock", "real"):
     raise RuntimeError(f"IA_MODO inválido: {IA_MODO!r}. Use mock ou real.")
-IA_TIMEOUT_S = float(os.getenv("IA_TIMEOUT_S", "30"))
+IA_TIMEOUT_S = float(os.getenv("IA_TIMEOUT_S", "90"))
 IA_API_KEY = os.getenv("IA_API_KEY", "")  # só no .env: nunca no código, na resposta ou no front
 # Módulo de insight da Equipe 3 (POST /ia/insight da receita). Vazio no modo real = texto alternativo.
 IA_INSIGHT_URL = os.getenv("IA_INSIGHT_URL", "")
