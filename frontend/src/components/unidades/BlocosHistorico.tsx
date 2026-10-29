@@ -22,12 +22,25 @@ import {
   LARGURAS_CONSUMO,
   LARGURAS_FATURAS,
   LARGURAS_INTERRUPCOES,
+  RECUO_BANDEIRA,
   RECUO_QUARTA_COLUNA,
   TABELA_PROPORCIONAL,
 } from './larguras'
+import { estiloBandeira } from './rotulos'
 
 // Consumo e faturas: a 4ª coluna (texto) vem depois de um número alinhado à direita.
 const TABELA_COM_RECUO = `${TABELA_PROPORCIONAL} ${RECUO_QUARTA_COLUNA}`
+const TABELA_FATURAS = `${TABELA_PROPORCIONAL} ${RECUO_BANDEIRA}`
+
+/** Bandeira tarifária como selo oval, com o nome dentro (a cor nunca é a única pista). */
+function SeloBandeira({ bandeira }: { bandeira: string }) {
+  const { variante, className } = estiloBandeira(bandeira)
+  return (
+    <Badge variante={variante} className={className}>
+      {formatarNome(bandeira)}
+    </Badge>
+  )
+}
 
 const uma = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
@@ -124,7 +137,7 @@ const colunaBandeira: Coluna<Fatura> = {
   id: 'bandeira',
   cabecalho: 'Bandeira',
   largura: LARGURAS_FATURAS.bandeira,
-  celula: (f) => formatarNome(f.bandeira_tarifaria),
+  celula: (f) => <SeloBandeira bandeira={f.bandeira_tarifaria} />,
 }
 
 /** Bloco 4: faturas em aberto (de qualquer mês) e pagas no período. */
@@ -179,7 +192,7 @@ export function BlocoFaturas({
         colunas={colunasAbertas}
         linhas={abertas}
         chaveLinha={(f) => f.id_fatura}
-        className={TABELA_COM_RECUO}
+        className={TABELA_FATURAS}
         vazio={
           <EmptyState
             icone={<CalendarCheck size={26} strokeWidth={1.5} />}
@@ -196,7 +209,7 @@ export function BlocoFaturas({
         colunas={colunasPagas}
         linhas={pagas}
         chaveLinha={(f) => f.id_fatura}
-        className={TABELA_COM_RECUO}
+        className={TABELA_FATURAS}
         vazio={
           <EmptyState
             titulo="Nenhuma fatura paga no período"

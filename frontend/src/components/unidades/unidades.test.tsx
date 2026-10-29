@@ -9,7 +9,7 @@ import { BlocoMedidor } from './BlocosCadastrais'
 import { BlocoFaturas } from './BlocosHistorico'
 import { caminhoBarra } from '@/components/graficos/geometria'
 import { mesesEstimados, pontosDoConsumo } from './consumo'
-import { rotuloModalidadeGd } from './rotulos'
+import { estiloBandeira, rotuloModalidadeGd } from './rotulos'
 
 afterEach(cleanup)
 
@@ -442,12 +442,43 @@ describe('tabelas na largura do cartão com colunas proporcionais', () => {
         .getAllByRole('columnheader')
         .map((th) => th.textContent)
       expect(cabecalhos.slice(2)).toEqual(['Valor total', 'Bandeira'])
-      expect(conteinerComClasse(tabela, '[&_td:nth-child(4)]:pl-8')).toBeTruthy()
-      expect(conteinerComClasse(tabela, '[&_th:nth-child(4)]:pl-8')).toBeTruthy()
+      expect(conteinerComClasse(tabela, '[&_td:nth-child(4)]:pl-9')).toBeTruthy() // recuo da bandeira
+      expect(conteinerComClasse(tabela, '[&_th:nth-child(4)]:pl-9')).toBeTruthy()
     }
     expect(larguras(abertas)).toEqual(['26%', '20%', '16%', '38%'])
     expect(larguras(pagas)).toEqual(larguras(abertas)) // colunas alinhadas uma embaixo da outra
     expect(within(abertas).getByText('R$ 486,00').closest('td')!.className).toContain('text-right')
+    // Bandeira como selo oval com o nome dentro: Amarela em amarelo (aberta), Verde em verde (paga).
+    const amarela = within(abertas).getByText('Amarela')
+    expect(amarela.className).toContain('rounded-full')
+    expect(amarela.className).toContain('bg-alerta-suave')
+    expect(within(pagas).getByText('Verde').className).toContain('bg-sucesso-suave')
+  })
+
+  it('selo da bandeira: as 4 da Gold com as variantes do Badge e desconhecida como neutra', () => {
+    expect(estiloBandeira('VERDE')).toEqual({ variante: 'sucesso' })
+    expect(estiloBandeira('AMARELA')).toEqual({ variante: 'alerta' })
+    expect(estiloBandeira('VERMELHA P1')).toEqual({ variante: 'perigo' })
+    expect(estiloBandeira('VERMELHA P2')).toEqual({
+      variante: 'perigo',
+      className: 'bg-perigo-escuro! text-ink-inverso!', // vermelho mais forte que a P1
+    })
+    expect(estiloBandeira('ESCASSEZ HIDRICA')).toEqual({ variante: 'neutro' })
+    expect(estiloBandeira('toString')).toEqual({ variante: 'neutro' })
+  })
+
+  it('a P2 aparece como selo vermelho forte com o nome dentro', () => {
+    const [aberta] = unidadeFixture.faturas_abertas as Fatura[]
+    render(
+      <BlocoFaturas
+        abertas={[{ ...aberta, bandeira_tarifaria: 'VERMELHA P2' }]}
+        pagas={[]}
+        periodo="2025-07/2026-06"
+      />,
+    )
+    const selo = screen.getByText('Vermelha P2')
+    expect(selo.className).toContain('bg-perigo-escuro!')
+    expect(selo.className).toContain('text-ink-inverso!')
   })
 
   it('todas as tabelas: largura do cartão, table-fixed e porcentagens que somam 100%', async () => {
@@ -462,13 +493,13 @@ describe('tabelas na largura do cartão com colunas proporcionais', () => {
       expect(tabela.className).toContain('w-full') // barra do cabeçalho de ponta a ponta
       expect(conteinerComClasse(tabela, '[&_table]:table-fixed')).toBeTruthy()
     }
-    // Recuo só onde um número alinhado à direita vem antes de texto: consumo e faturas.
-    expect(tabelas.map((t) => Boolean(conteinerComClasse(t, '[&_td:nth-child(4)]:pl-8')))).toEqual([
-      true,
-      true,
-      true,
-      false,
-      false,
-    ])
+    // Recuo só onde um número alinhado à direita vem antes de texto: consumo (8) e faturas (9).
+    const recuo = (t: HTMLElement) =>
+      conteinerComClasse(t, '[&_td:nth-child(4)]:pl-8')
+        ? 'pl-8'
+        : conteinerComClasse(t, '[&_td:nth-child(4)]:pl-9')
+          ? 'pl-9'
+          : null
+    expect(tabelas.map(recuo)).toEqual(['pl-8', 'pl-9', 'pl-9', null, null])
   })
 })
