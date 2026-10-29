@@ -192,7 +192,11 @@
   "diagnostico_conta": {
     "periodo_referencia": "2026-06",
     "conta_alta": null,
-    "veredito": "Sem o mesmo mês do ano anterior para comparar; o consumo de jun/2026 ficou mais de 20% acima da média dos meses anteriores (5 meses).",
+    "veredito": {
+      "titulo": "Consumo acima da média",
+      "detalhe": "Jun/2026 ficou 32% acima da média dos 5 meses anteriores com consumo; não há o mesmo mês do ano anterior para comparar.",
+      "orientacao": "O aumento do consumo explica a conta mais alta."
+    },
     "ultimo_mes": {
       "valor": 240.0,
       "unidade": "kWh",

@@ -61,10 +61,16 @@ class ConsumoMes(Schema):
     tipo_leitura: TipoLeitura | None          # mês da janela sem dado da UC: null, o mês não some
 
 
+class Veredito(Schema):
+    titulo: str                               # curto, ex.: "Consumo caiu"
+    detalhe: str                              # os números: percentuais contra o ano anterior e a média
+    orientacao: str | None                    # frase ao atendente; null quando não se aplica
+
+
 class DiagnosticoConta(Schema):
     periodo_referencia: Mes | None            # mês analisado: o último da janela com dado da UC
     conta_alta: bool | None
-    veredito: str | None
+    veredito: Veredito | None
     ultimo_mes: Indicador
     mesmo_mes_ano_anterior: Indicador
     media_12_meses: Indicador                 # 12 meses anteriores ao mês analisado, sem incluí-lo

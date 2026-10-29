@@ -71,56 +71,99 @@ def _alerta(ultimo: MesConsumo | None, anterior: MesConsumo | None) -> str | Non
     return ' '.join(avisos) or None
 
 
+CAUSA_NAO_E_CONSUMO = ('Se o valor da conta subiu, a causa não é o consumo, '
+                       'e sim tarifa, bandeira tarifária ou tributos.')
+CONSUMO_EXPLICA = 'O aumento do consumo explica a conta mais alta.'
+# Regra 3×3 (ano anterior × média), cada lado acima, em linha ou abaixo: título e orientação ao
+# atendente. Os números ficam no detalhe, montado à parte.
+VEREDITOS = {
+    ('acima', 'acima'): ('Consumo subiu', CONSUMO_EXPLICA),
+    ('acima', 'em linha'): ('Consumo subindo ao longo do ano',
+                            'O aumento do consumo explica a conta mais alta: não é um pico só deste mês.'),
+    ('acima', 'abaixo'): ('Consumo caindo nos últimos meses',
+                          'Contra o ano anterior, o consumo explica a conta mais alta; '
+                          'contra os últimos meses, não.'),
+    ('em linha', 'acima'): ('Alta sazonal',
+                            'O consumo maior é típico desta época do ano e explica a conta mais alta.'),
+    ('em linha', 'em linha'): ('Consumo estável', CAUSA_NAO_E_CONSUMO),
+    ('em linha', 'abaixo'): ('Consumo caiu', CAUSA_NAO_E_CONSUMO),
+    ('abaixo', 'acima'): ('Consumo voltou a subir',
+                          'Contra os últimos meses, o consumo explica a conta mais alta; '
+                          'contra o ano anterior, não.'),
+    ('abaixo', 'em linha'): ('Consumo caiu', CAUSA_NAO_E_CONSUMO),
+    ('abaixo', 'abaixo'): ('Consumo caiu', CAUSA_NAO_E_CONSUMO),
+}
+# Sem o mesmo mês do ano anterior, só a média decide.
+VEREDITOS_SEM_ANO_ANTERIOR = {
+    'acima': ('Consumo acima da média', CONSUMO_EXPLICA),
+    'em linha': ('Consumo em linha com a média', CAUSA_NAO_E_CONSUMO),
+    'abaixo': ('Consumo abaixo da média', CAUSA_NAO_E_CONSUMO),
+}
+
+
+def _percentual(valor: Decimal | float) -> str:
+    """Percentual inteiro e sem sinal para o texto (−37,4 → '37%'); o meio arredonda para cima."""
+    return f'{int(abs(float(valor)) + 0.5)}%'
+
+
+def _contra(estado: str, percentual: str | None, de: str, com: str) -> str:
+    """Uma comparação no texto: '37% abaixo da média…', 'acima de jun/2025' ou 'em linha com …'."""
+    if estado == 'em linha':
+        return f'em linha {com}'
+    return f'{percentual} {estado} {de}' if percentual else f'{estado} {de}'
+
+
+def _base_media(meses_media: int) -> str:
+    """Base da média no texto; com menos de 12 meses, diz quantos tinham consumo."""
+    if meses_media == MESES_MEDIA:
+        return f'média dos {MESES_MEDIA} meses anteriores'
+    if meses_media == 1:
+        return 'média de 1 mês anterior com consumo'
+    return f'média dos {meses_media} meses anteriores com consumo'
+
+
 def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None, variacao: Decimal | None,
-              media: float | None, meses_media: int) -> str:
-    rotulo = mes_texto(mes)
+              media: float | None, meses_media: int) -> dict:
+    """Veredito em três partes: título curto, detalhe com os números e orientação ao atendente."""
+    rotulo = mes_texto(mes).capitalize()
     if consumo is None or consumo <= 0:
-        return f'Sem consumo válido em {rotulo}: não é possível avaliar a conta.'
+        return {'titulo': 'Sem consumo válido',
+                'detalhe': f'{rotulo} não tem consumo válido: não é possível avaliar a conta.',
+                'orientacao': None}
+    if conta_alta is None and media is None:
+        return {'titulo': 'Sem base de comparação',
+                'detalhe': f'{rotulo} não tem o mesmo mês do ano anterior nem meses anteriores com '
+                           'consumo para comparar.',
+                'orientacao': None}
     # Média com três estados e o mesmo limiar nos dois sentidos: acima, abaixo ou em linha.
     fator = LIMIAR_MEDIA_PCT / 100
     acima_media = media is not None and float(consumo) > media * (1 + fator)
     abaixo_media = media is not None and float(consumo) < media * (1 - fator)
-    # Ano anterior também com três estados: subiu (flag da Gold), caiu (variacao_pct da Gold
+    estado_media = 'acima' if acima_media else 'abaixo' if abaixo_media else 'em linha'
+    desvio_media = None if media is None else _percentual((float(consumo) / media - 1) * 100)
+    base = _base_media(meses_media)
+    contra_media = _contra(estado_media, desvio_media, f'da {base}', f'com a {base}')
+    if conta_alta is None:
+        titulo, orientacao = VEREDITOS_SEM_ANO_ANTERIOR[estado_media]
+        return {'titulo': titulo,
+                'detalhe': f'{rotulo} ficou {contra_media}; não há o mesmo mês do ano anterior para comparar.',
+                'orientacao': orientacao}
+    # Ano anterior também com três estados: acima (flag da Gold), abaixo (variacao_pct da Gold
     # abaixo de −20%, estrito) ou em linha. Nenhum dos dois é recalculado aqui.
     caiu_no_ano = conta_alta is False and variacao is not None and variacao < -LIMIAR_MEDIA_PCT
-    limiar = f'{LIMIAR_MEDIA_PCT}%'
-    base = f'média dos meses anteriores ({meses_media} {"mês" if meses_media == 1 else "meses"})'
-    causa_nao_e_consumo = ('Se o valor da conta subiu, a causa não é o consumo, '
-                           'e sim tarifa, bandeira tarifária ou tributos.')
-    if conta_alta is None:
-        if media is None:
-            return (f'Sem base de comparação para {rotulo}: não há o mesmo mês do ano anterior '
-                    'nem meses anteriores com consumo.')
-        sem_ano_anterior = f'Sem o mesmo mês do ano anterior para comparar; o consumo de {rotulo}'
-        if acima_media:
-            return f'{sem_ano_anterior} ficou mais de {limiar} acima da {base}.'
-        if abaixo_media:
-            return f'{sem_ano_anterior} ficou mais de {limiar} abaixo da {base}.'
-        return f'{sem_ano_anterior} está em linha com a {base}.'
-    if conta_alta and acima_media:
-        return (f'Consumo subiu: {rotulo} ficou mais de {limiar} acima do mesmo mês do ano anterior '
-                f'e da {base}. O aumento do consumo explica a conta mais alta.')
-    if conta_alta and abaixo_media:
-        return (f'Consumo mais de {limiar} acima do mesmo mês do ano anterior, mas mais de {limiar} '
-                f'abaixo da {base}: o consumo vem caindo nos últimos meses.')
-    if conta_alta:
-        return (f'Consumo mais de {limiar} acima do mesmo mês do ano anterior, mas em linha com a {base}: '
-                'o consumo vem subindo ao longo do ano, não só neste mês.')
-    if caiu_no_ano and abaixo_media:
-        return (f'Consumo caiu: {rotulo} ficou mais de {limiar} abaixo do mesmo mês do ano anterior '
-                f'e da {base}. {causa_nao_e_consumo}')
-    if caiu_no_ano and acima_media:
-        return (f'Consumo mais de {limiar} abaixo do mesmo mês do ano anterior, mas mais de {limiar} '
-                f'acima da {base}: o consumo voltou a subir nos últimos meses.')
-    if caiu_no_ano:
-        return (f'Consumo caiu em relação ao mesmo mês do ano anterior: {rotulo} ficou mais de {limiar} '
-                f'abaixo dele e em linha com a {base}. {causa_nao_e_consumo}')
-    if acima_media:
-        return (f'Consumo em linha com o mesmo mês do ano anterior, mas mais de {limiar} acima da {base}: '
-                'efeito sazonal do mês.')
-    if abaixo_media:
-        return f'Consumo caiu: {rotulo} ficou mais de {limiar} abaixo da {base}. {causa_nao_e_consumo}'
-    return f'Consumo estável: {causa_nao_e_consumo[0].lower()}{causa_nao_e_consumo[1:]}'
+    estado_ano = 'acima' if conta_alta else 'abaixo' if caiu_no_ano else 'em linha'
+    ano_anterior = mes_texto(somar_meses(mes, -12))
+    contra_ano = _contra(estado_ano, None if variacao is None else _percentual(variacao),
+                         f'de {ano_anterior}', f'com {ano_anterior}')
+    # O que mudou vem primeiro; sem mudança, uma frase só.
+    if estado_ano == estado_media == 'em linha':
+        corpo = f'em linha com {ano_anterior} e com a {base}'
+    elif estado_ano == 'em linha':
+        corpo = f'{contra_media} e {contra_ano}'
+    else:
+        corpo = f'{contra_ano} e {contra_media}'
+    titulo, orientacao = VEREDITOS[estado_ano, estado_media]
+    return {'titulo': titulo, 'detalhe': f'{rotulo} ficou {corpo}.', 'orientacao': orientacao}
 
 
 def diagnosticar_conta(meses: list[MesConsumo], periodo: str) -> dict:

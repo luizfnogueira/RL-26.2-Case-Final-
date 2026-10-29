@@ -141,7 +141,7 @@ def test_monta_os_blocos_no_formato_do_contrato():
         'atual': {'valor': 300.0, 'unidade': 'kWh', 'periodo_referencia': '2026-06'},
         'ano_anterior': {'valor': 300.0, 'unidade': 'kWh', 'periodo_referencia': '2025-06'}}
     assert r['diagnostico_conta']['periodo_referencia'] == '2026-06'
-    assert r['diagnostico_conta']['veredito'].startswith('Consumo estável')
+    assert r['diagnostico_conta']['veredito']['titulo'] == 'Consumo estável'
     assert [f['status'] for f in r['faturas_abertas']] == ['EM ABERTO']   # fora da janela, mas em aberto
     assert r['faturas_pagas'][0]['valor_total'] == 486.0
     assert r['medidor']['ultima_leitura'] == {'data': date(2026, 6, 28), 'leitura_kwh': 18452.0,

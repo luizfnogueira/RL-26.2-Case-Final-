@@ -173,10 +173,16 @@ describe('diagnóstico "a conta veio alta?"', () => {
     await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
     const d = bloco()
     expect(d.getByText('Mês analisado: Jun/2026')).toBeTruthy()
-    expect(d.getByText('Consumo subiu')).toBeTruthy() // o selo mede consumo, não a conta
+    // Selo (mede consumo, não a conta) e título do veredito.
+    expect(d.getAllByText('Consumo subiu')).toHaveLength(2)
     expect(d.queryByText('Conta alta')).toBeNull()
     expect(d.getByText('Leitura estimada')).toBeTruthy()
-    expect(d.getByText(/^Consumo subiu: jun\/2026/)).toBeTruthy()
+    expect(
+      d.getByText(
+        'Jun/2026 ficou 38% acima de jun/2025 e 28% acima da média dos 12 meses anteriores.',
+      ),
+    ).toBeTruthy()
+    expect(d.getByText('O aumento do consumo explica a conta mais alta.')).toBeTruthy()
     expect(d.getByText('412 kWh')).toBeTruthy()
     expect(d.getByText('298 kWh')).toBeTruthy()
     expect(d.getByText('323 kWh')).toBeTruthy() // média 322,83
@@ -256,7 +262,40 @@ describe('diagnóstico "a conta veio alta?"', () => {
     expect(d.getByText('Sem comparação com o ano anterior')).toBeTruthy()
     expect(d.getAllByText('—')).toHaveLength(2) // ano anterior e variação: nunca 0
     expect(d.getByText('5 de 12 meses · Jun/2025 – Mai/2026')).toBeTruthy()
-    expect(d.getByText(/média dos meses anteriores \(5 meses\)/)).toBeTruthy()
+    expect(d.getByText('Consumo acima da média')).toBeTruthy()
+    expect(d.getByText(/^Jun\/2026 ficou 32% acima da média dos 5 meses anteriores/)).toBeTruthy()
+  })
+
+  it('veredito em três partes: título em destaque, detalhe normal e orientação discreta', () => {
+    const unidade = unidadeFixture as Unidade360
+    render(<BlocoDiagnostico diagnostico={unidade.diagnostico_conta} consumo={unidade.consumo} />)
+    const titulo = screen.getAllByText('Consumo subiu').find((el) => el.tagName === 'P')!
+    expect(titulo.className).toContain('text-titulo-lg')
+    expect(titulo.className).toContain('font-medium')
+    const detalhe = screen.getByText(/^Jun\/2026 ficou 38% acima de jun\/2025/)
+    expect(detalhe.className).toContain('text-corpo')
+    expect(detalhe.className).not.toContain('text-ink-2')
+    const orientacao = screen.getByText('O aumento do consumo explica a conta mais alta.')
+    expect(orientacao.className).toContain('text-ink-2')
+    expect(orientacao.className).toContain('border-l-2')
+  })
+
+  it('sem orientação (null), o bloco mostra só título e detalhe', () => {
+    const unidade = unidadeFixture as Unidade360
+    const semBase: DiagnosticoConta = {
+      ...unidade.diagnostico_conta,
+      conta_alta: null,
+      veredito: {
+        titulo: 'Sem base de comparação',
+        detalhe:
+          'Jun/2026 não tem o mesmo mês do ano anterior nem meses anteriores com consumo para comparar.',
+        orientacao: null,
+      },
+    }
+    const { container } = render(<BlocoDiagnostico diagnostico={semBase} consumo={[]} />)
+    expect(screen.getByText('Sem base de comparação')).toBeTruthy()
+    expect(screen.getByText(/^Jun\/2026 não tem o mesmo mês/)).toBeTruthy()
+    expect(container.querySelector('.border-l-2')).toBeNull()
   })
 
   it('janela sem dados da UC mostra o estado próprio, sem números vazios', () => {

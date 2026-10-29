@@ -113,7 +113,14 @@ export default function BlocoDiagnostico({
         </div>
       }
     >
-      <p className="text-titulo">{d.veredito}</p>
+      <p className="text-titulo-lg font-medium">{d.veredito.titulo}</p>
+      <p className="mt-1 text-corpo">{d.veredito.detalhe}</p>
+      {d.veredito.orientacao && (
+        // Orientação ao atendente: separada dos números e num tom mais discreto.
+        <p className="mt-3 border-l-2 border-borda pl-3 text-corpo text-ink-2">
+          {d.veredito.orientacao}
+        </p>
+      )}
 
       <dl className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Numero
