@@ -12,17 +12,13 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from app.repositories import vocabulario_gold
 
 MAX_OPCOES = 8
 TODOS = "somando todos os municípios"
 _MINUSCULAS = {"de", "da", "do", "das", "dos", "e"}
 _ESTE_ANO = re.compile(r"\b(?:(n|d)?(?:este|esse)\s+ano|(no|do)\s+ano\s+atual)\b", re.IGNORECASE)
 _ANO_OU_PERIODO = re.compile(r"\b(20\d{2}|p[12])\b", re.IGNORECASE)
-
-# Bairro → municípios onde ele existe, por versão da Gold (a lista muda só quando a Gold é recarregada)
-_VOCABULARIO: dict[str, dict[str, set[str]]] = {}
 
 
 def normalizar(texto: str) -> str:
@@ -38,23 +34,7 @@ def nome_legivel(nome: str) -> str:
 
 def vocabulario(db, versao_gold: Any) -> dict[str, set[str]]:
     """Bairros ambíguos (em 2 municípios ou mais) da Gold; sem banco, nenhum (só o caso do ano vale)."""
-    chave = str(versao_gold)
-    if chave in _VOCABULARIO:
-        return _VOCABULARIO[chave]
-    if db is None:
-        return {}
-    from app.models.gold_source import UnidadeConsumidora as UC
-    try:
-        pares = db.execute(select(UC.bairro, UC.municipio).distinct()).all()
-    except SQLAlchemyError:
-        return {}
-    por_bairro: dict[str, set[str]] = {}
-    for bairro, municipio in pares:
-        if bairro and municipio:
-            por_bairro.setdefault(normalizar(bairro), set()).add(municipio)
-    _VOCABULARIO.clear()
-    _VOCABULARIO[chave] = {b: m for b, m in por_bairro.items() if len(m) > 1}
-    return _VOCABULARIO[chave]
+    return vocabulario_gold.nomes(db, versao_gold)["bairros_ambiguos"]
 
 
 def _menciona(texto_normalizado: str, nome: str) -> bool:

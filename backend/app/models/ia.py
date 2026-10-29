@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ARRAY, BigInteger, CheckConstraint, DateTime, Index, Integer, Text, func, text
+from sqlalchemy import (ARRAY, BigInteger, CheckConstraint, DateTime, Index, Integer, Text, UniqueConstraint, func,
+                        text)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,6 +15,29 @@ from app.db.base import IABase
 
 # `esclarecer`: a pergunta voltou com opções, sem consulta; fica no log, fora da memória.
 STATUS_VALIDOS = "status IN ('ok', 'nao_sei', 'bloqueado', 'esclarecer')"
+
+
+class RespostaCache(IABase):
+    """Respostas `ok` reaproveitadas para perguntas iguais ou parecidas, por versão da Gold (sem tokens).
+
+    Só respostas sem histórico de conversa. A pergunta é gravada mascarada; a resposta só tem agregados.
+    """
+    __tablename__ = "resposta_cache"
+    __table_args__ = (
+        UniqueConstraint("versao_gold", "chave", name="versao_chave"),
+        # A busca filtra pela versão e pela assinatura (nomes, números e qualificadores) antes de comparar o texto
+        Index("ix_resposta_cache_versao_assinatura", "versao_gold", "assinatura"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    versao_gold: Mapped[str] = mapped_column(Text, nullable=False)
+    chave: Mapped[str] = mapped_column(Text, nullable=False)
+    assinatura: Mapped[str] = mapped_column(Text, nullable=False)
+    pergunta: Mapped[str] = mapped_column(Text, nullable=False)
+    resposta: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    acertos: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    usado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 def atualizar_restricoes(conn) -> None:

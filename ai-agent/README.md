@@ -23,6 +23,7 @@ Só uma etapa usa o modelo para responder (o agente gerador). As outras são có
 | 7 | Apresentação: texto ou tabela | `resposta.py` | GENAI-14 | pronto |
 | 7b | Gráfico na conversa: barras, pizza ou linhas pela forma dos dados, sem tokens | `services/grafico_ia.py`, `components/graficos/` | extra | pronto |
 | 8 | Telemetria e gravação | `telemetria.py`, `interacao_repository.registrar` | GENAI-17, 20 | pronto |
+| 8b | Respostas pré-calculadas: pergunta igual ou parecida, mesmos nomes e números, sai do cache sem tokens | `services/cache_respostas.py`, tabela `ia.resposta_cache` | extra | pronto |
 | — | Ponte com o `POST /ia`: memória, prazo, log | `services/ia_service.py` (`AgenteReal`) | GENAI-2 | pronto |
 | — | Insight da Tela 2 | `ai/insights.py`, `services/insight_service.py` (`GeradorIA`) | GENAI-25 | pronto |
 
@@ -74,7 +75,7 @@ Resumo da conversa antiga: com mais de 3 trocas, as 10 perguntas anteriores (só
    | `LLM_MODELO` | Nome do modelo no provedor (`LLM_MODELO_SQL` e `LLM_MODELO_INSIGHT` sobrescrevem por perfil) |
    | `LLM_API_KEY` | Chave do provedor (também aceita `OPENROUTER_API_KEY`, `IA_API_KEY`, `GEMINI_API_KEY`) |
    | `IA_TIMEOUT_S` | Prazo do `POST /ia`; o agente tem 5 s a menos |
-   | `AI_CACHE_ENABLED` | `1` (padrão) reaproveita respostas repetidas sem histórico |
+   | `AI_CACHE_ENABLED` | `1` (padrão) reaproveita respostas de perguntas iguais ou muito parecidas sem histórico: em memória (agente) e em `ia.resposta_cache` (ponte, sobrevive a reinícios); `0` desliga os dois |
    | `AI_MODO_SCHEMA` | `skills` (padrão) ou `catalogo_inteiro`, para comparar no golden set |
    | `AI_SELF_CONSISTENCY` | `1` liga a votação entre candidatos quando a confiança vem baixa (desligado por padrão) |
 
