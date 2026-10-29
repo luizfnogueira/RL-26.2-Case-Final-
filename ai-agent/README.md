@@ -15,7 +15,7 @@ Só uma etapa usa o modelo para responder (o agente gerador). As outras são có
 | --- | --- | --- | --- | --- |
 | 1 | Pré-filtro: bloqueia o óbvio sem chamar o modelo | `guardrails.py` | GENAI-22 | pendente |
 | 1b | Esclarecimento: bairro em vários municípios ou "este ano" voltam com opções, sem tokens | `services/esclarecimento_ia.py` | extra | pronto |
-| 2 | Memória: últimas 3 trocas da conversa | `repositories/interacao_repository.py`, `agent.converter_historico_para_mensagens` | GENAI-11, 13 | pronto |
+| 2 | Memória: últimas 3 trocas da conversa e resumo das 10 anteriores | `repositories/interacao_repository.py`, `agent.converter_historico_para_mensagens` | GENAI-11, 13 | pronto |
 | 3 | IR: liga "Jaboatão" ao valor do banco | `entidades.py` | GENAI-8 | pendente (hoje `valores_distintos` usa listas fixas) |
 | 4 | SS: escolhe 1 ou 2 skills | `roteador.py`, `skills/` | GENAI-7, 23 | `receita.md` pronta; demais skills pendentes |
 | 5 | CG: plano → SQL → `consultar_gold` → corrige até 2× | `agent.py` | GENAI-9 | pronto |
@@ -51,6 +51,8 @@ Caminho de uma pergunta com `IA_MODO=real`:
 ## Memória da conversa
 
 O front guarda só o `conversa_id` e o reenvia. O histórico fica no servidor, na tabela `ia.interacao`. Ao agente vão as 3 últimas trocas `ok` das últimas 2 horas, como pares de mensagens user/model: a pergunta interpretada, um resumo de até 300 caracteres e o SQL executado. As linhas de dados nunca vão. "Limpar conversa" começa um id novo.
+
+Resumo da conversa antiga: com mais de 3 trocas, as 10 perguntas anteriores (só a pergunta interpretada, até 150 caracteres cada) entram como uma lista antes das 3 trocas completas (`interacao_repository.carregar_resumo`). Não é prompt cache: é memória. Custa uns 20 a 40 tokens de entrada por pergunta antiga e nenhuma chamada a mais ao modelo, porque a lista é montada pelo código. O resumo não é gravado nem devolvido ao front. Depois de 13 trocas, uma pergunta sobre o começo da conversa responde "não sei" sem chamar o modelo.
 
 ## Como rodar
 

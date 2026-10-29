@@ -278,7 +278,7 @@ Content-Type: application/json
 }
 ```
 
-`conversa_id` (UUID) é opcional. Na primeira pergunta o front não envia o campo: o backend cria o id e o devolve na resposta. Nas perguntas seguintes, o front reenvia o mesmo id, e o agente usa as últimas trocas daquela conversa (até 3, guardadas no servidor) para entender perguntas de continuação ("E só comercial?"). “Limpar conversa” no front começa uma conversa nova. Um id desconhecido ou expirado (mais de 2 h sem perguntas) abre uma conversa nova, sem erro.
+`conversa_id` (UUID) é opcional. Na primeira pergunta o front não envia o campo: o backend cria o id e o devolve na resposta. Nas perguntas seguintes, o front reenvia o mesmo id, e o agente usa as últimas trocas daquela conversa (até 3, guardadas no servidor) para entender perguntas de continuação ("E só comercial?"). Em conversa mais longa, ele recebe também a lista das 10 perguntas anteriores, montada pelo backend a partir do log (sem chamar o modelo e sem sair do servidor), para responder "qual foi o primeiro município que perguntei?". “Limpar conversa” no front começa uma conversa nova. Um id desconhecido ou expirado (mais de 2 h sem perguntas) abre uma conversa nova, sem erro.
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_ia.json)**
 

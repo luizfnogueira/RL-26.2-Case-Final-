@@ -2,6 +2,7 @@
 
 O modelo é sempre um FunctionModel do PydanticAI: nenhum teste gasta tokens nem precisa de chave.
 """
+import json
 import os
 import sys
 import time
@@ -50,6 +51,7 @@ def memoria(monkeypatch):
     """Memória em lista, para os testes que não usam o PostgreSQL."""
     gravadas = []
     monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, conversa: [])
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_resumo", lambda db, conversa: [])
     monkeypatch.setattr(ia_service.interacao_repository, "registrar",
                         lambda db, conversa, pergunta, resposta: gravadas.append((conversa, pergunta, resposta)))
     return gravadas
@@ -194,19 +196,41 @@ HISTORICO_CHEIO = [{"pergunta_interpretada": p, "resposta_resumo": "", "sql_exec
                    for p in ("Receita comercial de Olinda em P2", "Receita residencial de Olinda em P2", "Olinda P1 x P2")]
 
 
+RESUMO_CHEIO = [f"Pergunta antiga {i}" for i in range(1, 11)]
+
+
 @pytest.mark.parametrize("pergunta", ["E o primeiro município que eu perguntei?",
                                       "Qual foi a primeira pergunta?", "O que eu perguntei no início?"])
-def test_pergunta_sobre_o_comeco_com_a_memoria_cheia_nao_chama_o_modelo(memoria, monkeypatch, pergunta):
-    # Caso real: depois de Recife, Olinda, residencial e P1, o modelo respondia "Olinda" (Recife já tinha saído)
+def test_pergunta_sobre_o_comeco_depois_de_13_trocas_nao_chama_o_modelo(memoria, monkeypatch, pergunta):
+    # 3 trocas na memória + 10 no resumo: a 14ª pergunta da conversa já saiu de tudo
     monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, conversa: HISTORICO_CHEIO)
-    monkeypatch.setattr(ia_service.interacao_repository, "contar_trocas", lambda db, conversa: 4)
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_resumo", lambda db, conversa: RESUMO_CHEIO)
+    monkeypatch.setattr(ia_service.interacao_repository, "contar_trocas", lambda db, conversa: 14)
     agente = AgenteReal(responder=falhar(AssertionError("não deveria chamar o modelo")),
                         executar_sql=executar_sql, sessao=nullcontext)
     corpo = agente.perguntar(ia_service.PerguntaIA(pergunta=pergunta, conversa_id=uuid.uuid4()))
     RespostaIA.model_validate(corpo)
     assert corpo["status"] == "nao_sei"
-    assert "últimas 3 perguntas" in corpo["resposta"] and "Receita comercial de Olinda em P2" in corpo["resposta"]
+    assert "últimas 13 perguntas" in corpo["resposta"] and "Pergunta antiga 1" in corpo["resposta"]
     assert memoria[0][2]["status"] == "nao_sei"   # também vai para o log
+
+
+def test_com_4_trocas_o_modelo_recebe_a_primeira_no_resumo(memoria, monkeypatch):
+    # Caso real: depois de Recife, Olinda, residencial e P1, o modelo respondia "Olinda" (Recife tinha saído)
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, conversa: HISTORICO_CHEIO)
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_resumo",
+                        lambda db, conversa: ["Receita comercial de Recife em P2"])
+    monkeypatch.setattr(ia_service.interacao_repository, "contar_trocas", lambda db, conversa: 4)
+    recebidos = {}
+
+    def responder(pergunta, **kwargs):
+        recebidos.update(kwargs)
+        return exemplo("resposta_ia")
+    corpo = AgenteReal(responder=responder, executar_sql=executar_sql, sessao=nullcontext).perguntar(
+        ia_service.PerguntaIA(pergunta="E o primeiro município que eu perguntei?", conversa_id=uuid.uuid4()))
+    assert corpo["status"] == "ok"
+    assert recebidos["resumo_conversa"] == ["Receita comercial de Recife em P2"]
+    assert "Receita comercial de Recife em P2" not in json.dumps(corpo, default=str)  # o resumo nunca vai ao front
 
 
 def test_com_a_conversa_inteira_na_memoria_quem_responde_e_o_modelo(memoria, monkeypatch):

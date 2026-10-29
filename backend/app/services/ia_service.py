@@ -85,10 +85,14 @@ def pede_o_comeco_da_conversa(pergunta: str) -> bool:
     return bool(_COMECO.search(pergunta) and _FALA_DA_PESSOA.search(pergunta))
 
 
-def resposta_sem_o_comeco_da_conversa(historico: list[dict], gold_atualizada_em: Any) -> dict:
-    """Resposta `nao_sei` sem chamar o modelo, que chutaria a troca mais antiga que vê (GENAI-13)."""
-    mais_antiga = historico[0]["pergunta_interpretada"] if historico else None
-    texto = (f"Eu só lembro das últimas {interacao_repository.MAX_TROCAS} perguntas respondidas desta conversa, "
+def resposta_sem_o_comeco_da_conversa(historico: list[dict], resumo: list[str], gold_atualizada_em: Any) -> dict:
+    """Resposta `nao_sei` sem chamar o modelo, que chutaria a troca mais antiga que vê (GENAI-13).
+
+    Só acontece depois de 13 trocas: as 3 da memória mais as 10 do resumo.
+    """
+    mais_antiga = resumo[0] if resumo else (historico[0]["pergunta_interpretada"] if historico else None)
+    lembradas = interacao_repository.MAX_TROCAS + interacao_repository.MAX_RESUMO
+    texto = (f"Eu só lembro das últimas {lembradas} perguntas respondidas desta conversa, "
              "e o começo dela já saiu da minha memória.")
     if mais_antiga:
         texto += f" A mais antiga de que lembro é: “{mais_antiga}”."
@@ -142,21 +146,25 @@ class AgenteReal:
             
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
+                # Conversa longa: as perguntas anteriores às 3 da memória, em lista curta (só para o agente)
+                resumo = (interacao_repository.carregar_resumo(db, dados.conversa_id)
+                          if len(historico) >= interacao_repository.MAX_TROCAS else [])
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
                 # Pergunta ambígua volta com opções antes de gastar tokens
                 esclarecer = esclarecimento_ia.detectar(
                     dados.pergunta, historico, esclarecimento_ia.vocabulario(db, gold["gold_atualizada_em"]))
                 sem_o_comeco = not esclarecer and (
                     pede_o_comeco_da_conversa(dados.pergunta)
-                    and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico))
+                    and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico) + len(resumo))
             if esclarecer:
                 resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
             elif sem_o_comeco:
-                resposta = resposta_sem_o_comeco_da_conversa(historico, gold["gold_atualizada_em"])
+                resposta = resposta_sem_o_comeco_da_conversa(historico, resumo, gold["gold_atualizada_em"])
             else:
                 resposta = executar_com_prazo(lambda: responder(
                     dados.pergunta,
                     historico=historico,
+                    resumo_conversa=resumo,
                     conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
                     executar_sql_fn=executar_sql,
                     **extras,

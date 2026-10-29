@@ -14,6 +14,8 @@ from app.models.ia import Interacao
 
 JANELA_CONVERSA = timedelta(hours=2)    # conversa sem pergunta há mais de 2 h recomeça do zero
 MAX_TROCAS = 3                          # trocas que viram message_history do agente (~600 tokens)
+MAX_RESUMO = 10                         # perguntas anteriores no resumo (~20 a 40 tokens cada)
+RESUMO_PERGUNTA_MAX = 150
 RETENCAO = timedelta(days=30)
 RESUMO_MAX = 300
 
@@ -84,6 +86,22 @@ def carregar_historico(db: Session, conversa_id: uuid.UUID) -> list[dict]:
         "sql_executado": t.sql_executado,
         "filtros": t.filtros or {},
     } for t in reversed(trocas)]
+
+
+def carregar_resumo(db: Session, conversa_id: uuid.UUID) -> list[str]:
+    """Perguntas `ok` mais antigas que as 3 da memória (até 10, da mais antiga para a mais recente).
+
+    Montado por código a partir do log, sem chamar o modelo: vai só para o agente, nunca para o front.
+    """
+    desde = datetime.now(timezone.utc) - JANELA_CONVERSA
+    trocas = db.scalars(
+        select(Interacao)
+        .where(Interacao.conversa_id == conversa_id, Interacao.status == "ok", Interacao.criado_em >= desde)
+        .order_by(Interacao.criado_em.desc(), Interacao.id.desc())
+        .offset(MAX_TROCAS)
+        .limit(MAX_RESUMO)
+    ).all()
+    return [(t.pergunta_interpretada or t.pergunta)[:RESUMO_PERGUNTA_MAX] for t in reversed(trocas)]
 
 
 def contar_trocas(db: Session, conversa_id: uuid.UUID) -> int:

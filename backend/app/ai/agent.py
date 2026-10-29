@@ -90,8 +90,9 @@ REGRAS_CRITICAS_TOPO = """
    - Se a pergunta contiver uma premissa contrária aos dados (ex.: "Quanto a receita comercial cresceu em Jaboatão?", quando na verdade caiu 2,09% de P1 para P2), corrija a premissa de forma explícita no texto informando que houve queda/redução.
 5. CONTINUAÇÃO DE CONVERSA / FOLLOW-UP (GENAI-13):
    - Quando houver histórico na conversa (ex.: usuário pergunta "E só comercial?", "E em Olinda?", "E no ano anterior?"), herde da troca anterior os filtros não repetidos (métrica, município, bairro, classe ou período), registre essa herança em `premissas` e escreva a `pergunta_interpretada` completa e autossuficiente.
-   - Você só recebe as últimas 3 trocas respondidas da conversa (das últimas 2 horas); perguntas mais antigas, recusadas ou sem resposta não chegam até você. A troca mais antiga que você vê NÃO é necessariamente a primeira da conversa.
-   - Se a pessoa perguntar por algo de antes dessas trocas (ex.: "a primeira pergunta que eu fiz", "o primeiro município que perguntei", "o que perguntei no início"), não presuma: responda com `status="nao_sei"`, diga que você só lembra das últimas 3 perguntas, cite a mais antiga que você vê e peça para a pessoa repetir o que quer consultar.
+   - Você recebe as últimas 3 trocas respondidas da conversa (das últimas 2 horas) e, quando a conversa é mais longa, uma lista curta com as perguntas anteriores a elas (até 10, da mais antiga para a mais recente). Perguntas recusadas ou sem resposta não chegam até você.
+   - Para perguntas sobre o começo da conversa (ex.: "a primeira pergunta que eu fiz", "o primeiro município que perguntei"), use essa lista: o 1º item dela, ou a troca mais antiga quando não houver lista, é a primeira pergunta. Se pedirem dados de uma pergunta da lista, consulte o banco de novo com os mesmos filtros.
+   - Se o que pedem estiver antes até da lista, não presuma: responda com `status="nao_sei"`, diga que você só lembra das perguntas mais recentes e peça para a pessoa repetir o que quer consultar.
 6. ALIASES SQL E TABELAS (GENAI-14):
    - Use aliases legíveis e com unidade nas colunas do SQL (ex.: `receita_energia_brl`, `consumo_valido_kwh`, `dec_horas_uc`, `variacao_pct`).
    - Quando o resultado for um ranking ou lista (várias linhas), mencione no texto o período, a unidade e o destaque do 1º lugar.
@@ -287,13 +288,25 @@ def valores_distintos_padrao(tabela: str, coluna: str) -> list[str]:
     return []
 
 
-def converter_historico_para_mensagens(historico: list[TrocaHistorico | dict[str, Any]] | None) -> list[ModelMessage]:
-    """Converte as até 3 últimas trocas em pares user/model do PydanticAI (GENAI-13)."""
+def converter_historico_para_mensagens(
+    historico: list[TrocaHistorico | dict[str, Any]] | None,
+    resumo_conversa: list[str] | None = None,
+) -> list[ModelMessage]:
+    """Converte as até 3 últimas trocas em pares user/model do PydanticAI (GENAI-13).
+
+    `resumo_conversa`: perguntas mais antigas que essas 3, montadas pela ponte a partir do log
+    (sem chamar o modelo); entram como um par a mais, antes das trocas completas.
+    """
     if not historico:
         return []
 
     ultimas = historico[-3:]
     mensagens: list[ModelMessage] = []
+    if resumo_conversa:
+        lista = "\n".join(f"{i}. {p}" for i, p in enumerate(resumo_conversa, start=1))
+        mensagens.append(ModelRequest(parts=[UserPromptPart(
+            content=f"Perguntas anteriores desta conversa (da mais antiga para a mais recente):\n{lista}")]))
+        mensagens.append(ModelResponse(parts=[TextPart(content="Anotado; as 3 trocas mais recentes vêm a seguir.")]))
     for item in ultimas:
         troca = item if isinstance(item, TrocaHistorico) else TrocaHistorico.model_validate(item)
         mensagens.append(ModelRequest(parts=[UserPromptPart(content=troca.pergunta_interpretada)]))
@@ -566,6 +579,7 @@ def responder(
     pergunta: str,
     *,
     historico: list[TrocaHistorico | dict[str, Any]] | None = None,
+    resumo_conversa: list[str] | None = None,
     conversa_id: str | None = None,
     modelo: Model | None = None,
     executar_sql_fn: Any | None = None,
@@ -612,7 +626,7 @@ def responder(
         skills_forcadas=skills_ativas,
         modo=modo_schema,
     )
-    msgs_historico = converter_historico_para_mensagens(historico)
+    msgs_historico = converter_historico_para_mensagens(historico, resumo_conversa)
     etapas_ms["ss_ms"] = int((time.perf_counter() - t_ss) * 1000)
 
     # 3. Candidate Generator (CG do CHESS — GENAI-9, 10, 13, 14, 17)
