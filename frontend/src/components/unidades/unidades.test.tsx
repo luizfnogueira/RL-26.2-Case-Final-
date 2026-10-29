@@ -1,7 +1,11 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
+import unidadeFixture from '@/data/mocks/unidade.json'
 import UnidadePage from '@/pages/UnidadePage'
+import type { DiagnosticoConta } from '@/types/unidades'
+import BlocoDiagnostico from './BlocoDiagnostico'
+import { rotuloModalidadeGd } from './rotulos'
 
 afterEach(cleanup)
 
@@ -118,6 +122,7 @@ describe('detalhe da unidade (/unidades/:id)', () => {
     expect(cadastro.queryByText('Telefone')).toBeNull() // sem fonte na Gold: campo não exibido
     expect(cadastro.getByText('Rua de Exemplo, 100 · Boa Vista, Recife – PE')).toBeTruthy()
     expect(cadastro.getByText('12/03/2018')).toBeTruthy() // data sem passar por fuso
+    expect(cadastro.getByText('00000-000')).toBeTruthy() // CEP com máscara
 
     const medidor = within(screen.getByRole('region', { name: 'Medidor' }))
     expect(medidor.getByText('18.452 kWh em 28/06/2026')).toBeTruthy() // valor exato
@@ -125,7 +130,15 @@ describe('detalhe da unidade (/unidades/:id)', () => {
 
     const gd = within(screen.getByRole('region', { name: 'Geração distribuída' }))
     expect(gd.getByText('5,0 kWp')).toBeTruthy()
-    expect(gd.getByText('GERACAO NA PROPRIA UC')).toBeTruthy()
+    expect(gd.getByText('Geração na própria UC')).toBeTruthy()
+  })
+
+  it('rótulo da modalidade de GD para as 3 da Gold; valor desconhecido aparece como veio', () => {
+    expect(rotuloModalidadeGd('GERACAO NA PROPRIA UC')).toBe('Geração na própria UC')
+    expect(rotuloModalidadeGd('AUTOCONSUMO REMOTO')).toBe('Autoconsumo remoto')
+    expect(rotuloModalidadeGd('GERACAO COMPARTILHADA')).toBe('Geração compartilhada')
+    expect(rotuloModalidadeGd('MODALIDADE NOVA')).toBe('MODALIDADE NOVA')
+    expect(rotuloModalidadeGd('toString')).toBe('toString')
   })
 
   it('UC sem GD mostra o estado próprio do bloco', async () => {
@@ -139,5 +152,48 @@ describe('detalhe da unidade (/unidades/:id)', () => {
     expect(screen.queryByRole('alert')).toBeNull() // não é erro
     fireEvent.click(screen.getByRole('link', { name: 'Voltar para a busca' }))
     expect(caminho()).toBe('/unidades')
+  })
+})
+
+describe('diagnóstico "a conta veio alta?"', () => {
+  const bloco = () => within(screen.getByRole('region', { name: 'A conta veio alta?' }))
+
+  it('UC com consumo acima do ano anterior: selo, veredito, os 4 números e o alerta', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    const d = bloco()
+    expect(d.getByText('Mês analisado: Jun/2026')).toBeTruthy()
+    expect(d.getByText('Consumo subiu')).toBeTruthy() // o selo mede consumo, não a conta
+    expect(d.queryByText('Conta alta')).toBeNull()
+    expect(d.getByText('Leitura estimada')).toBeTruthy()
+    expect(d.getByText(/^Consumo subiu: jun\/2026/)).toBeTruthy()
+    expect(d.getByText('412 kWh')).toBeTruthy()
+    expect(d.getByText('298 kWh')).toBeTruthy()
+    expect(d.getByText('323 kWh')).toBeTruthy() // média 322,83
+    expect(d.getByText('12 de 12 meses · Jun/2025 – Mai/2026')).toBeTruthy()
+    expect(d.getByText('+38,3%')).toBeTruthy()
+    expect(d.getByText(/^Leitura ESTIMADA em jun\/2026/)).toBeTruthy()
+  })
+
+  it('UC recente: sem ano anterior, os ausentes viram travessão e a média mostra a base curta', async () => {
+    abrir('/unidades/UC-DEMO-007')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
+    const d = bloco()
+    expect(d.getByText('Sem comparação com o ano anterior')).toBeTruthy()
+    expect(d.getAllByText('—')).toHaveLength(2) // ano anterior e variação: nunca 0
+    expect(d.getByText('5 de 12 meses · Jun/2025 – Mai/2026')).toBeTruthy()
+    expect(d.getByText(/média dos meses anteriores \(5 meses\)/)).toBeTruthy()
+  })
+
+  it('janela sem dados da UC mostra o estado próprio, sem números vazios', () => {
+    const vazio: DiagnosticoConta = {
+      ...(unidadeFixture.diagnostico_conta as DiagnosticoConta),
+      periodo_referencia: null,
+      veredito: null,
+      conta_alta: null,
+    }
+    render(<BlocoDiagnostico diagnostico={vazio} />)
+    expect(screen.getByRole('heading', { name: 'Sem consumo nesta janela' })).toBeTruthy()
+    expect(screen.queryByText('Último mês')).toBeNull()
   })
 })

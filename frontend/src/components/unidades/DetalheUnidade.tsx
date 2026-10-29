@@ -12,6 +12,7 @@ import type { Unidade360 } from '@/types/unidades'
 import { formatarAtualizacao } from '@/utils/datas'
 import { formatarNome } from '@/utils/formatacao'
 import { formatarPeriodo } from '@/utils/periodos'
+import BlocoDiagnostico from './BlocoDiagnostico'
 import { BlocoCadastro, BlocoGeracao, BlocoMedidor } from './BlocosCadastrais'
 
 const ESTILO_LINK =
@@ -66,6 +67,7 @@ export default function DetalheUnidade({ id }: { id: string }) {
       }
     >
       <CabecalhoUnidade unidade={dados} />
+      <BlocoDiagnostico diagnostico={dados.diagnostico_conta} />
       <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <BlocoCadastro cadastro={dados.cadastro} />
         <BlocoMedidor medidor={dados.medidor} />

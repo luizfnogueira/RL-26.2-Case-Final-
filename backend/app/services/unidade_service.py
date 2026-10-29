@@ -31,6 +31,14 @@ def somar_meses(mes: str, n: int) -> str:
     return f'{total // 12}-{total % 12 + 1:02d}'
 
 
+MESES_TEXTO = ('jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez')
+
+
+def mes_texto(mes: str) -> str:
+    """Mês para ler no veredito e no alerta: '2026-06' → 'jun/2026'."""
+    return f'{MESES_TEXTO[int(mes[5:]) - 1]}/{mes[:4]}'
+
+
 def periodo_media(mes_analisado: str) -> str:
     """Os 12 meses anteriores ao mês analisado, sem incluí-lo (ex.: 2026-06 → 2025-06/2026-05)."""
     return f'{somar_meses(mes_analisado, -MESES_MEDIA)}/{somar_meses(mes_analisado, -1)}'
@@ -52,42 +60,67 @@ def media_12_meses(meses: list[MesConsumo], mes_analisado: str) -> tuple[float |
 def _alerta(ultimo: MesConsumo | None, anterior: MesConsumo | None) -> str | None:
     avisos = []
     if ultimo and ultimo.tipo_leitura == 'ESTIMADA':
-        avisos.append(f'Leitura ESTIMADA em {ultimo.mes}: o consumo pode ser ajustado na próxima leitura real.')
+        avisos.append(f'Leitura ESTIMADA em {mes_texto(ultimo.mes)}: o consumo pode ser ajustado '
+                      'na próxima leitura real.')
     if anterior and anterior.tipo_leitura == 'ESTIMADA':
-        avisos.append(f'Leitura ESTIMADA em {anterior.mes}: a comparação com o ano anterior é fraca.')
+        avisos.append(f'Leitura ESTIMADA em {mes_texto(anterior.mes)}: a comparação com o ano anterior é fraca.')
     for mes in (ultimo, anterior):
         if mes and mes.troca_medidor:
-            avisos.append(f'Troca de medidor em {mes.mes}: a primeira leitura após a troca '
+            avisos.append(f'Troca de medidor em {mes_texto(mes.mes)}: a primeira leitura após a troca '
                           'pode distorcer a comparação.')
     return ' '.join(avisos) or None
 
 
-def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None,
+def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None, variacao: Decimal | None,
               media: float | None, meses_media: int) -> str:
+    rotulo = mes_texto(mes)
     if consumo is None or consumo <= 0:
-        return f'Sem consumo válido em {mes}: não é possível avaliar a conta.'
-    acima_media = media is not None and float(consumo) > media * (1 + LIMIAR_MEDIA_PCT / 100)
+        return f'Sem consumo válido em {rotulo}: não é possível avaliar a conta.'
+    # Média com três estados e o mesmo limiar nos dois sentidos: acima, abaixo ou em linha.
+    fator = LIMIAR_MEDIA_PCT / 100
+    acima_media = media is not None and float(consumo) > media * (1 + fator)
+    abaixo_media = media is not None and float(consumo) < media * (1 - fator)
+    # Ano anterior também com três estados: subiu (flag da Gold), caiu (variacao_pct da Gold
+    # abaixo de −20%, estrito) ou em linha. Nenhum dos dois é recalculado aqui.
+    caiu_no_ano = conta_alta is False and variacao is not None and variacao < -LIMIAR_MEDIA_PCT
     limiar = f'{LIMIAR_MEDIA_PCT}%'
     base = f'média dos meses anteriores ({meses_media} {"mês" if meses_media == 1 else "meses"})'
+    causa_nao_e_consumo = ('Se o valor da conta subiu, a causa não é o consumo, '
+                           'e sim tarifa, bandeira tarifária ou tributos.')
     if conta_alta is None:
         if media is None:
-            return f'Sem base de comparação para {mes}: não há o mesmo mês do ano anterior nem meses anteriores com consumo.'
+            return (f'Sem base de comparação para {rotulo}: não há o mesmo mês do ano anterior '
+                    'nem meses anteriores com consumo.')
+        sem_ano_anterior = f'Sem o mesmo mês do ano anterior para comparar; o consumo de {rotulo}'
         if acima_media:
-            return (f'Sem o mesmo mês do ano anterior para comparar; o consumo de {mes} ficou '
-                    f'mais de {limiar} acima da {base}.')
-        return (f'Sem o mesmo mês do ano anterior para comparar; o consumo de {mes} está '
-                f'em linha com a {base}.')
+            return f'{sem_ano_anterior} ficou mais de {limiar} acima da {base}.'
+        if abaixo_media:
+            return f'{sem_ano_anterior} ficou mais de {limiar} abaixo da {base}.'
+        return f'{sem_ano_anterior} está em linha com a {base}.'
     if conta_alta and acima_media:
-        return (f'Consumo subiu: {mes} ficou mais de {limiar} acima do mesmo mês do ano anterior '
+        return (f'Consumo subiu: {rotulo} ficou mais de {limiar} acima do mesmo mês do ano anterior '
                 f'e da {base}. O aumento do consumo explica a conta mais alta.')
+    if conta_alta and abaixo_media:
+        return (f'Consumo mais de {limiar} acima do mesmo mês do ano anterior, mas mais de {limiar} '
+                f'abaixo da {base}: o consumo vem caindo nos últimos meses.')
     if conta_alta:
         return (f'Consumo mais de {limiar} acima do mesmo mês do ano anterior, mas em linha com a {base}: '
                 'o consumo vem subindo ao longo do ano, não só neste mês.')
+    if caiu_no_ano and abaixo_media:
+        return (f'Consumo caiu: {rotulo} ficou mais de {limiar} abaixo do mesmo mês do ano anterior '
+                f'e da {base}. {causa_nao_e_consumo}')
+    if caiu_no_ano and acima_media:
+        return (f'Consumo mais de {limiar} abaixo do mesmo mês do ano anterior, mas mais de {limiar} '
+                f'acima da {base}: o consumo voltou a subir nos últimos meses.')
+    if caiu_no_ano:
+        return (f'Consumo caiu em relação ao mesmo mês do ano anterior: {rotulo} ficou mais de {limiar} '
+                f'abaixo dele e em linha com a {base}. {causa_nao_e_consumo}')
     if acima_media:
         return (f'Consumo em linha com o mesmo mês do ano anterior, mas mais de {limiar} acima da {base}: '
                 'efeito sazonal do mês.')
-    return ('Consumo estável: se o valor da conta subiu, a causa não é o consumo, '
-            'e sim tarifa, bandeira tarifária ou tributos.')
+    if abaixo_media:
+        return f'Consumo caiu: {rotulo} ficou mais de {limiar} abaixo da {base}. {causa_nao_e_consumo}'
+    return f'Consumo estável: {causa_nao_e_consumo[0].lower()}{causa_nao_e_consumo[1:]}'
 
 
 def diagnosticar_conta(meses: list[MesConsumo], periodo: str) -> dict:
@@ -108,7 +141,8 @@ def diagnosticar_conta(meses: list[MesConsumo], periodo: str) -> dict:
     return {
         'periodo_referencia': ultimo.mes if ultimo else None,
         'conta_alta': conta_alta,
-        'veredito': _veredito(analisado, ultimo.consumo_kwh, conta_alta, media, meses_media) if ultimo else None,
+        'veredito': (_veredito(analisado, ultimo.consumo_kwh, conta_alta, ultimo.variacao_pct, media, meses_media)
+                     if ultimo else None),
         'ultimo_mes': _indicador(ultimo.consumo_kwh if ultimo else None, 'kWh', analisado),
         'mesmo_mes_ano_anterior': _indicador(ultimo.consumo_kwh_ano_anterior if ultimo else None,
                                              'kWh', mes_anterior),

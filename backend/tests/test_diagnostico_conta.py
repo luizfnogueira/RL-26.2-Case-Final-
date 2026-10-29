@@ -4,7 +4,9 @@ from decimal import Decimal
 import pytest
 
 from app.services.stubs import exemplo
-from app.services.unidade_service import MesConsumo, diagnosticar_conta, media_12_meses, somar_meses
+from app.services.unidade_service import (
+    MesConsumo, diagnosticar_conta, media_12_meses, mes_texto, somar_meses,
+)
 
 PERIODO = '2025-07/2026-06'
 JANELA = [somar_meses('2025-07', i) for i in range(12)]          # 2025-07 … 2026-06
@@ -53,6 +55,11 @@ def test_somar_meses_atravessa_o_ano():
     assert somar_meses('2025-12', 1) == '2026-01'
 
 
+@pytest.mark.parametrize('mes, texto', [('2026-06', 'jun/2026'), ('2025-01', 'jan/2025'), ('2024-12', 'dez/2024')])
+def test_mes_no_texto_e_por_extenso(mes, texto):
+    assert mes_texto(mes) == texto
+
+
 def test_conta_alta_com_consumo_acima_da_media_explica_a_conta():
     d = diagnosticar_conta(historico(), PERIODO)
 
@@ -84,8 +91,66 @@ def test_acima_da_media_sem_conta_alta_e_efeito_sazonal():
 def test_consumo_estavel_aponta_tarifa_bandeira_ou_tributos():
     d = diagnosticar_conta(historico(ultimo=305, ano_anterior=298), PERIODO)
     assert d['conta_alta'] is False
+    assert d['veredito'] == ('Consumo estável: se o valor da conta subiu, a causa não é o consumo, '
+                             'e sim tarifa, bandeira tarifária ou tributos.')
+
+
+def test_consumo_muito_abaixo_da_media_e_consumo_caiu_nao_estavel():
+    # Caso real da UC100015: 52 kWh contra média ~83 (−37%), sem alta sobre o ano anterior.
+    d = diagnosticar_conta(historico(ultimo=52, ano_anterior=60, base=83), PERIODO)
+    assert d['conta_alta'] is False
+    assert d['veredito'] == ('Consumo caiu: jun/2026 ficou mais de 20% abaixo da média dos meses anteriores '
+                             '(12 meses). Se o valor da conta subiu, a causa não é o consumo, '
+                             'e sim tarifa, bandeira tarifária ou tributos.')
+
+
+def test_exatamente_20_por_cento_abaixo_da_media_ainda_e_estavel():
+    # Média (240 + 11 × 300) / 12 = 295; 240 não é menor que 80% de 295 (236).
+    d = diagnosticar_conta(historico(ultimo=240, ano_anterior=240), PERIODO)
     assert d['veredito'].startswith('Consumo estável')
-    assert 'bandeira' in d['veredito']
+
+
+def test_acima_do_ano_anterior_mas_muito_abaixo_da_media_indica_queda_recente():
+    d = diagnosticar_conta(historico(ultimo=200, ano_anterior=150), PERIODO)
+    assert d['conta_alta'] is True
+    assert 'abaixo da média dos meses anteriores (12 meses): o consumo vem caindo' in d['veredito']
+
+
+def test_queda_forte_no_ano_e_media_em_linha_e_queda_contra_o_ano_anterior():
+    # −33% contra o ano anterior; média (300 + 11 × 210) / 12 = 217,5, então 200 está em linha.
+    d = diagnosticar_conta(historico(ultimo=200, ano_anterior=300, base=210), PERIODO)
+    assert d['conta_alta'] is False and d['variacao_percentual']['valor'] == -33.33
+    assert d['veredito'] == ('Consumo caiu em relação ao mesmo mês do ano anterior: jun/2026 ficou mais de 20% '
+                             'abaixo dele e em linha com a média dos meses anteriores (12 meses). Se o valor da '
+                             'conta subiu, a causa não é o consumo, e sim tarifa, bandeira tarifária ou tributos.')
+
+
+def test_queda_forte_no_ano_e_na_media():
+    d = diagnosticar_conta(historico(ultimo=100, ano_anterior=300, base=300), PERIODO)
+    assert d['veredito'] == ('Consumo caiu: jun/2026 ficou mais de 20% abaixo do mesmo mês do ano anterior e da '
+                             'média dos meses anteriores (12 meses). Se o valor da conta subiu, a causa não é o '
+                             'consumo, e sim tarifa, bandeira tarifária ou tributos.')
+
+
+def test_queda_forte_no_ano_mas_acima_da_media_e_retomada():
+    # −33% contra o ano anterior; média (300 + 11 × 150) / 12 = 162,5, então 200 está acima.
+    d = diagnosticar_conta(historico(ultimo=200, ano_anterior=300, base=150), PERIODO)
+    assert 'abaixo do mesmo mês do ano anterior, mas mais de 20% acima da média' in d['veredito']
+    assert d['veredito'].endswith('o consumo voltou a subir nos últimos meses.')
+
+
+def test_exatamente_20_por_cento_abaixo_do_ano_anterior_ainda_e_em_linha():
+    # −20,00% contra o ano anterior: o limiar é estrito, então não é "caiu".
+    d = diagnosticar_conta(historico(ultimo=240, ano_anterior=300, base=240), PERIODO)
+    assert d['variacao_percentual']['valor'] == -20.0
+    assert d['veredito'].startswith('Consumo estável')
+
+
+def test_sem_ano_anterior_e_muito_abaixo_da_media():
+    d = diagnosticar_conta(historico(ultimo=200, ano_anterior=None), PERIODO)
+    assert d['conta_alta'] is None
+    assert d['veredito'] == ('Sem o mesmo mês do ano anterior para comparar; o consumo de jun/2026 '
+                             'ficou mais de 20% abaixo da média dos meses anteriores (11 meses).')
 
 
 def test_conta_alta_vem_da_gold_sem_recalcular():
@@ -108,7 +173,7 @@ def test_sem_ano_anterior_fica_nulo_e_usa_so_a_media():
 def test_ultimo_mes_sem_consumo_valido_nao_avalia_a_conta():
     d = diagnosticar_conta(historico(ultimo=0), PERIODO)
     assert d['conta_alta'] is None and d['variacao_percentual']['valor'] is None
-    assert d['veredito'].startswith('Sem consumo válido em 2026-06')
+    assert d['veredito'].startswith('Sem consumo válido em jun/2026')
     assert d['media_12_meses']['valor'] == 299.83
 
 
@@ -119,7 +184,7 @@ def test_ultimo_mes_com_dado_e_o_mes_analisado_quando_a_janela_passa_do_fim_da_b
     assert d['mesmo_mes_ano_anterior']['periodo_referencia'] == '2025-06'
     # A média não segue a janela: são os mesmos 12 meses anteriores a jun/2026.
     assert d['media_12_meses'] == {'valor': 299.83, 'unidade': 'kWh', 'periodo_referencia': BASE_MEDIA}
-    assert d['veredito'].startswith('Consumo subiu: 2026-06')
+    assert d['veredito'].startswith('Consumo subiu: jun/2026')
 
 
 @pytest.mark.parametrize('meses', [[], historico()], ids=['uc_sem_meses', 'janela_sem_dados'])
@@ -158,16 +223,16 @@ def test_uc_recente_usa_os_meses_que_existem():
 def test_leitura_estimada_no_ultimo_mes():
     d = diagnosticar_conta(historico(tipo='ESTIMADA'), PERIODO)
     assert d['leitura_estimada'] is True
-    assert d['alerta'] == 'Leitura ESTIMADA em 2026-06: o consumo pode ser ajustado na próxima leitura real.'
+    assert d['alerta'] == 'Leitura ESTIMADA em jun/2026: o consumo pode ser ajustado na próxima leitura real.'
 
 
 def test_leitura_estimada_no_ano_anterior_enfraquece_a_comparacao():
     d = diagnosticar_conta(historico(tipo_anterior='ESTIMADA'), PERIODO)
     assert d['leitura_estimada'] is True
-    assert d['alerta'] == 'Leitura ESTIMADA em 2025-06: a comparação com o ano anterior é fraca.'
+    assert d['alerta'] == 'Leitura ESTIMADA em jun/2025: a comparação com o ano anterior é fraca.'
 
 
-@pytest.mark.parametrize('campo, mes', [('troca', '2026-06'), ('troca_anterior', '2025-06')])
+@pytest.mark.parametrize('campo, mes', [('troca', 'jun/2026'), ('troca_anterior', 'jun/2025')])
 def test_troca_de_medidor_gera_alerta_sem_marcar_estimada(campo, mes):
     d = diagnosticar_conta(historico(**{campo: True}), PERIODO)
     assert d['leitura_estimada'] is False
@@ -179,4 +244,4 @@ def test_alertas_se_somam_e_nao_mudam_o_veredito():
     d = diagnosticar_conta(historico(tipo='ESTIMADA', tipo_anterior='ESTIMADA', troca=True), PERIODO)
     assert d['veredito'] == sem_alerta['veredito']
     assert [frase.split(':')[0] for frase in d['alerta'].split('. ') if frase] == [
-        'Leitura ESTIMADA em 2026-06', 'Leitura ESTIMADA em 2025-06', 'Troca de medidor em 2026-06']
+        'Leitura ESTIMADA em jun/2026', 'Leitura ESTIMADA em jun/2025', 'Troca de medidor em jun/2026']

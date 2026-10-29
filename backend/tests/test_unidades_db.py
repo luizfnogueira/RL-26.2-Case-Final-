@@ -60,7 +60,7 @@ with TestClient(app) as client:
     d = uc['diagnostico_conta']
     assert d['periodo_referencia'] == '2026-06' and d['conta_alta'] is True      # flag da Gold
     assert d['variacao_percentual']['valor'] == 12.3 and d['meses_media'] == 0
-    assert 'Troca de medidor em 2026-06' in d['alerta']
+    assert 'Troca de medidor em jun/2026' in d['alerta']
 
     assert [f['status'] for f in uc['faturas_abertas']] == ['EM ABERTO'] and uc['faturas_pagas'] == []
     assert uc['medidor']['id_medidor'] == 'MD-TEST'

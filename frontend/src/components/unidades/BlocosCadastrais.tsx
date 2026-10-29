@@ -4,8 +4,9 @@ import Card from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
 import type { Cadastro, GeracaoDistribuida, Medidor } from '@/types/unidades'
 import { formatarData } from '@/utils/datas'
-import { formatarIndicador, formatarNome } from '@/utils/formatacao'
+import { formatarCep, formatarIndicador, formatarNome } from '@/utils/formatacao'
 import ListaDados from './ListaDados'
+import { rotuloModalidadeGd } from './rotulos'
 
 const NAO_INFORMADO = 'Não informado'
 const leitura = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
@@ -27,7 +28,7 @@ export function BlocoCadastro({ cadastro: c }: { cadastro: Cadastro }) {
             rotulo: 'Endereço',
             valor: `${formatarNome(c.logradouro)}, ${c.numero} · ${formatarNome(c.bairro)}, ${formatarNome(c.municipio)} – ${c.uf}`,
           },
-          { rotulo: 'CEP', valor: c.cep ?? NAO_INFORMADO },
+          { rotulo: 'CEP', valor: c.cep ? formatarCep(c.cep) : NAO_INFORMADO },
           {
             rotulo: 'Classe e subgrupo',
             valor: `${formatarNome(c.classe)} · ${c.subgrupo_tarifario}`,
@@ -104,8 +105,7 @@ export function BlocoGeracao({ gd }: { gd: GeracaoDistribuida | null }) {
         className="sm:grid-cols-1"
         itens={[
           { rotulo: 'Potência instalada', valor: `${potencia.format(gd.potencia_kwp)} kWp` },
-          // Código de domínio da Gold: formatarNome estragaria a sigla ("UC" → "Uc").
-          { rotulo: 'Modalidade', valor: gd.modalidade },
+          { rotulo: 'Modalidade', valor: rotuloModalidadeGd(gd.modalidade) },
           { rotulo: 'Conectada em', valor: formatarData(gd.data_conexao) },
           {
             rotulo: 'Energia injetada (média mensal)',

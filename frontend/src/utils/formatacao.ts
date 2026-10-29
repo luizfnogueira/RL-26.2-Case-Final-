@@ -75,6 +75,12 @@ export function formatarNome(nome: string): string {
     .join(' ')
 }
 
+/** CEP da Gold (8 dígitos, sem hífen) → "50050-000". Fora desse padrão, volta como veio. */
+export function formatarCep(cep: string): string {
+  const m = /^(\d{5})-?(\d{3})$/.exec(cep)
+  return m ? `${m[1]}-${m[2]}` : cep
+}
+
 /** Formata um indicador da API pela unidade; null vira travessão (nunca zero). */
 export function formatarIndicador(indicador: Pick<Indicador, 'valor' | 'unidade'>): string {
   const { valor, unidade } = indicador
