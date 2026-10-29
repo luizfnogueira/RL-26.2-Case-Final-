@@ -194,7 +194,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
           role="tabpanel"
           id={`${idAbas}-sugestoes-painel`}
           aria-labelledby={`${idAbas}-sugestoes`}
-          className={cx('flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
+          className={cx('relative flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
         >
           <div className={cx('flex w-full flex-col gap-4', pagina && 'mx-auto max-w-[760px]')}>
             {SUGESTOES_POR_CATEGORIA.map(({ categoria, perguntas }) => (
@@ -218,6 +218,8 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
         </div>
       )}
 
+      {/* `relative` prende os textos sr-only (position: absolute) dentro da rolagem; sem ele, cada
+          mensagem estica a página para baixo da conversa e a tela desce a cada pergunta. */}
       <div
         ref={conversa}
         role="log"
@@ -225,7 +227,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
         aria-live="polite"
         id={`${idAbas}-conversa-painel`}
         hidden={aba !== 'conversa'}
-        className={cx('flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
+        className={cx('relative flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
       >
         <div className={cx('flex w-full flex-col gap-4', pagina && 'mx-auto max-w-[760px]')}>
           {vazia ? (
