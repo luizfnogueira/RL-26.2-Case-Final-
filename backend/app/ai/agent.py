@@ -109,7 +109,10 @@ REGRAS_CRITICAS_TOPO = """
 10. PEDIDO DE GRÁFICO (barras, pizza, linhas):
    - Nunca recuse nem diga que não gera gráficos: o portal desenha o gráfico a partir do resultado de `consultar_gold`. Consulte os dados normalmente e responda com `status="ok"`.
    - Se o pedido se refere à resposta anterior ("faça um gráfico disso"), rode de novo o SQL da troca anterior, com os mesmos filtros.
-   - Devolva uma coluna de nomes (ou de mês) e as colunas numéricas, com aliases com unidade (`_brl`, `_kwh`, `_pct`). Para pizza, traga totais somáveis (receita, kWh, contagens), nunca médias ou percentuais. Para comparar P1 e P2, use colunas `..._p1` e `..._p2` ou a coluna `periodo`.
+   - Devolva uma coluna de nomes (ou de mês) e as colunas numéricas, com aliases com unidade (`_brl`, `_kwh`, `_pct`). Para pizza, traga totais somáveis (receita, kWh, contagens), nunca médias ou percentuais. Para comparar P1 e P2, use colunas `..._p1` e `..._p2` numa linha só ou a coluna `periodo` com `GROUP BY periodo`; nunca `UNION` com colunas extras.
+   - O gráfico não muda a pergunta: traga só a métrica e os agrupamentos pedidos. Não acrescente outra métrica (ex.: receita de energia quando pediram "receita") nem um agrupamento que a pergunta não pediu (classe, município, mês) só para ter o que desenhar. Se a resposta for um número só, devolva o número; o portal explica que não há gráfico.
+   - Em série no tempo ou lista completa ("por mês", "por município", "mês a mês"), não use `LIMIT`: o gráfico precisa de todas as linhas. `LIMIT` só em ranking pedido ("top 5", "os 10 maiores").
+   - Na `pergunta_interpretada`, descreva os dados, sem citar o gráfico (nada de "formatado para gráfico de pizza").
 """.strip()
 
 REGRAS_CRITICAS_RODAPE = """
@@ -117,6 +120,7 @@ REGRAS_CRITICAS_RODAPE = """
 - Preencha primeiro o `plano` (`PlanoConsulta`) com tabelas, colunas, filtros, agregação, ordenação, limite e período.
 - Se consultar `fato_uc_mes` ou `uc_consumo_comparativo` para consumo normal (especialmente `MIN`, menor consumo, média ou ranking), garanta `flag_consumo_negativo = FALSE` e `consumo_kwh_valido >= 0` (ou `> 0` para menor consumo de UC ativa). NUNCA mostre consumo negativo salvo pedido explícito de erro de medidor!
 - DEC/FEC de um período é `SUM` dos meses, nunca `AVG` (salvo pedido explícito de média mensal).
+- Pedido de gráfico: só a métrica e os agrupamentos pedidos, e sem `LIMIT` em série no tempo ou lista completa.
 - Cite sempre o período (ex.: P1 = jul/2022 a jun/2023; P2 = jul/2025 a jun/2026), a unidade (R$, kWh, %, h/UC) e a métrica (ex.: receita de energia sem tributos vs. receita faturada com tributos).
 - Todos os números citados no `texto` devem estar declarados em `marcadores` (`{v1}`, `{v2}`) e bater com o resultado de `consultar_gold`.
 """.strip()
