@@ -12,9 +12,8 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Any
 
-from app.repositories import vocabulario_gold
-
-MAX_OPCOES = 8
+# O Centro existe em 10 municípios da Gold: todos viram botão (mais o "Todos")
+MAX_OPCOES = 10
 TODOS = "somando todos os municípios"
 _MINUSCULAS = {"de", "da", "do", "das", "dos", "e"}
 _ESTE_ANO = re.compile(r"\b(?:(n|d)?(?:este|esse)\s+ano|(no|do)\s+ano\s+atual)\b", re.IGNORECASE)
@@ -32,16 +31,12 @@ def nome_legivel(nome: str) -> str:
     return " ".join(p if i and p in _MINUSCULAS else p[:1].upper() + p[1:] for i, p in enumerate(palavras))
 
 
-def vocabulario(db, versao_gold: Any) -> dict[str, set[str]]:
-    """Bairros ambíguos (em 2 municípios ou mais) da Gold; sem banco, nenhum (só o caso do ano vale)."""
-    return vocabulario_gold.nomes(db, versao_gold)["bairros_ambiguos"]
-
-
 def _menciona(texto_normalizado: str, nome: str) -> bool:
     return re.search(rf"(?<![A-Z0-9]){re.escape(normalizar(nome))}(?![A-Z0-9])", texto_normalizado) is not None
 
 
-def _bairro_ambiguo(pergunta: str, historico: list[dict], ambiguos: dict[str, set[str]]) -> dict | None:
+def _bairro_ambiguo(pergunta: str, historico: list[dict], ambiguos: dict[str, set[str]],
+                    municipios: set[str]) -> dict | None:
     texto = normalizar(pergunta)
     if normalizar(TODOS) in texto:
         return None
@@ -50,17 +45,18 @@ def _bairro_ambiguo(pergunta: str, historico: list[dict], ambiguos: dict[str, se
     for bairro in sorted(ambiguos, key=len, reverse=True):
         if not _menciona(texto, bairro):
             continue
-        municipios = ambiguos[bairro]
-        if any(_menciona(texto, m) or _menciona(anterior, m) for m in municipios):
+        do_bairro = ambiguos[bairro]
+        # Qualquer município citado resolve, mesmo um sem esse bairro: aí o agente responde que não há dados
+        if any(_menciona(texto, m) or _menciona(anterior, m) for m in do_bairro | municipios):
             return None
         base = pergunta.strip().rstrip("?").strip()
         legivel = nome_legivel(bairro)
         opcoes = [{"rotulo": f"{legivel} de {nome_legivel(m)}",
                    "pergunta": f"{base} (bairro {legivel}, em {nome_legivel(m)})?"}
-                  for m in sorted(municipios)[:MAX_OPCOES]]
+                  for m in sorted(do_bairro)[:MAX_OPCOES]]
         opcoes.append({"rotulo": "Todos os municípios juntos", "pergunta": f"{base} (bairro {legivel}, {TODOS})?"})
         return {
-            "pergunta": f"O bairro {legivel} existe em {len(municipios)} municípios. De qual você quer saber?",
+            "pergunta": f"O bairro {legivel} existe em {len(do_bairro)} municípios. De qual você quer saber?",
             "opcoes": opcoes,
         }
     return None
@@ -85,9 +81,10 @@ def _este_ano(pergunta: str) -> dict | None:
     }
 
 
-def detectar(pergunta: str, historico: list[dict], ambiguos: dict[str, set[str]]) -> dict | None:
+def detectar(pergunta: str, historico: list[dict], ambiguos: dict[str, set[str]],
+             municipios: set[str] = frozenset()) -> dict | None:
     """O pedido de esclarecimento (pergunta e opções) ou None quando a pergunta já é clara."""
-    return _bairro_ambiguo(pergunta, historico, ambiguos) or _este_ano(pergunta)
+    return _bairro_ambiguo(pergunta, historico, ambiguos, set(municipios)) or _este_ano(pergunta)
 
 
 def resposta(esclarecimento: dict, gold_atualizada_em: Any) -> dict:

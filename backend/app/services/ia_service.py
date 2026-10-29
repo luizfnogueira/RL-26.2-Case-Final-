@@ -51,6 +51,8 @@ def executar_com_prazo(funcao: Callable[[], Any], prazo_s: float) -> Any:
     try:
         return _THREADS_IA.submit(funcao).result(timeout=prazo_s)
     except PrazoEsgotado as erro:
+        # Sem esta linha, o 503 por prazo não deixava rastro no log (o agente segue em segundo plano)
+        logger.warning("Agente de IA passou do prazo de %.0f s", prazo_s)
         raise AgenteIndisponivelException() from erro
 
 
@@ -157,15 +159,16 @@ class AgenteReal:
                 resumo = (interacao_repository.carregar_resumo(db, dados.conversa_id)
                           if len(historico) >= interacao_repository.MAX_TROCAS else [])
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
+                # Nomes da Gold (uma consulta por versão): esclarecimento e assinatura do cache
+                nomes = vocabulario_gold.nomes(db, gold["gold_atualizada_em"])
                 # Pergunta ambígua volta com opções antes de gastar tokens
                 esclarecer = esclarecimento_ia.detectar(
-                    dados.pergunta, historico, esclarecimento_ia.vocabulario(db, gold["gold_atualizada_em"]))
+                    dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
                 sem_o_comeco = not esclarecer and (
                     pede_o_comeco_da_conversa(dados.pergunta)
                     and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico) + len(resumo))
                 # Respostas pré-calculadas: pergunta igual ou parecida a uma já respondida, sem histórico
                 usa_cache = cache_ligado() and not historico and not esclarecer and not sem_o_comeco
-                nomes = vocabulario_gold.nomes(db, gold["gold_atualizada_em"]) if usa_cache else {}
                 reaproveitada = (cache_respostas.buscar(db, dados.pergunta, gold["gold_atualizada_em"], nomes)
                                  if usa_cache else None)
             para_o_cache = None

@@ -298,7 +298,7 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 
 | Caso | Exemplo | Opções |
 | --- | --- | --- |
-| Bairro que existe em 2 municípios ou mais, sem o município na pergunta nem na troca anterior | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 8) e "Todos os municípios juntos" |
+| Bairro que existe em 2 municípios ou mais, sem nenhum município na pergunta nem na troca anterior | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 10) e "Todos os municípios juntos". Um município citado resolve, mesmo sem esse bairro: aí o agente responde que não há dados |
 | "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
 
 ```json
@@ -315,7 +315,7 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 }
 ```
 
-`opcoes` tem de 2 a 10 itens. Cada `pergunta` já vem completa: o front a envia como uma pergunta nova, na mesma conversa, e ela não pede esclarecimento de novo. A troca `esclarecer` vai para o log em `ia.interacao`, mas não entra na memória da conversa. [Exemplo completo (bairro)](../backend/app/services/fixtures/resposta_ia_esclarecer.json), [exemplo do ano](../backend/app/services/fixtures/resposta_ia_esclarecer_ano.json).
+`opcoes` tem de 2 a 11 itens. Cada `pergunta` já vem completa: o front a envia como uma pergunta nova, na mesma conversa, e ela não pede esclarecimento de novo. A troca `esclarecer` vai para o log em `ia.interacao`, mas não entra na memória da conversa. [Exemplo completo (bairro)](../backend/app/services/fixtures/resposta_ia_esclarecer.json), [exemplo do ano](../backend/app/services/fixtures/resposta_ia_esclarecer_ano.json).
 
 **Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
 

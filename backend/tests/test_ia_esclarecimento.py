@@ -12,10 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.db import seed
 from app.main import app
-from app.repositories import interacao_repository
+from app.repositories import interacao_repository, vocabulario_gold
 from app.schemas.ia import RespostaIA
-from app.services import esclarecimento_ia, ia_service
-from app.services.esclarecimento_ia import detectar, vocabulario
+from app.services import ia_service
+from app.services.esclarecimento_ia import detectar
 from app.services.ia_service import AgenteReal, obter_agente
 from app.services.stubs import exemplo
 
@@ -57,11 +57,20 @@ def test_municipio_da_troca_anterior_resolve_o_bairro():
     assert detectar("E no Centro?", historico, AMBIGUOS) is None
 
 
-def test_opcoes_param_em_8_municipios_mais_todos():
-    muitos = {"CENTRO": {f"MUNICIPIO {i:02d}" for i in range(10)}}
-    pedido = detectar("Receita do Centro", [], muitos)
-    assert len(pedido["opcoes"]) == 9 and pedido["opcoes"][-1]["rotulo"] == "Todos os municípios juntos"
+def test_os_10_municipios_do_centro_viram_botao_mais_todos():
+    # Caso real: na Gold o Centro existe em 10 municípios; com o limite antigo de 8, dois sumiam
+    dez = {"CENTRO": {f"MUNICIPIO {i:02d}" for i in range(10)}}
+    pedido = detectar("Receita do Centro", [], dez)
+    assert len(pedido["opcoes"]) == 11 and pedido["opcoes"][-1]["rotulo"] == "Todos os municípios juntos"
     assert "10 municípios" in pedido["pergunta"]
+    doze = {"CENTRO": {f"MUNICIPIO {i:02d}" for i in range(12)}}
+    assert len(detectar("Receita do Centro", [], doze)["opcoes"]) == 11
+
+
+def test_municipio_sem_esse_bairro_tambem_resolve():
+    # Caso real: Recife não tem bairro "Centro" na Gold; perguntar de novo não ajuda, o agente responde
+    assert detectar("Qual a receita do Centro, em Recife?", [], {"CENTRO": {"OLINDA", "PAULISTA"}},
+                    {"RECIFE", "OLINDA", "PAULISTA"}) is None
 
 
 # ---------- "este ano" ----------
@@ -93,8 +102,8 @@ def test_sem_banco_ou_com_erro_no_banco_so_o_caso_do_ano_vale():
     class Quebrado:
         def execute(self, *a):
             raise SQLAlchemyError("fora do ar")
-    assert vocabulario(None, "versao-x") == {}
-    assert vocabulario(Quebrado(), "versao-y") == {}
+    assert vocabulario_gold.nomes(None, "versao-x")["bairros_ambiguos"] == {}
+    assert vocabulario_gold.nomes(Quebrado(), "versao-y")["bairros_ambiguos"] == {}
 
 
 # ---------- contrato e ponte ----------
@@ -113,7 +122,8 @@ def test_ponte_responde_esclarecimento_sem_chamar_o_modelo_e_grava_no_log(monkey
     monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, c: [])
     monkeypatch.setattr(ia_service.interacao_repository, "registrar", lambda db, c, p, r: gravadas.append(r))
     monkeypatch.setattr("app.repositories.gold_metadata.GOLD_SOURCE", "seed")
-    monkeypatch.setattr(esclarecimento_ia, "vocabulario", lambda db, versao: AMBIGUOS)
+    monkeypatch.setattr(vocabulario_gold, "nomes",
+                        lambda db, versao: {**vocabulario_gold.VAZIO, "bairros_ambiguos": AMBIGUOS})
 
     def nao_chamar(*a, **k):
         raise AssertionError("não deveria chamar o modelo")

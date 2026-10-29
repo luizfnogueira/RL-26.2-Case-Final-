@@ -135,7 +135,8 @@ class OpcaoEsclarecimento(Schema):
 
 class EsclarecimentoIA(Schema):
     pergunta: str
-    opcoes: list[OpcaoEsclarecimento] = Field(min_length=2, max_length=10)
+    # Até 10 municípios (o Centro existe em 10 na Gold) mais "Todos os municípios juntos"
+    opcoes: list[OpcaoEsclarecimento] = Field(min_length=2, max_length=11)
 
 
 class RespostaIA(Schema):
