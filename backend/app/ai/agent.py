@@ -95,12 +95,18 @@ REGRAS_CRITICAS_TOPO = """
    - Quando o resultado for um ranking ou lista (várias linhas), mencione no texto o período, a unidade e o destaque do 1º lugar.
 7. DADOS PESSOAIS PROTEGIDOS:
    - O agente não tem acesso a `cpf_cnpj`, `nome_titular` ou endereço detalhado. Se pedirem titular ou CPF, recuse com `status="bloqueado"`.
+8. DEC E FEC DE UM PERÍODO (REGRA DE NEGÓCIO CRÍTICA):
+   - O DEC e o FEC de cada mês já são médias por UC. O DEC (ou FEC) de um período (P1, P2, um ano) é a SOMA dos meses: use `SUM(dec)`, nunca `AVG(dec)`.
+   - "DEC médio de P2" é o DEC de P2: responda com a soma dos meses e explique que o DEC já é uma média por UC. Só use a média mensal se a pergunta pedir "por mês", "mensal" ou "média mensal".
+   - Sistema inteiro: some os meses de `agg_kpis_mensal`. Por alimentador: some os meses de `agg_dec_fec_mensal` agrupando por `alimentador`.
+   - Nunca some o DEC de alimentadores diferentes no mesmo mês: o DEC de um grupo de alimentadores (ex.: um município) é `SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)` em cada mês, e depois a soma dos meses.
 """.strip()
 
 REGRAS_CRITICAS_RODAPE = """
 === LEMBRETE FINAL ANTES DE GERAR O PLANO E O SQL ===
 - Preencha primeiro o `plano` (`PlanoConsulta`) com tabelas, colunas, filtros, agregação, ordenação, limite e período.
 - Se consultar `fato_uc_mes` ou `uc_consumo_comparativo` para consumo normal (especialmente `MIN`, menor consumo, média ou ranking), garanta `flag_consumo_negativo = FALSE` e `consumo_kwh_valido >= 0` (ou `> 0` para menor consumo de UC ativa). NUNCA mostre consumo negativo salvo pedido explícito de erro de medidor!
+- DEC/FEC de um período é `SUM` dos meses, nunca `AVG` (salvo pedido explícito de média mensal).
 - Cite sempre o período (ex.: P1 = jul/2022 a jun/2023; P2 = jul/2025 a jun/2026), a unidade (R$, kWh, %, h/UC) e a métrica (ex.: receita de energia sem tributos vs. receita faturada com tributos).
 - Todos os números citados no `texto` devem estar declarados em `marcadores` (`{v1}`, `{v2}`) e bater com o resultado de `consultar_gold`.
 """.strip()
@@ -198,6 +204,20 @@ def validar_regra_consumo_negativo_no_sql(sql: str, consumo_negativo_solicitado:
             )
 
 
+PEDIDO_MEDIA_MENSAL = re.compile(r"por\s+m[eê]s|mensal|m[eê]s\s+a\s+m[eê]s|cada\s+m[eê]s", re.IGNORECASE)
+
+
+def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
+    """DEC/FEC de um período é a soma dos meses (contrato de dados, seção 4); a média só com pedido explícito."""
+    usa_media = re.search(r"\bavg\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?\s*\)", (sql or "").lower())
+    if usa_media and not PEDIDO_MEDIA_MENSAL.search(pergunta or ""):
+        raise ErroConsulta(
+            "Regra de negócio violada: o DEC/FEC de um período é a SOMA dos meses (`SUM(dec)`), nunca `AVG(dec)`. "
+            "O DEC mensal já é uma média por UC. Para um grupo de alimentadores, pondere pelas UCs em cada mês "
+            "(`SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)`) e depois some os meses."
+        )
+
+
 def descrever_tabela_padrao(tabela: str) -> str:
     """Retorna as colunas e chaves da tabela a partir do contrato oficial da Gold."""
     nome_limpo = tabela.strip().lower().removeprefix("gold.").removeprefix("agente.")
@@ -287,6 +307,7 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
         ctx.deps.tentativas_sql += 1
         try:
             validar_regra_consumo_negativo_no_sql(sql, ctx.deps.consumo_negativo_solicitado)
+            validar_regra_dec_fec_no_sql(sql, ctx.deps.pergunta_original)
             if ctx.deps.executar_sql_fn is None:
                 raise ErroConsulta("Função de consulta ao banco não configurada.")
             resultado = ctx.deps.executar_sql_fn(sql)
