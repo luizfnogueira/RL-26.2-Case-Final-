@@ -25,7 +25,7 @@ import {
   RECUO_QUARTA_COLUNA,
   TABELA_PROPORCIONAL,
 } from './larguras'
-import { estiloBandeira } from './rotulos'
+import { estiloBandeira, formatarTempoAteFechamento, rotuloAssunto, rotuloCanal } from './rotulos'
 
 // Consumo: a 4ª coluna (leitura, texto) vem depois de um número alinhado à direita.
 const TABELA_COM_RECUO = `${TABELA_PROPORCIONAL} ${RECUO_QUARTA_COLUNA}`
@@ -306,25 +306,25 @@ const COLUNAS_CHAMADOS: readonly Coluna<Chamado>[] = [
     id: 'canal',
     cabecalho: 'Canal',
     largura: LARGURAS_CHAMADOS.canal,
-    celula: (c) => formatarNome(c.canal),
+    celula: (c) => rotuloCanal(c.canal),
   },
   {
     id: 'assunto',
     cabecalho: 'Assunto',
     largura: LARGURAS_CHAMADOS.assunto,
-    celula: (c) => `${formatarNome(c.assunto)} · ${formatarNome(c.subassunto)}`,
+    celula: (c) => rotuloAssunto(c.assunto, c.subassunto),
   },
   {
     id: 'tempo',
-    cabecalho: 'Tempo de atendimento',
-    alinhar: 'direita',
+    cabecalho: 'Tempo até o fechamento',
+    alinhar: 'centro',
     largura: LARGURAS_CHAMADOS.tempo,
-    celula: (c) => `${uma.format(c.tempo_atendimento_h)} h`,
+    celula: (c) => formatarTempoAteFechamento(c.tempo_atendimento_h),
   },
   {
     id: 'nota',
     cabecalho: 'Nota',
-    alinhar: 'direita',
+    alinhar: 'centro',
     largura: LARGURAS_CHAMADOS.nota,
     // Nota não preenchida: "Sem nota", nunca 0.
     celula: (c) =>
@@ -336,7 +336,7 @@ const COLUNAS_CHAMADOS: readonly Coluna<Chamado>[] = [
   },
 ]
 
-/** Bloco 9: chamados do cliente com tempo de atendimento e nota. */
+/** Bloco 9: chamados do cliente com tempo até o fechamento e nota. */
 export function BlocoChamados({ chamados }: { chamados: readonly Chamado[] }) {
   return (
     <Card

@@ -9,7 +9,13 @@ import { BlocoMedidor } from './BlocosCadastrais'
 import { BlocoFaturas } from './BlocosHistorico'
 import { caminhoBarra } from '@/components/graficos/geometria'
 import { mesesEstimados, pontosDoConsumo } from './consumo'
-import { estiloBandeira, rotuloModalidadeGd } from './rotulos'
+import {
+  estiloBandeira,
+  formatarTempoAteFechamento,
+  rotuloAssunto,
+  rotuloCanal,
+  rotuloModalidadeGd,
+} from './rotulos'
 
 afterEach(cleanup)
 
@@ -316,8 +322,11 @@ describe('consumo, faturas, interrupções e chamados', () => {
 
     const chamados = regiao('Chamados')
     expect(chamados.getByText('02/07/2026, 10:05')).toBeTruthy()
-    expect(chamados.getByText('30,4 h')).toBeTruthy()
+    expect(chamados.getByText('1 d 6 h')).toBeTruthy() // 30,42 h
     expect(chamados.getByText('3,0')).toBeTruthy()
+    expect(chamados.getByText('Aplicativo')).toBeTruthy()
+    // Assunto da fixture fora da Gold: aparece como veio, sem esconder o dado.
+    expect(chamados.getByText('CONTA ALTA · LEITURA ESTIMADA')).toBeTruthy()
   })
 
   it('UC recente: meses sem dado, nenhuma interrupção e chamado sem nota', async () => {
@@ -340,7 +349,58 @@ describe('consumo, faturas, interrupções e chamados', () => {
         name: 'Nenhuma interrupção no período',
       }),
     ).toBeTruthy()
-    expect(regiao('Chamados').getByText('Sem nota')).toBeTruthy()
+    const chamados = regiao('Chamados')
+    expect(chamados.getByText('Sem nota')).toBeTruthy()
+    expect(chamados.getByText('WhatsApp')).toBeTruthy()
+    expect(chamados.getByText('Fatura · Valor alto')).toBeTruthy()
+    expect(chamados.getByText('1 d 2 h')).toBeTruthy() // 25,75 h
+  })
+
+  it('tempo até o fechamento: horas até 24 h, dias e horas acima', () => {
+    expect(formatarTempoAteFechamento(1)).toBe('1 h')
+    expect(formatarTempoAteFechamento(4)).toBe('4 h') // inteiro sem casa decimal
+    expect(formatarTempoAteFechamento(4.5)).toBe('4,5 h')
+    expect(formatarTempoAteFechamento(24)).toBe('24 h')
+    expect(formatarTempoAteFechamento(188)).toBe('7 d 20 h')
+    expect(formatarTempoAteFechamento(48)).toBe('2 d') // sem "0 h"
+    expect(formatarTempoAteFechamento(719)).toBe('29 d 23 h') // máximo da Gold
+  })
+
+  it('rótulos de canal, assunto e subassunto da Gold; valor desconhecido aparece como veio', () => {
+    expect(['APP', 'PRESENCIAL', 'SITE', 'TELEFONE', 'WHATSAPP'].map(rotuloCanal)).toEqual([
+      'Aplicativo',
+      'Presencial',
+      'Site',
+      'Telefone',
+      'WhatsApp',
+    ])
+    // Os 17 pares assunto · subassunto da Gold.
+    const pares: [string, string, string][] = [
+      ['DANO ELETRICO', 'RESSARCIMENTO', 'Dano elétrico · Ressarcimento'],
+      ['DANO ELETRICO', 'VISTORIA', 'Dano elétrico · Vistoria'],
+      ['FALTA DE ENERGIA', 'INTERRUPCAO PARCIAL', 'Falta de energia · Interrupção parcial'],
+      ['FALTA DE ENERGIA', 'INTERRUPCAO TOTAL', 'Falta de energia · Interrupção total'],
+      ['FALTA DE ENERGIA', 'OSCILACAO', 'Falta de energia · Oscilação'],
+      ['FATURA', 'CONTESTACAO', 'Fatura · Contestação'],
+      ['FATURA', 'PARCELAMENTO', 'Fatura · Parcelamento'],
+      ['FATURA', 'SEGUNDA VIA', 'Fatura · Segunda via'],
+      ['FATURA', 'VALOR ALTO', 'Fatura · Valor alto'],
+      ['GERACAO DISTRIBUIDA', 'CREDITOS', 'Geração distribuída · Créditos'],
+      ['GERACAO DISTRIBUIDA', 'HOMOLOGACAO', 'Geração distribuída · Homologação'],
+      ['GERACAO DISTRIBUIDA', 'VISTORIA', 'Geração distribuída · Vistoria'],
+      ['LIGACAO NOVA', 'PRAZO', 'Ligação nova · Prazo'],
+      ['LIGACAO NOVA', 'SOLICITACAO', 'Ligação nova · Solicitação'],
+      ['LIGACAO NOVA', 'VISTORIA', 'Ligação nova · Vistoria'],
+      ['RELIGACAO', 'APOS PAGAMENTO', 'Religação · Após pagamento'],
+      ['RELIGACAO', 'URGENCIA', 'Religação · Urgência'],
+    ]
+    for (const [assunto, subassunto, rotulo] of pares) {
+      expect(rotuloAssunto(assunto, subassunto)).toBe(rotulo)
+    }
+    expect(rotuloCanal('TOTEM')).toBe('TOTEM')
+    expect(rotuloCanal('toString')).toBe('toString')
+    expect(rotuloAssunto('FATURA', 'NOVO SUB')).toBe('Fatura · NOVO SUB')
+    expect(rotuloAssunto('OUTRO', 'VISTORIA')).toBe('OUTRO · Vistoria')
   })
 })
 
@@ -485,6 +545,28 @@ describe('tabelas na largura do cartão com colunas proporcionais', () => {
     const selo = screen.getByText('Vermelha P2')
     expect(selo.className).toContain('bg-perigo-escuro!')
     expect(selo.className).toContain('text-ink-inverso!')
+  })
+
+  it('chamados: tempo até o fechamento e nota centralizados, cabeçalho e células', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    const tabela = within(screen.getByRole('region', { name: 'Chamados' })).getByRole('table')
+    const cabecalhos = within(tabela).getAllByRole('columnheader')
+    expect(cabecalhos.map((th) => th.textContent)).toEqual([
+      'Aberto em',
+      'Canal',
+      'Assunto',
+      'Tempo até o fechamento',
+      'Nota',
+    ])
+    for (const indice of [3, 4]) {
+      expect(cabecalhos[indice].className).toContain('text-center')
+      for (const linha of within(tabela).getAllByRole('row').slice(1)) {
+        expect(within(linha).getAllByRole('cell')[indice].className).toContain('text-center')
+      }
+    }
+    // Assunto estreito (o mais longo ainda cabe em uma linha); a sobra vai para tempo e nota.
+    expect(larguras(tabela)).toEqual(['18%', '12%', '32%', '26%', '12%'])
   })
 
   it('todas as tabelas: largura do cartão, table-fixed e porcentagens que somam 100%', async () => {

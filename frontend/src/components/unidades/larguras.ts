@@ -14,12 +14,15 @@ export const LARGURAS_INTERRUPCOES = {
   causa: '28%',
   alimentador: '18%',
 }
+// Chamados: o assunto fica no mínimo em que o mais longo da Gold ("Falta de energia · Interrupção
+// parcial", ~230 px em Outfit 14px) cabe sem quebrar na largura mínima da tabela (32% de 832 px,
+// menos o padding = 242 px). A sobra vai para o tempo e a nota, centralizados.
 export const LARGURAS_CHAMADOS = {
   abertura: '18%',
   canal: '12%',
-  assunto: '38%',
-  tempo: '22%',
-  nota: '10%',
+  assunto: '32%',
+  tempo: '26%',
+  nota: '12%',
 }
 
 /**
