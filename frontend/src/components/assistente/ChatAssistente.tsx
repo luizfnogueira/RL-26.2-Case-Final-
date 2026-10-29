@@ -294,6 +294,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
                     mensagem={mensagem}
                     enviando={enviando}
                     aoTentarNovamente={() => tentarNovamente(mensagem.id)}
+                    aoEscolher={enviar}
                   />
                 </div>
               ),

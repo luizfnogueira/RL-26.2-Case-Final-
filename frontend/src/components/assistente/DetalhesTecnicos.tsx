@@ -12,6 +12,7 @@ const STATUS: Record<StatusIA, string> = {
   ok: 'Respondidas',
   nao_sei: 'Não sei',
   bloqueado: 'Bloqueadas',
+  esclarecer: 'Esclarecimento pedido',
 }
 
 const segundos = (ms: number) => `${numero.format(ms / 1000)} s`

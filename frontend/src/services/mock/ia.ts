@@ -48,6 +48,19 @@ function tipoDeGraficoPedido(pergunta: string): 'barras' | 'pizza' | 'linhas' | 
   return grafico ? 'barras' : null
 }
 
+/**
+ * Como `esclarecimento_ia` do stub: "Centro" (bairro fictício em Recife, Olinda e Paulista) sem o
+ * município, ou "este ano" sem ano nem período, voltam com opções.
+ */
+function esclarecimentoPedido(pergunta: string): 'bairro' | 'ano' | null {
+  const texto = normalizar(pergunta)
+  if (/\bcentro\b/.test(texto) && !/\b(recife|olinda|paulista|todos os municipios)\b/.test(texto))
+    return 'bairro'
+  if (/\b(n|d)?(este|esse) ano\b|\b(no|do) ano atual\b/.test(texto) && !/\b(20\d{2}|p[12])\b/.test(texto))
+    return 'ano'
+  return null
+}
+
 /** Respostas extras do mock do front (não fazem parte dos fixtures do contrato), montadas com os mesmos dados fictícios. */
 async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
   const base = await fixtures.respostaIa()
@@ -63,7 +76,7 @@ async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
     },
   })
 
-  if (pergunta === 'quais bairros tiveram mais falta de luz este ano') {
+  if (pergunta === 'quais bairros tiveram mais falta de luz em p2') {
     const { ranking_alimentadores } = await fixtures.operacao()
     const top = [...ranking_alimentadores.items]
       .sort((a, b) => (b.dec.valor ?? 0) - (a.dec.valor ?? 0))
@@ -144,14 +157,19 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
   const grafico = tipoDeGraficoPedido(bruta)
+  const esclarecer = esclarecimentoPedido(bruta)
   const resposta =
     pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta)
       ? await fixtures.respostaIaBloqueado()
       : pergunta === PERGUNTA_OK
         ? await fixtures.respostaIa()
-        : grafico
-          ? await fixtures.respostaIaGrafico[grafico]()
-          : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
+        : esclarecer
+          ? await (esclarecer === 'bairro'
+              ? fixtures.respostaIaEsclarecer()
+              : fixtures.respostaIaEsclarecerAno())
+          : grafico
+            ? await fixtures.respostaIaGrafico[grafico]()
+            : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
   // Como a API: devolve o id recebido ou cria um na primeira pergunta.
   return {
     ...resposta,

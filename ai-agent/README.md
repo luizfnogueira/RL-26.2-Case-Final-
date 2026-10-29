@@ -14,6 +14,7 @@ Só uma etapa usa o modelo para responder (o agente gerador). As outras são có
 | # | Etapa | Arquivo | Tarefa | Estado |
 | --- | --- | --- | --- | --- |
 | 1 | Pré-filtro: bloqueia o óbvio sem chamar o modelo | `guardrails.py` | GENAI-22 | pendente |
+| 1b | Esclarecimento: bairro em vários municípios ou "este ano" voltam com opções, sem tokens | `services/esclarecimento_ia.py` | extra | pronto |
 | 2 | Memória: últimas 3 trocas da conversa | `repositories/interacao_repository.py`, `agent.converter_historico_para_mensagens` | GENAI-11, 13 | pronto |
 | 3 | IR: liga "Jaboatão" ao valor do banco | `entidades.py` | GENAI-8 | pendente (hoje `valores_distintos` usa listas fixas) |
 | 4 | SS: escolhe 1 ou 2 skills | `roteador.py`, `skills/` | GENAI-7, 23 | `receita.md` pronta; demais skills pendentes |

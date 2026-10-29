@@ -12,6 +12,7 @@ def main():
         # Memória e log do assistente (GENAI-11)
         conn.execute(text('CREATE SCHEMA IF NOT EXISTS ia'))
         IABase.metadata.create_all(conn)
+        ia.atualizar_restricoes(conn)
 
 
 if __name__ == '__main__':

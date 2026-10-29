@@ -388,7 +388,7 @@ describe('POST /ia', () => {
 
   it('responde as perguntas sugeridas da tela do assistente com dados consistentes', async () => {
     for (const pergunta of [
-      'Quais bairros tiveram mais falta de luz este ano?',
+      'Quais bairros tiveram mais falta de luz em P2?',
       'Quais UCs têm maior risco de perda?',
       'Por que a conta de luz aumentou?',
     ]) {

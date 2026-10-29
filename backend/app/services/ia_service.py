@@ -16,7 +16,7 @@ from app.db.session import SessionLocal
 from app.repositories import interacao_repository
 from app.repositories.gold_metadata import metadados_gold
 from app.schemas.ia import GraficoIA, PerguntaIA, RespostaIA
-from app.services import grafico_ia, stub_ia
+from app.services import esclarecimento_ia, grafico_ia, stub_ia
 from app.ai.consulta import descrever_tabela, valores_distintos
 
 logger = logging.getLogger(__name__)
@@ -143,9 +143,15 @@ class AgenteReal:
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
-                sem_o_comeco = (pede_o_comeco_da_conversa(dados.pergunta)
-                                and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico))
-            if sem_o_comeco:
+                # Pergunta ambígua volta com opções antes de gastar tokens
+                esclarecer = esclarecimento_ia.detectar(
+                    dados.pergunta, historico, esclarecimento_ia.vocabulario(db, gold["gold_atualizada_em"]))
+                sem_o_comeco = not esclarecer and (
+                    pede_o_comeco_da_conversa(dados.pergunta)
+                    and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico))
+            if esclarecer:
+                resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
+            elif sem_o_comeco:
                 resposta = resposta_sem_o_comeco_da_conversa(historico, gold["gold_atualizada_em"])
             else:
                 resposta = executar_com_prazo(lambda: responder(

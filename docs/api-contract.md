@@ -282,7 +282,7 @@ Content-Type: application/json
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_ia.json)**
 
-Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
+Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`, `esclarecer`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
 
 Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem eles continuam válidos:
 
@@ -292,6 +292,30 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | `apresentacao` | `"texto"`, `"tabela"` ou `"grafico"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. Com `grafico`, a Tela 7 desenha o campo `grafico` (abaixo). |
 | `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
 | `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
+| `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
+
+**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta dois casos:
+
+| Caso | Exemplo | Opções |
+| --- | --- | --- |
+| Bairro que existe em 2 municípios ou mais, sem o município na pergunta nem na troca anterior | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 8) e "Todos os municípios juntos" |
+| "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
+
+```json
+{
+  "status": "esclarecer",
+  "resposta": "O bairro Centro existe em 3 municípios. De qual você quer saber?",
+  "esclarecimento": {
+    "pergunta": "O bairro Centro existe em 3 municípios. De qual você quer saber?",
+    "opcoes": [
+      {"rotulo": "Centro de Recife", "pergunta": "Qual a receita do Centro (bairro Centro, em Recife)?"},
+      {"rotulo": "Todos os municípios juntos", "pergunta": "Qual a receita do Centro (bairro Centro, somando todos os municípios)?"}
+    ]
+  }
+}
+```
+
+`opcoes` tem de 2 a 10 itens. Cada `pergunta` já vem completa: o front a envia como uma pergunta nova, na mesma conversa, e ela não pede esclarecimento de novo. A troca `esclarecer` vai para o log em `ia.interacao`, mas não entra na memória da conversa. [Exemplo completo (bairro)](../backend/app/services/fixtures/resposta_ia_esclarecer.json), [exemplo do ano](../backend/app/services/fixtures/resposta_ia_esclarecer_ano.json).
 
 **Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
 
@@ -342,6 +366,7 @@ Cenários demonstrativos:
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 | Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
+| Qual a receita do Centro? / Qual foi a receita deste ano? | esclarecer — exemplos acima (no mock, "Centro" é um bairro fictício de Recife, Olinda e Paulista) |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 

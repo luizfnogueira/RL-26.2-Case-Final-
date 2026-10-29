@@ -5,7 +5,8 @@ from pydantic import AwareDatetime, ConfigDict, Field, StringConstraints, model_
 
 from app.schemas.common import Contexto, IndicadorNomeado, Metadados, Schema, Texto
 
-StatusIA = Literal['ok', 'nao_sei', 'bloqueado']
+# `esclarecer`: a pergunta é ambígua e volta com opções, sem consulta (contrato, seção 9).
+StatusIA = Literal['ok', 'nao_sei', 'bloqueado', 'esclarecer']
 
 
 class PerguntaIA(Schema):
@@ -126,6 +127,17 @@ class GraficoIA(Schema):
         return self
 
 
+class OpcaoEsclarecimento(Schema):
+    rotulo: str = Field(max_length=120)
+    # A pergunta já completa: o front a reenvia como se a pessoa tivesse digitado.
+    pergunta: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+
+
+class EsclarecimentoIA(Schema):
+    pergunta: str
+    opcoes: list[OpcaoEsclarecimento] = Field(min_length=2, max_length=10)
+
+
 class RespostaIA(Schema):
     resposta: str
     sql: str | None
@@ -139,11 +151,14 @@ class RespostaIA(Schema):
     apresentacao: Literal['texto', 'tabela', 'grafico'] | None = None
     detalhes_tecnicos: DetalhesTecnicos | None = None
     grafico: GraficoIA | None = None
+    esclarecimento: EsclarecimentoIA | None = None
 
     @model_validator(mode='after')
     def validar_grafico(self):
         if (self.apresentacao == 'grafico') != (self.grafico is not None):
             raise ValueError('apresentacao "grafico" e o campo grafico andam juntos')
+        if (self.status == 'esclarecer') != (self.esclarecimento is not None):
+            raise ValueError('status "esclarecer" e o campo esclarecimento andam juntos')
         return self
 
 

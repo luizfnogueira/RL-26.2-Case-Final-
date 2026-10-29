@@ -24,7 +24,7 @@ export const SUGESTOES_POR_CATEGORIA = [
   {
     categoria: 'Falta de luz (DEC/FEC)',
     perguntas: [
-      'Quais bairros tiveram mais falta de luz este ano?',
+      'Quais bairros tiveram mais falta de luz em P2?',
       'Quais os 5 alimentadores com maior DEC em P2?',
       'Qual foi o DEC de P2 sem o dia crítico?',
     ],
@@ -48,7 +48,7 @@ export const SUGESTOES_POR_CATEGORIA = [
 /** Destaques da conversa vazia, com "conta de luz" e "falta de luz"; o mock do front responde todas. */
 export const PERGUNTAS_SUGERIDAS = [
   'Por que a conta de luz aumentou?',
-  'Quais bairros tiveram mais falta de luz este ano?',
+  'Quais bairros tiveram mais falta de luz em P2?',
   'Quais UCs têm maior risco de perda?',
   'Qual foi a receita no período?',
 ]

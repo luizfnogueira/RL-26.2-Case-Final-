@@ -12,11 +12,20 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import IABase
 
+# `esclarecer`: a pergunta voltou com opções, sem consulta; fica no log, fora da memória.
+STATUS_VALIDOS = "status IN ('ok', 'nao_sei', 'bloqueado', 'esclarecer')"
+
+
+def atualizar_restricoes(conn) -> None:
+    """Banco criado antes do status `esclarecer`: troca a restrição (rodar de novo não muda nada)."""
+    conn.execute(text("ALTER TABLE ia.interacao DROP CONSTRAINT IF EXISTS ck_interacao_status_valido"))
+    conn.execute(text(f"ALTER TABLE ia.interacao ADD CONSTRAINT ck_interacao_status_valido CHECK ({STATUS_VALIDOS})"))
+
 
 class Interacao(IABase):
     __tablename__ = "interacao"
     __table_args__ = (
-        CheckConstraint("status IN ('ok', 'nao_sei', 'bloqueado')", name="status_valido"),
+        CheckConstraint(STATUS_VALIDOS, name="status_valido"),
         # Carregar as últimas trocas de uma conversa (memória) é a consulta mais frequente.
         Index("ix_interacao_conversa_id_criado_em", "conversa_id", text("criado_em DESC")),
     )

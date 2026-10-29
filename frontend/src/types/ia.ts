@@ -1,7 +1,21 @@
 import type { ContextoEnvio, IndicadorNomeado, Metadados } from './comum'
 
-/** `nao_sei` e `bloqueado` são respostas válidas (HTTP 200), não erros de transporte. */
-export type StatusIA = 'ok' | 'nao_sei' | 'bloqueado'
+/**
+ * `nao_sei`, `bloqueado` e `esclarecer` são respostas válidas (HTTP 200), não erros de transporte.
+ * `esclarecer`: a pergunta é ambígua e volta com opções (campo `esclarecimento`), sem consulta.
+ */
+export type StatusIA = 'ok' | 'nao_sei' | 'bloqueado' | 'esclarecer'
+
+/** Uma opção do esclarecimento; `pergunta` já vem completa e é reenviada como se fosse digitada. */
+export interface OpcaoEsclarecimento {
+  rotulo: string
+  pergunta: string
+}
+
+export interface EsclarecimentoIA {
+  pergunta: string
+  opcoes: OpcaoEsclarecimento[]
+}
 
 /** Entrada do POST /ia: a pergunta e, a partir da segunda, o id da conversa. */
 export interface PerguntaIA {
@@ -131,6 +145,8 @@ export interface RespostaIA {
   detalhes_tecnicos?: DetalhesTecnicos | null
   /** Presente só com `apresentacao: "grafico"`. */
   grafico?: GraficoIA | null
+  /** Presente só com `status: "esclarecer"`. */
+  esclarecimento?: EsclarecimentoIA | null
 }
 
 export type ContextoInsight = 'receita' | 'unidade'
