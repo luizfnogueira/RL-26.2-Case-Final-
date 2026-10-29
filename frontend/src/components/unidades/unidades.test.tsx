@@ -3,12 +3,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import unidadeFixture from '@/data/mocks/unidade.json'
 import UnidadePage from '@/pages/UnidadePage'
-import type { DiagnosticoConta, Fatura, Medidor, Unidade360 } from '@/types/unidades'
+import type { ConsumoMes, DiagnosticoConta, Fatura, Medidor, Unidade360 } from '@/types/unidades'
 import BlocoDiagnostico from './BlocoDiagnostico'
 import { BlocoMedidor } from './BlocosCadastrais'
 import { BlocoFaturas } from './BlocosHistorico'
 import { caminhoBarra } from '@/components/graficos/geometria'
-import { pontosDoConsumo } from './consumo'
+import { mesesEstimados, pontosDoConsumo } from './consumo'
 import { rotuloModalidadeGd } from './rotulos'
 
 afterEach(cleanup)
@@ -176,7 +176,71 @@ describe('diagnóstico "a conta veio alta?"', () => {
     expect(d.getByText('323 kWh')).toBeTruthy() // média 322,83
     expect(d.getByText('12 de 12 meses · Jun/2025 – Mai/2026')).toBeTruthy()
     expect(d.getByText('+38,3%')).toBeTruthy()
-    expect(d.getByText(/^Leitura ESTIMADA em jun\/2026/)).toBeTruthy()
+    expect(d.getByText(/^Leitura estimada em jun\/2026/)).toBeTruthy() // minúsculas no alerta
+    expect(d.getByText('Saiba mais')).toBeTruthy()
+    expect(d.getByText('Explicação geral')).toBeTruthy()
+    expect(d.getByText(/a diferença entre o estimado e o real costuma ser acertada/)).toBeTruthy()
+    expect(d.getByText('Meses com leitura estimada no período')).toBeTruthy()
+    expect(d.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Jun/2026: ainda sem leitura posterior no período',
+    ])
+  })
+
+  it('estimada só no ano anterior: sem selo, mas com alerta e "Saiba mais"', () => {
+    const unidade = unidadeFixture as Unidade360
+    const soAnoAnterior: DiagnosticoConta = {
+      ...unidade.diagnostico_conta,
+      leitura_estimada: true, // o mesmo mês do ano anterior foi estimado
+      alerta: 'Leitura estimada em jun/2025: a comparação com o ano anterior é fraca.',
+    }
+    const consumoReal = unidade.consumo.map((m) => ({ ...m, tipo_leitura: 'REAL' as const }))
+    render(<BlocoDiagnostico diagnostico={soAnoAnterior} consumo={consumoReal} />)
+    expect(screen.queryByText('Leitura estimada')).toBeNull() // selo é só do mês analisado
+    expect(screen.getByText(/^Leitura estimada em jun\/2025/)).toBeTruthy()
+    expect(screen.getByText('Saiba mais')).toBeTruthy()
+    expect(screen.getByText(/^Nenhum mês do período foi estimado/)).toBeTruthy()
+  })
+
+  it('mesesEstimados: a situação da leitura seguinte, do mais recente para o mais antigo', () => {
+    const tipos: Record<string, ConsumoMes['tipo_leitura']> = {
+      '2025-07': 'ESTIMADA', // seguinte REAL
+      '2025-08': 'REAL',
+      '2025-09': 'ESTIMADA', // seguinte AUTENTICADA (real)
+      '2025-10': 'AUTENTICADA',
+      '2025-11': 'ESTIMADA', // seguinte ESTIMADA
+      '2025-12': 'ESTIMADA', // seguinte MEDIA (não é real)
+      '2026-01': 'MEDIA',
+      '2026-02': 'ESTIMADA', // seguinte sem dado
+      '2026-03': null,
+      '2026-04': 'REAL',
+      '2026-05': 'REAL',
+      '2026-06': 'ESTIMADA', // último do período
+    }
+    const consumo = (unidadeFixture as Unidade360).consumo.map((m) => ({
+      ...m,
+      tipo_leitura: tipos[m.mes],
+    }))
+    expect(mesesEstimados(consumo)).toEqual([
+      { mes: '2026-06', seguinte: 'ainda sem leitura posterior no período' },
+      { mes: '2026-02', seguinte: 'sem dado no mês seguinte (Mar/2026)' },
+      { mes: '2025-12', seguinte: 'a leitura seguinte (Jan/2026) não foi real (Media)' },
+      { mes: '2025-11', seguinte: 'a leitura seguinte (Dez/2025) também foi estimada' },
+      { mes: '2025-09', seguinte: 'a leitura seguinte (Out/2025) foi real' },
+      { mes: '2025-07', seguinte: 'a leitura seguinte (Ago/2025) foi real' },
+    ])
+  })
+
+  it('alerta só de troca de medidor não traz o "Saiba mais" de leitura estimada', () => {
+    const unidade = unidadeFixture as Unidade360
+    const soTroca: DiagnosticoConta = {
+      ...unidade.diagnostico_conta,
+      leitura_estimada: false,
+      alerta:
+        'Troca de medidor em jun/2026: a primeira leitura após a troca pode distorcer a comparação.',
+    }
+    render(<BlocoDiagnostico diagnostico={soTroca} consumo={[]} />)
+    expect(screen.getByText(/^Troca de medidor/)).toBeTruthy()
+    expect(screen.queryByText('Saiba mais')).toBeNull()
   })
 
   it('UC recente: sem ano anterior, os ausentes viram travessão e a média mostra a base curta', async () => {
@@ -196,7 +260,7 @@ describe('diagnóstico "a conta veio alta?"', () => {
       veredito: null,
       conta_alta: null,
     }
-    render(<BlocoDiagnostico diagnostico={vazio} />)
+    render(<BlocoDiagnostico diagnostico={vazio} consumo={[]} />)
     expect(screen.getByRole('heading', { name: 'Sem consumo nesta janela' })).toBeTruthy()
     expect(screen.queryByText('Último mês')).toBeNull()
   })
@@ -351,5 +415,60 @@ describe('geometria da barra', () => {
   it('topo arredondado em até 4 px e base reta na linha do zero', () => {
     expect(caminhoBarra(10, 20, 12, 100)).toBe('M10,120 V24 Q10,20 14,20 H18 Q22,20 22,24 V120 Z')
     expect(caminhoBarra(0, 0, 12, 2)).toBe('M0,2 V2 Q0,0 2,0 H10 Q12,0 12,2 V2 Z') // barra baixa
+  })
+})
+
+describe('tabelas na largura do cartão com colunas proporcionais', () => {
+  const larguras = (tabela: HTMLElement) =>
+    within(tabela)
+      .getAllByRole('columnheader')
+      .map((th) => th.style.width)
+
+  /** Contêiner do Tabela, onde ficam as classes que valem para a tabela interna. */
+  const conteinerComClasse = (tabela: HTMLElement, classe: string) => {
+    let conteiner: HTMLElement | null = tabela.parentElement
+    while (conteiner && !conteiner.classList.contains(classe)) conteiner = conteiner.parentElement
+    return conteiner
+  }
+
+  it('faturas: valor antes da bandeira, com recuo nela, e as duas tabelas alinhadas', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    const [abertas, pagas] = within(screen.getByRole('region', { name: 'Faturas' })).getAllByRole(
+      'table',
+    )
+    for (const tabela of [abertas, pagas]) {
+      const cabecalhos = within(tabela)
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent)
+      expect(cabecalhos.slice(2)).toEqual(['Valor total', 'Bandeira'])
+      expect(conteinerComClasse(tabela, '[&_td:nth-child(4)]:pl-8')).toBeTruthy()
+      expect(conteinerComClasse(tabela, '[&_th:nth-child(4)]:pl-8')).toBeTruthy()
+    }
+    expect(larguras(abertas)).toEqual(['26%', '20%', '16%', '38%'])
+    expect(larguras(pagas)).toEqual(larguras(abertas)) // colunas alinhadas uma embaixo da outra
+    expect(within(abertas).getByText('R$ 486,00').closest('td')!.className).toContain('text-right')
+  })
+
+  it('todas as tabelas: largura do cartão, table-fixed e porcentagens que somam 100%', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver como tabela' }))
+    const tabelas = screen.getAllByRole('table')
+    expect(tabelas).toHaveLength(5) // consumo, 2 de faturas, interrupções e chamados
+    for (const tabela of tabelas) {
+      const soma = larguras(tabela).reduce((total, l) => total + Number.parseFloat(l), 0)
+      expect(soma).toBe(100)
+      expect(tabela.className).toContain('w-full') // barra do cabeçalho de ponta a ponta
+      expect(conteinerComClasse(tabela, '[&_table]:table-fixed')).toBeTruthy()
+    }
+    // Recuo só onde um número alinhado à direita vem antes de texto: consumo e faturas.
+    expect(tabelas.map((t) => Boolean(conteinerComClasse(t, '[&_td:nth-child(4)]:pl-8')))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+    ])
   })
 })

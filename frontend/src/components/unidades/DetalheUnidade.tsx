@@ -68,16 +68,18 @@ export default function DetalheUnidade({ id }: { id: string }) {
       }
     >
       <CabecalhoUnidade unidade={dados} />
-      <BlocoDiagnostico diagnostico={dados.diagnostico_conta} />
-      {/* Primeiro o que explica a conta (consumo e faturas), depois cadastro e histórico de atendimento. */}
-      <div className="grid gap-4 md:gap-6 xl:grid-cols-2">
-        <BlocoConsumo consumo={dados.consumo} />
-        <BlocoFaturas
-          abertas={dados.faturas_abertas}
-          pagas={dados.faturas_pagas}
-          periodo={dados.periodo_referencia}
-        />
-      </div>
+      <BlocoDiagnostico diagnostico={dados.diagnostico_conta} consumo={dados.consumo} />
+      {/*
+        Primeiro o que explica a conta (consumo e faturas), depois cadastro e histórico de atendimento.
+        Consumo e faturas em largura inteira, um abaixo do outro: lado a lado, a lista de faturas
+        esticava o cartão do gráfico (altura fixa) e deixava um vazio grande sob ele.
+      */}
+      <BlocoConsumo consumo={dados.consumo} />
+      <BlocoFaturas
+        abertas={dados.faturas_abertas}
+        pagas={dados.faturas_pagas}
+        periodo={dados.periodo_referencia}
+      />
       <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <BlocoCadastro cadastro={dados.cadastro} />
         <BlocoMedidor medidor={dados.medidor} />

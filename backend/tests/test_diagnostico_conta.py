@@ -223,13 +223,13 @@ def test_uc_recente_usa_os_meses_que_existem():
 def test_leitura_estimada_no_ultimo_mes():
     d = diagnosticar_conta(historico(tipo='ESTIMADA'), PERIODO)
     assert d['leitura_estimada'] is True
-    assert d['alerta'] == 'Leitura ESTIMADA em jun/2026: o consumo pode ser ajustado na próxima leitura real.'
+    assert d['alerta'] == 'Leitura estimada em jun/2026: o consumo pode ser ajustado na próxima leitura real.'
 
 
 def test_leitura_estimada_no_ano_anterior_enfraquece_a_comparacao():
     d = diagnosticar_conta(historico(tipo_anterior='ESTIMADA'), PERIODO)
     assert d['leitura_estimada'] is True
-    assert d['alerta'] == 'Leitura ESTIMADA em jun/2025: a comparação com o ano anterior é fraca.'
+    assert d['alerta'] == 'Leitura estimada em jun/2025: a comparação com o ano anterior é fraca.'
 
 
 @pytest.mark.parametrize('campo, mes', [('troca', 'jun/2026'), ('troca_anterior', 'jun/2025')])
@@ -244,4 +244,4 @@ def test_alertas_se_somam_e_nao_mudam_o_veredito():
     d = diagnosticar_conta(historico(tipo='ESTIMADA', tipo_anterior='ESTIMADA', troca=True), PERIODO)
     assert d['veredito'] == sem_alerta['veredito']
     assert [frase.split(':')[0] for frase in d['alerta'].split('. ') if frase] == [
-        'Leitura ESTIMADA em jun/2026', 'Leitura ESTIMADA em jun/2025', 'Troca de medidor em jun/2026']
+        'Leitura estimada em jun/2026', 'Leitura estimada em jun/2025', 'Troca de medidor em jun/2026']

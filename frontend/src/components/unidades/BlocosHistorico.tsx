@@ -17,6 +17,17 @@ import {
 } from '@/utils/formatacao'
 import { formatarMes, limitesDoPeriodo } from '@/utils/periodos'
 import { pontosDoConsumo } from './consumo'
+import {
+  LARGURAS_CHAMADOS,
+  LARGURAS_CONSUMO,
+  LARGURAS_FATURAS,
+  LARGURAS_INTERRUPCOES,
+  RECUO_QUARTA_COLUNA,
+  TABELA_PROPORCIONAL,
+} from './larguras'
+
+// Consumo e faturas: a 4ª coluna (texto) vem depois de um número alinhado à direita.
+const TABELA_COM_RECUO = `${TABELA_PROPORCIONAL} ${RECUO_QUARTA_COLUNA}`
 
 const uma = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
@@ -27,20 +38,27 @@ function SeloLeitura({ tipo }: { tipo: ConsumoMes['tipo_leitura'] }) {
 }
 
 const COLUNAS_CONSUMO: readonly Coluna<ConsumoMes>[] = [
-  { id: 'mes', cabecalho: 'Mês', celula: (m) => formatarMes(m.mes) },
+  { id: 'mes', cabecalho: 'Mês', largura: LARGURAS_CONSUMO.mes, celula: (m) => formatarMes(m.mes) },
   {
     id: 'atual',
     cabecalho: 'Consumo',
     alinhar: 'direita',
+    largura: LARGURAS_CONSUMO.consumo,
     celula: (m) => formatarIndicador(m.atual),
   },
   {
     id: 'anterior',
     cabecalho: 'Mesmo mês do ano anterior',
     alinhar: 'direita',
+    largura: LARGURAS_CONSUMO.anterior,
     celula: (m) => formatarIndicador(m.ano_anterior),
   },
-  { id: 'leitura', cabecalho: 'Leitura', celula: (m) => <SeloLeitura tipo={m.tipo_leitura} /> },
+  {
+    id: 'leitura',
+    cabecalho: 'Leitura',
+    largura: LARGURAS_CONSUMO.leitura,
+    celula: (m) => <SeloLeitura tipo={m.tipo_leitura} />,
+  },
 ]
 
 /** Bloco 2: os 12 meses lado a lado com o ano anterior, em gráfico ou tabela. */
@@ -69,6 +87,7 @@ export function BlocoConsumo({ consumo }: { consumo: readonly ConsumoMes[] }) {
           colunas={COLUNAS_CONSUMO}
           linhas={consumo}
           chaveLinha={(m) => m.mes}
+          className={TABELA_COM_RECUO}
         />
       ) : (
         <BarrasComparadas
@@ -91,17 +110,20 @@ export function BlocoConsumo({ consumo }: { consumo: readonly ConsumoMes[] }) {
 const colunaMes: Coluna<Fatura> = {
   id: 'mes',
   cabecalho: 'Referência',
+  largura: LARGURAS_FATURAS.referencia,
   celula: (f) => formatarMes(f.mes_referencia),
 }
 const colunaValor: Coluna<Fatura> = {
   id: 'valor',
   cabecalho: 'Valor total',
   alinhar: 'direita',
+  largura: LARGURAS_FATURAS.valor,
   celula: (f) => formatarReaisCompleto(f.valor_total),
 }
 const colunaBandeira: Coluna<Fatura> = {
   id: 'bandeira',
   cabecalho: 'Bandeira',
+  largura: LARGURAS_FATURAS.bandeira,
   celula: (f) => formatarNome(f.bandeira_tarifaria),
 }
 
@@ -127,13 +149,23 @@ export function BlocoFaturas({
         </span>
       ),
     },
-    { id: 'vencimento', cabecalho: 'Vencimento', celula: (f) => formatarData(f.data_vencimento) },
+    {
+      id: 'vencimento',
+      cabecalho: 'Vencimento',
+      largura: LARGURAS_FATURAS.data,
+      celula: (f) => formatarData(f.data_vencimento),
+    },
     colunaValor,
     colunaBandeira,
   ]
   const colunasPagas: readonly Coluna<Fatura>[] = [
     colunaMes,
-    { id: 'pagamento', cabecalho: 'Pago em', celula: (f) => formatarData(f.data_pagamento ?? '') },
+    {
+      id: 'pagamento',
+      cabecalho: 'Pago em',
+      largura: LARGURAS_FATURAS.data,
+      celula: (f) => formatarData(f.data_pagamento ?? ''),
+    },
     colunaValor,
     colunaBandeira,
   ]
@@ -147,6 +179,7 @@ export function BlocoFaturas({
         colunas={colunasAbertas}
         linhas={abertas}
         chaveLinha={(f) => f.id_fatura}
+        className={TABELA_COM_RECUO}
         vazio={
           <EmptyState
             icone={<CalendarCheck size={26} strokeWidth={1.5} />}
@@ -163,6 +196,7 @@ export function BlocoFaturas({
         colunas={colunasPagas}
         linhas={pagas}
         chaveLinha={(f) => f.id_fatura}
+        className={TABELA_COM_RECUO}
         vazio={
           <EmptyState
             titulo="Nenhuma fatura paga no período"
@@ -175,11 +209,36 @@ export function BlocoFaturas({
 }
 
 const COLUNAS_INTERRUPCOES: readonly Coluna<Interrupcao>[] = [
-  { id: 'inicio', cabecalho: 'Início', celula: (i) => formatarDataHora(i.data_abertura) },
-  { id: 'duracao', cabecalho: 'Duração', celula: (i) => formatarDuracao(i.duracao_min) },
-  { id: 'tipo', cabecalho: 'Tipo', celula: (i) => formatarNome(i.tipo) },
-  { id: 'causa', cabecalho: 'Causa', celula: (i) => formatarNome(i.causa) },
-  { id: 'alimentador', cabecalho: 'Alimentador', celula: (i) => i.alimentador },
+  {
+    id: 'inicio',
+    cabecalho: 'Início',
+    largura: LARGURAS_INTERRUPCOES.inicio,
+    celula: (i) => formatarDataHora(i.data_abertura),
+  },
+  {
+    id: 'duracao',
+    cabecalho: 'Duração',
+    largura: LARGURAS_INTERRUPCOES.duracao,
+    celula: (i) => formatarDuracao(i.duracao_min),
+  },
+  {
+    id: 'tipo',
+    cabecalho: 'Tipo',
+    largura: LARGURAS_INTERRUPCOES.tipo,
+    celula: (i) => formatarNome(i.tipo),
+  },
+  {
+    id: 'causa',
+    cabecalho: 'Causa',
+    largura: LARGURAS_INTERRUPCOES.causa,
+    celula: (i) => formatarNome(i.causa),
+  },
+  {
+    id: 'alimentador',
+    cabecalho: 'Alimentador',
+    largura: LARGURAS_INTERRUPCOES.alimentador,
+    celula: (i) => i.alimentador,
+  },
 ]
 
 /** Bloco 8: interrupções do período, com as mesmas regras do DEC (até 10 e o total). */
@@ -206,6 +265,7 @@ export function BlocoInterrupcoes({
         colunas={COLUNAS_INTERRUPCOES}
         linhas={recentes}
         chaveLinha={(i) => i.id_ocorrencia}
+        className={TABELA_PROPORCIONAL}
         vazio={
           <EmptyState
             icone={<ZapOff size={26} strokeWidth={1.5} />}
@@ -223,23 +283,36 @@ export function BlocoInterrupcoes({
 }
 
 const COLUNAS_CHAMADOS: readonly Coluna<Chamado>[] = [
-  { id: 'abertura', cabecalho: 'Aberto em', celula: (c) => formatarDataHora(c.data_abertura) },
-  { id: 'canal', cabecalho: 'Canal', celula: (c) => formatarNome(c.canal) },
+  {
+    id: 'abertura',
+    cabecalho: 'Aberto em',
+    largura: LARGURAS_CHAMADOS.abertura,
+    celula: (c) => formatarDataHora(c.data_abertura),
+  },
+  {
+    id: 'canal',
+    cabecalho: 'Canal',
+    largura: LARGURAS_CHAMADOS.canal,
+    celula: (c) => formatarNome(c.canal),
+  },
   {
     id: 'assunto',
     cabecalho: 'Assunto',
+    largura: LARGURAS_CHAMADOS.assunto,
     celula: (c) => `${formatarNome(c.assunto)} · ${formatarNome(c.subassunto)}`,
   },
   {
     id: 'tempo',
     cabecalho: 'Tempo de atendimento',
     alinhar: 'direita',
+    largura: LARGURAS_CHAMADOS.tempo,
     celula: (c) => `${uma.format(c.tempo_atendimento_h)} h`,
   },
   {
     id: 'nota',
     cabecalho: 'Nota',
     alinhar: 'direita',
+    largura: LARGURAS_CHAMADOS.nota,
     // Nota não preenchida: "Sem nota", nunca 0.
     celula: (c) =>
       c.nota_satisfacao === null ? (
@@ -263,6 +336,7 @@ export function BlocoChamados({ chamados }: { chamados: readonly Chamado[] }) {
         colunas={COLUNAS_CHAMADOS}
         linhas={chamados}
         chaveLinha={(c) => c.protocolo}
+        className={TABELA_PROPORCIONAL}
         vazio={
           <EmptyState
             icone={<Headset size={26} strokeWidth={1.5} />}

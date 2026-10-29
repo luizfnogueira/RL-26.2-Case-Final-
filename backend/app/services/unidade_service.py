@@ -60,10 +60,10 @@ def media_12_meses(meses: list[MesConsumo], mes_analisado: str) -> tuple[float |
 def _alerta(ultimo: MesConsumo | None, anterior: MesConsumo | None) -> str | None:
     avisos = []
     if ultimo and ultimo.tipo_leitura == 'ESTIMADA':
-        avisos.append(f'Leitura ESTIMADA em {mes_texto(ultimo.mes)}: o consumo pode ser ajustado '
+        avisos.append(f'Leitura estimada em {mes_texto(ultimo.mes)}: o consumo pode ser ajustado '
                       'na próxima leitura real.')
     if anterior and anterior.tipo_leitura == 'ESTIMADA':
-        avisos.append(f'Leitura ESTIMADA em {mes_texto(anterior.mes)}: a comparação com o ano anterior é fraca.')
+        avisos.append(f'Leitura estimada em {mes_texto(anterior.mes)}: a comparação com o ano anterior é fraca.')
     for mes in (ultimo, anterior):
         if mes and mes.troca_medidor:
             avisos.append(f'Troca de medidor em {mes_texto(mes.mes)}: a primeira leitura após a troca '

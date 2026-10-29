@@ -215,7 +215,7 @@
       "periodo_referencia": "2026-06"
     },
     "leitura_estimada": true,
-    "alerta": "Leitura ESTIMADA em jun/2026: o consumo pode ser ajustado na próxima leitura real."
+    "alerta": "Leitura estimada em jun/2026: o consumo pode ser ajustado na próxima leitura real."
   },
   "faturas_abertas": [
     {
