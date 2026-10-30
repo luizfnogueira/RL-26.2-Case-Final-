@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Literal
 
+from app.ai.roteador import MAPA_GLOSSARIO_SKILLS
+
 
 @dataclass(frozen=True)
 class Triagem:
@@ -32,9 +34,11 @@ def limpar(pergunta: str) -> str:
     return re.sub(r'\s+', ' ', texto).strip()
 
 
+TEXTO_SEGURANCA = ('Ação de segurança bloqueada. Meu acesso é restrito apenas a consultas de leitura (SELECT) '
+                   'no banco de dados.')
 TEXTO_BLOQUEIO = {
-    'escrita': 'Eu só consulto os dados da V-Energy, não altero nem apago nada.',
-    'injecao': 'Não posso mudar minhas regras. Faça uma pergunta sobre os dados da V-Energy.',
+    'escrita': TEXTO_SEGURANCA,
+    'injecao': TEXTO_SEGURANCA,
     'prompt': 'Não compartilho minhas instruções internas nem credenciais. Posso ajudar com perguntas sobre os dados.',
     'dados_pessoais': 'Não tenho acesso a CPF, nome do titular, endereço ou contato dos clientes. '
                       'Posso responder por município, bairro, classe ou código da UC.',
@@ -83,8 +87,18 @@ TEXTO_APRESENTACAO = ('Olá! Respondo perguntas sobre os dados da V-Energy (jul/
 FORA_DO_ESCOPO = re.compile(r'\b(receita de (bolo|torta|pao|comida)|piada|poema|poesia|letra da musica|horoscopo'
                             r'|previsao do tempo|futebol|bitcoin|criptomoeda|bolsa de valores'
                             r'|escreva (um|uma) (redacao|carta|historia)|traduza)\b')
-TEXTO_FORA_DO_ESCOPO = ('Essa pergunta está fora do que eu sei responder. Pergunte sobre receita, consumo, '
-                        'continuidade, perdas, atendimento ou geração distribuída da V-Energy.')
+# Clima e figuras históricas: só quando a pergunta não cita nada do negócio ("chuva" pode ser causa de
+# interrupção; "quem foi o bairro com maior DEC?" é pergunta de dados).
+FORA_DO_DOMINIO = re.compile(r'\b(clima|vai chover|temperatura|como (esta|ta) o tempo|quem (foi|era) (?!o |a |os |as )'
+                             r'|presidente|imperador|rei|rainha|guerra mundial|descobriu|inventou)\b')
+TEXTO_FORA_DO_ESCOPO = ('Essa pergunta foge do meu domínio. Sou um assistente especializado nos dados da V-Energy. '
+                        'Como posso te ajudar a analisar consumos ou cadastros de unidades de energia?')
+
+# Vocabulário do negócio: o glossário das skills mais os recortes da Gold.
+TERMOS_DO_NEGOCIO = re.compile(r'\b(' + '|'.join(sorted(
+    {re.escape(t) for grupo in MAPA_GLOSSARIO_SKILLS.values() for t in grupo}
+    | {'ucs?', 'unidades?', 'bairros?', 'municipios?', 'cidades?', 'alimentador(es)?', 'classes?', 'v-energy', 'energia'},
+    key=len, reverse=True)) + r')\b')
 
 # Só as regras de escrita, injeção e prompt: um valor pode citar "endereço" sem ser ataque.
 REGRAS_DE_INSTRUCAO = [padrao for regra, padrao in REGRAS_BLOQUEIO if regra != 'dados_pessoais']
@@ -103,7 +117,7 @@ def triar(pergunta: str) -> Triagem:
             return Triagem('bloquear', limpa, regra, TEXTO_BLOQUEIO[regra])
     if SAUDACAO.match(texto) or AJUDA.match(texto):
         return Triagem('responder', limpa, 'saudacao', TEXTO_APRESENTACAO)
-    if FORA_DO_ESCOPO.search(texto):
+    if FORA_DO_ESCOPO.search(texto) or (FORA_DO_DOMINIO.search(texto) and not TERMOS_DO_NEGOCIO.search(texto)):
         return Triagem('responder', limpa, 'fora_do_escopo', TEXTO_FORA_DO_ESCOPO)
     return Triagem('seguir', limpa)
 
