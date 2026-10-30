@@ -32,6 +32,7 @@ export const fixtures = {
   recortes: () => carregar<{ recortes: Recorte[] }>(import('@/data/mocks/dashboard_recortes.json')),
   unidades: () => carregar<Unidades>(import('@/data/mocks/unidades.json')),
   unidade: () => carregar<Unidade360>(import('@/data/mocks/unidade.json')),
+  unidadeRecente: () => carregar<Unidade360>(import('@/data/mocks/unidade_recente.json')),
   candidatos: () => carregar<Candidatos>(import('@/data/mocks/candidatos.json')),
   inspecoes: () => carregar<Ordens>(import('@/data/mocks/inspecoes.json')),
   operacao: () => carregar<Operacao>(import('@/data/mocks/operacao.json')),

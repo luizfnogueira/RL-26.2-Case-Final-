@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, Protocol
 
-from sqlalchemy import and_, false, func, or_, select
+from sqlalchemy import and_, case, false, func, null, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.gold_real import DimMes, DimUC, FatoUCMes, UCAtendimentos, UCConsumoComparativo, UCInterrupcoes
@@ -140,6 +140,21 @@ def _escapar_like(texto: str) -> str:
     return texto.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
+def _relevancia_do_nome(termo: str):
+    """Grupo de relevância da busca pelo titular (termo já escapado para o LIKE).
+
+    1: o nome começa com o termo; 2: outra palavra começa com ele; 3: o termo está no meio de uma
+    palavra; 4: só o código da UC casa. Os nomes da Gold só separam palavras por espaço.
+    """
+    nome = DimUC.nome_titular
+    return case(
+        (nome.ilike(f'{termo}%', escape='\\'), 1),
+        (nome.ilike(f'% {termo}%', escape='\\'), 2),
+        (nome.ilike(f'%{termo}%', escape='\\'), 3),
+        else_=4,
+    )
+
+
 def _condicoes_regiao(**filtros: Optional[str]) -> list:
     """Filtros geográficos por AND, com o valor exato da Gold (RECIFE, BOA VISTA), como o /dashboard.
 
@@ -173,15 +188,22 @@ class SqlAlchemyUnidadeRepository:
                page_size: int = 20) -> tuple[list[UnidadeResumo], int]:
         condicoes = _condicoes_regiao(municipio=municipio, bairro=bairro, classe=classe,
                                       alimentador=alimentador)
+        ordem = [DimUC.id_uc]
         if busca:
-            termo = f'%{_escapar_like(busca.strip())}%'
-            condicoes.append(or_(DimUC.id_uc.ilike(termo, escape='\\'),
-                                 DimUC.nome_titular.ilike(termo, escape='\\')))
+            termo = _escapar_like(busca.strip())
+            condicoes.append(or_(DimUC.id_uc.ilike(f'%{termo}%', escape='\\'),
+                                 DimUC.nome_titular.ilike(f'%{termo}%', escape='\\')))
+            # Por relevância do nome e, no grupo, alfabética palavra por palavra (COLLATE "C": a
+            # en_US ignora espaços e poria ANDREIA antes de ANDRE TORRES). Quem casa só pelo código
+            # fica por último, pelo ID, como antes; o ID também desempata a paginação.
+            relevancia = _relevancia_do_nome(termo)
+            ordem = [relevancia, case((relevancia == 4, null()), else_=DimUC.nome_titular.collate('C')),
+                     DimUC.id_uc]
         linhas = self.db.execute(
             select(DimUC.id_uc, DimUC.nome_titular, DimUC.municipio, DimUC.bairro, DimUC.classe,
                    DimUC.alimentador, DimUC.status)
             .where(*condicoes)
-            .order_by(DimUC.id_uc)
+            .order_by(*ordem)
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()

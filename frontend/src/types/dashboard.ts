@@ -103,3 +103,39 @@ export interface Dashboard {
   drill_down: DrillDown
   metadados: Metadados
 }
+
+/**
+ * Query de GET /dashboard/comparacao (contrato, seção 3.1). `itens` vai repetido na URL
+ * (itens=A&itens=B). nivel=bairro exige municipio; nivel=classe aceita municipio e bairro.
+ */
+export interface ParamsComparacao {
+  periodo_atual: Periodo
+  periodo_comparacao: Periodo
+  nivel: NivelDrill
+  /** 2 a 4, sem repetição, com os valores exatos do GET /filtros (ex.: RECIFE). */
+  itens: readonly string[]
+  municipio?: string
+  bairro?: string
+}
+
+/** Um recorte da comparação: seis KPIs no formato do painel. */
+export interface ItemComparacao {
+  nome: string
+  ucs_ativas: Kpi
+  /** Receita faturada ÷ UCs ativas ÷ meses da janela (BRL/UC/mes). */
+  receita_media_uc: Kpi
+  /** Volume faturado ÷ UCs ativas ÷ meses da janela (kWh/UC/mes). */
+  consumo_medio_uc: Kpi
+  /** Valor em aberto em % da receita; `diferenca` em pontos percentuais (p.p.). */
+  valor_em_aberto_pct: Kpi
+  /** null em bairro e classe, como no painel. */
+  dec: Kpi
+  fec: Kpi
+}
+
+export interface Comparacao {
+  filtros: Contexto & { nivel: NivelDrill; itens: string[] }
+  /** Na ordem pedida. Item sem UCs no recorte: ucs_ativas 0 e os demais null. */
+  itens: ItemComparacao[]
+  metadados: Metadados
+}

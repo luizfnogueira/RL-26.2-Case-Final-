@@ -17,6 +17,7 @@ import {
   perguntarIA,
 } from '..'
 import { atenderMock, reiniciarOrdens } from '.'
+import type { Comparacao } from '@/types/dashboard'
 
 const ATUAL = '2025-07/2026-06'
 const COMPARACAO = '2022-07/2023-06'
@@ -138,6 +139,62 @@ describe('GET /filtros', () => {
   })
 })
 
+describe('GET /dashboard/comparacao', () => {
+  const comparar = (params: Record<string, unknown>) =>
+    atenderMock('GET', '/dashboard/comparacao', {
+      params: { ...DASH, ...params },
+    }) as Promise<Comparacao>
+
+  it('cada item bate com o painel filtrado por ele, por UC e por mês', async () => {
+    const { municipios } = await buscarFiltros()
+    const itens = municipios.slice(0, 2)
+    const resposta = await comparar({ nivel: 'municipio', itens })
+    expect(resposta.itens.map((i) => i.nome)).toEqual(itens)
+    for (const item of resposta.itens) {
+      const painel = (await buscarDashboard({ ...DASH, municipio: item.nome })).indicadores
+      expect(item.ucs_ativas).toEqual(painel.ucs_ativas)
+      const esperado = painel.receita_faturada.atual.valor! / painel.ucs_ativas.atual.valor! / 12
+      expect(item.receita_media_uc.atual.valor).toBeCloseTo(esperado, 2)
+      expect(item.valor_em_aberto_pct.diferenca.unidade).toBe('p.p.')
+    }
+    expect(resposta.metadados.dados_ficticios).toBe(true)
+  })
+
+  it('item fora do cadastro vem vazio e não derruba os outros', async () => {
+    const { municipios } = await buscarFiltros()
+    const resposta = await comparar({ nivel: 'municipio', itens: [municipios[0], 'NAO EXISTE'] })
+    const [real, vazio] = resposta.itens
+    expect(real.receita_media_uc.atual.valor).not.toBeNull()
+    expect(vazio.ucs_ativas.atual.valor).toBe(0)
+    expect(vazio.receita_media_uc.atual.valor).toBeNull()
+    expect(resposta.metadados.observacoes.some((o) => o.includes('NAO EXISTE'))).toBe(true)
+  })
+
+  it.each([
+    { nivel: 'municipio', itens: ['RECIFE'] },
+    { nivel: 'municipio', itens: ['A', 'B', 'C', 'D', 'E'] },
+    { nivel: 'municipio', itens: ['RECIFE', 'RECIFE'] },
+    { nivel: 'municipio', itens: ['RECIFE', 'OLINDA'], municipio: 'RECIFE' },
+    { nivel: 'bairro', itens: ['BOA VIAGEM', 'BOA VISTA'] },
+    { nivel: 'municipio', itens: ['RECIFE', 'OLINDA'], classe: 'RESIDENCIAL' },
+    { itens: ['RECIFE', 'OLINDA'] },
+  ])('pedido inválido é 422 DADOS_INVALIDOS: %o', async (params) => {
+    const erro = await erroDe(comparar(params))
+    expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
+  })
+
+  it('período fora do cenário é erro do pedido, não item vazio', async () => {
+    const erro = await erroDe(
+      comparar({
+        periodo_atual: '2024-07/2025-06',
+        nivel: 'municipio',
+        itens: ['RECIFE', 'OLINDA'],
+      }),
+    )
+    expect(erro.codigo).toBe('CENARIO_STUB_INDISPONIVEL')
+  })
+})
+
 describe('GET /unidades', () => {
   it('busca por ID ou titular e devolve lista vazia sem correspondência', async () => {
     const todas = await buscarUnidades({})
@@ -162,12 +219,32 @@ describe('GET /unidades', () => {
     }
   })
 
-  it('só UC-DEMO-001 tem visão 360; outras UCs dão 404', async () => {
+  it('UC-DEMO-001 e UC-DEMO-007 têm visão 360; outras UCs dão 404', async () => {
     const uc = await buscarUnidade('UC-DEMO-001', { periodo_atual: ATUAL })
     expect(uc.consumo).toHaveLength(12)
     expect(uc.diagnostico_conta.leitura_estimada).toEqual(expect.any(Boolean))
-    const erro = await erroDe(buscarUnidade('UC-DEMO-002'))
-    expect([erro.status, erro.codigo]).toEqual([404, 'UC_INEXISTENTE'])
+    expect((await buscarUnidade('UC-DEMO-007')).cadastro.id_uc).toBe('UC-DEMO-007')
+    for (const id of ['UC-DEMO-002', 'constructor', 'toString']) {
+      const erro = await erroDe(buscarUnidade(id))
+      expect([erro.status, erro.codigo]).toEqual([404, 'UC_INEXISTENTE'])
+    }
+  })
+
+  it('a UC recente cobre meses nulos, ausência de GD e leitura estimada', async () => {
+    const uc = await buscarUnidade('UC-DEMO-007')
+    expect(uc.consumo).toHaveLength(12)
+    expect(
+      uc.consumo.slice(0, 6).every((m) => m.atual.valor === null && m.tipo_leitura === null),
+    ).toBe(true)
+    expect(uc.consumo.slice(6).every((m) => m.atual.valor !== null)).toBe(true)
+    expect(uc.geracao_distribuida).toBeNull()
+    expect(uc.interrupcoes_recentes).toEqual([])
+    expect(uc.total_interrupcoes.valor).toBe(0)
+    expect(uc.diagnostico_conta).toMatchObject({
+      conta_alta: null,
+      meses_media: 5,
+      leitura_estimada: true,
+    })
   })
 })
 

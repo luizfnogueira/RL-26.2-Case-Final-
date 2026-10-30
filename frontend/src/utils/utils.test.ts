@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { formatarAtualizacao } from './datas'
+import { formatarAtualizacao, formatarData, formatarDataHora, formatarDuracao } from './datas'
+
+describe('datas e durações da Visão 360', () => {
+  it('formatarData não passa por fuso', () => {
+    expect(formatarData('2018-03-12')).toBe('12/03/2018')
+  })
+
+  it('formatarDataHora mostra a hora de Recife, qualquer que seja o fuso da máquina', () => {
+    expect(formatarDataHora('2026-06-14T19:20:00-03:00')).toBe('14/06/2026, 19:20')
+    expect(formatarDataHora('2026-06-14T22:20:00Z')).toBe('14/06/2026, 19:20')
+    expect(formatarDataHora('nada')).toBe('—')
+  })
+
+  it('formatarDuracao em minutos e horas', () => {
+    expect(formatarDuracao(45)).toBe('45 min')
+    expect(formatarDuracao(120)).toBe('2 h')
+    expect(formatarDuracao(105)).toBe('1 h 45 min')
+  })
+})
 import { paraOpcoesBarra } from './filtros'
 import {
   duracaoEmMeses,

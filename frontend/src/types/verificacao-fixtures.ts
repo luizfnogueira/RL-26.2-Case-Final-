@@ -9,6 +9,7 @@ import ordemAtualizada from '@/data/mocks/ordem_atualizada.json'
 import ordemCriada from '@/data/mocks/ordem_criada.json'
 import candidatos from '@/data/mocks/candidatos.json'
 import cancelarInspecao from '@/data/mocks/cancelar_inspecao.json'
+import comparacao from '@/data/mocks/comparacao.json'
 import concluirInspecao from '@/data/mocks/concluir_inspecao.json'
 import criarInspecao from '@/data/mocks/criar_inspecao.json'
 import dashboard from '@/data/mocks/dashboard.json'
@@ -26,9 +27,10 @@ import respostaIaNaoSei from '@/data/mocks/resposta_ia_nao_sei.json'
 import respostaInsight from '@/data/mocks/resposta_insight.json'
 import respostaInsightUnidade from '@/data/mocks/resposta_insight_unidade.json'
 import unidade from '@/data/mocks/unidade.json'
+import unidadeRecente from '@/data/mocks/unidade_recente.json'
 import unidades from '@/data/mocks/unidades.json'
 import type { ErroApiCorpo } from './comum'
-import type { Dashboard } from './dashboard'
+import type { Comparacao, Dashboard } from './dashboard'
 import type { OpcoesFiltrosApi } from './filtros'
 import type { PedidoInsight, PerguntaIA, RespostaIA, RespostaInsight } from './ia'
 import type {
@@ -55,9 +57,11 @@ type Largo<T> = T extends string
 
 export const fixturesConferidos = {
   dashboard: dashboard satisfies Largo<Dashboard>,
+  comparacao: comparacao satisfies Largo<Comparacao>,
   filtros: filtros satisfies Largo<OpcoesFiltrosApi>,
   unidades: unidades satisfies Largo<Unidades>,
   unidade: unidade satisfies Largo<Unidade360>,
+  unidadeRecente: unidadeRecente satisfies Largo<Unidade360>,
   candidatos: candidatos satisfies Largo<Candidatos>,
   inspecoes: inspecoes satisfies Largo<Ordens>,
   ordemCriada: ordemCriada satisfies Largo<Ordem>,

@@ -27,6 +27,8 @@ def test_exemplo_do_contrato_segue_o_schema():
 
 
 def test_service_monta_as_listas_do_repository(monkeypatch):
+    monkeypatch.setattr(filtros_service, "metadados_gold", lambda db, tabela, obs: {
+        "dados_ficticios": True, "gold_atualizada_em": None, "observacoes": [obs]})
     repo = filtros_service.filtros_repository
     monkeypatch.setattr(repo, "listar_municipios", lambda db: ["OLINDA", "RECIFE"])
     monkeypatch.setattr(repo, "listar_bairros", lambda db: [("OLINDA", "CENTRO"), ("RECIFE", "CENTRO")])

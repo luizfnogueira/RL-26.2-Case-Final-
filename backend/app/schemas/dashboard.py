@@ -1,10 +1,11 @@
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
-from app.schemas.common import Contexto, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema
+from app.schemas.common import Contexto, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema, Texto
 
 NivelDrill = Literal['municipio', 'bairro', 'classe']
+MIN_ITENS, MAX_ITENS = 2, 4
 
 
 class FiltrosDashboard(Contexto, Paginacao):
@@ -95,4 +96,39 @@ class Dashboard(Schema):
     serie_historica: list[PontoSerie]
     ponte_receita: PonteReceita
     drill_down: DrillDown
+    metadados: Metadados
+
+
+class FiltrosComparacao(Contexto):
+    """2 a 4 recortes do mesmo nível; municipio e bairro são os filtros "pai" dos itens."""
+    periodo_comparacao: Periodo
+    nivel: NivelDrill
+    itens: list[Texto] = Field(min_length=MIN_ITENS, max_length=MAX_ITENS)
+
+    @model_validator(mode='after')
+    def validar_recorte(self):
+        if len(set(self.itens)) != len(self.itens):
+            raise ValueError('itens repetidos')
+        if self.classe is not None or self.alimentador is not None:
+            raise ValueError('a comparação aceita só municipio e bairro como filtros pai')
+        if self.nivel == 'municipio' and (self.municipio or self.bairro):
+            raise ValueError('nivel municipio não aceita filtro pai')
+        if self.nivel == 'bairro' and (not self.municipio or self.bairro):
+            raise ValueError('nivel bairro exige municipio, sem bairro')
+        return self
+
+
+class ItemComparacao(Schema):
+    nome: str
+    ucs_ativas: Kpi
+    receita_media_uc: Kpi
+    consumo_medio_uc: Kpi
+    valor_em_aberto_pct: Kpi
+    dec: Kpi
+    fec: Kpi
+
+
+class Comparacao(Schema):
+    filtros: FiltrosComparacao
+    itens: list[ItemComparacao]
     metadados: Metadados

@@ -60,7 +60,7 @@ with TestClient(app) as client:
     d = uc['diagnostico_conta']
     assert d['periodo_referencia'] == '2026-06' and d['conta_alta'] is True      # flag da Gold
     assert d['variacao_percentual']['valor'] == 12.3 and d['meses_media'] == 0
-    assert 'Troca de medidor em 2026-06' in d['alerta']
+    assert 'Troca de medidor em jun/2026' in d['alerta']
 
     assert [f['status'] for f in uc['faturas_abertas']] == ['EM ABERTO'] and uc['faturas_pagas'] == []
     assert uc['medidor']['id_medidor'] == 'MD-TEST'
@@ -70,7 +70,8 @@ with TestClient(app) as client:
     [interrupcao] = uc['interrupcoes_recentes']
     assert interrupcao['data_abertura'] == '2026-06-14T19:20:00-03:00'          # relógio mantido
     assert interrupcao['duracao_min'] == 30                                       # efetiva, como no DEC
-    assert uc['total_interrupcoes']['valor'] == 1
+    assert uc['total_interrupcoes']['valor'] == 1 and type(uc['total_interrupcoes']['valor']) is int
+    assert type(interrupcao['duracao_min']) is int                                # contagens: inteiro
     assert uc['chamados'][0]['nota_satisfacao'] == 12.3
 
     r = client.get('/unidades/UC-NAO-EXISTE')
@@ -100,3 +101,53 @@ def test_visao_360_le_a_gold_real(package, pg):
     env = dict(os.environ, GOLD_SOURCE='real', DATABASE_URL=pg.url.render_as_string(hide_password=False))
     resultado = subprocess.run([sys.executable, '-c', VERIFICAR], env=env, capture_output=True, text=True)
     assert resultado.returncode == 0, resultado.stderr
+
+
+# Titulares da busca "andre": (ID, nome). Os IDs estão fora da ordem esperada de propósito.
+TITULARES_ANDRE = [
+    ('UC-A01', 'ALEXANDRE DUARTE'),        # 3: no meio de uma palavra
+    ('UC-A02', 'JOSE ANDRE LIMA'),         # 2: outra palavra começa com o termo
+    ('UC-A03', 'ANDREIA LIMA'),            # 1: o nome começa com o termo
+    ('UC-A04', 'CARLOS ALEXANDRE ROCHA'),  # 3
+    ('UC-A05', 'ANDRE TORRES'),            # 1
+    ('UC-A06', 'MARIA ANDREZA SOUZA'),     # 2
+    ('UC-A07', 'ANDRE ANDRADE'),           # 1
+    ('UC-A08', 'PEDRO COSTA'),             # não casa
+]
+
+
+def test_busca_por_nome_ordena_por_relevancia(package, pg):
+    from sqlalchemy.orm import Session
+
+    from app.repositories.unidade_repository import SqlAlchemyUnidadeRepository
+    for tabela, colunas in PREENCHER.items():
+        for coluna, valor in colunas.items():
+            change(package, tabela, coluna, valor)
+    import_gold(pg, package)
+    with pg.begin() as conn:
+        for id_uc, nome in TITULARES_ANDRE:      # cópias da UC sintética, com outro ID e titular
+            conn.execute(text(
+                "INSERT INTO gold.dim_uc SELECT (jsonb_populate_record(d, jsonb_build_object("
+                "'id_uc', CAST(:id AS text), 'nome_titular', CAST(:nome AS text)))).* "
+                "FROM gold.dim_uc d WHERE d.id_uc = 'UC-TEST'"), {'id': id_uc, 'nome': nome})
+
+    with Session(pg) as db:
+        repo = SqlAlchemyUnidadeRepository(db)
+        itens, total = repo.buscar(busca='andre')
+        # Andrés antes dos Alexandres; em cada grupo, alfabética palavra por palavra
+        # (ANDRE TORRES antes de ANDREIA LIMA, o que a collation en_US inverteria).
+        assert [uc.nome_titular for uc in itens] == [
+            'ANDRE ANDRADE', 'ANDRE TORRES', 'ANDREIA LIMA',
+            'JOSE ANDRE LIMA', 'MARIA ANDREZA SOUZA',
+            'ALEXANDRE DUARTE', 'CARLOS ALEXANDRE ROCHA',
+        ]
+        assert total == 7
+        # A paginação segue a mesma ordem.
+        pagina, _ = repo.buscar(busca='  ANDRE ', page=2, page_size=3)
+        assert [uc.id_uc for uc in pagina] == ['UC-A02', 'UC-A06', 'UC-A01']
+        # Busca por código continua pelo ID.
+        itens, _ = repo.buscar(busca='uc-a0')
+        assert [uc.id_uc for uc in itens] == [f'UC-A0{i}' for i in range(1, 9)]
+        # Sem busca, a ordem continua pelo ID.
+        itens, _ = repo.buscar()
+        assert [uc.id_uc for uc in itens][:2] == ['UC-A01', 'UC-A02']
