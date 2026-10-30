@@ -1,4 +1,4 @@
-"""Base isolada de AUTH-b. Não ativa autenticação nem acessa banco ou ambiente.
+"""Criptografia de AUTH-b. Configuração e acesso ao banco ficam nas camadas chamadoras.
 
 Na integração, o chamador deve fornecer o JWT_SECRET vindo do ambiente.
 Nenhum segredo padrão é criado por este módulo.

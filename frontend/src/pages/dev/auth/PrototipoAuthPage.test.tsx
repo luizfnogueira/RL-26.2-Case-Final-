@@ -81,7 +81,7 @@ describe('prévia isolada do fluxo de autenticação', () => {
     expect(document.activeElement).toBe(screen.getByLabelText('E-mail'))
   })
 
-  it('reaproveita o e-mail cadastrado no login sem reaproveitar senha ou convite', async () => {
+  it('reaproveita o e-mail cadastrado no login sem reaproveitar a senha', async () => {
     abrir('/dev/auth/cadastro')
     fireEvent.click(screen.getByRole('button', { name: 'Preencher exemplo' }))
     fireEvent.change(screen.getByLabelText('E-mail'), {
@@ -94,12 +94,12 @@ describe('prévia isolada do fluxo de autenticação', () => {
       'artur.novo@venergy.test',
     )
     expect((screen.getByLabelText('Senha') as HTMLInputElement).value).toBe('')
-    fireEvent.click(screen.getByRole('link', { name: 'Criar acesso com convite' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Criar acesso' }))
     expect((screen.getByLabelText('Nome') as HTMLInputElement).value).toBe('Artur')
     expect((screen.getByLabelText('E-mail') as HTMLInputElement).value).toBe(
       'artur.novo@venergy.test',
     )
-    for (const rotulo of ['Senha', 'Confirmar senha', 'Código de convite']) {
+    for (const rotulo of ['Senha', 'Confirmar senha']) {
       expect((screen.getByLabelText(rotulo) as HTMLInputElement).value).toBe('')
     }
   })
@@ -195,16 +195,6 @@ describe('prévia isolada do fluxo de autenticação', () => {
     expect(screen.getByRole('alert').textContent).toBe('As senhas precisam ser iguais.')
     expect(screen.getByLabelText('Confirmar senha').getAttribute('aria-invalid')).toBe('true')
     expect(screen.getByRole('heading', { name: 'Crie seu acesso' })).toBeTruthy()
-  })
-
-  it('identifica convite de demonstração inválido sem criar uma conta', () => {
-    abrir('/dev/auth/cadastro')
-    fireEvent.click(screen.getByRole('button', { name: 'Preencher exemplo' }))
-    fireEvent.change(screen.getByLabelText('Código de convite'), { target: { value: 'INCORRETO' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Criar acesso' }))
-    expect(screen.getByRole('alert').textContent).toContain('Convite não reconhecido')
-    expect(fetch).not.toHaveBeenCalled()
-    expect(localStorage.length).toBe(0)
   })
 
   it('não continua com os campos obrigatórios vazios', () => {

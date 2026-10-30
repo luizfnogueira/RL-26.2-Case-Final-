@@ -1,12 +1,13 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import CORS_ORIGINS
 from app.core.errors import register_error_handlers
 from app.core.exceptions import AppException
+from app.core.auth import proteger_rotas
 
-from app.routers import dashboard, filtros, ia, inspecoes, operacao, unidades
+from app.routers import auth, dashboard, filtros, ia, inspecoes, operacao, unidades
 
 app = FastAPI(
     title="V-Energy Grid 360 API",
@@ -22,7 +23,9 @@ register_error_handlers(app)
 
 for router in (dashboard.router, filtros.router, unidades.router, inspecoes.router, operacao.router,
                ia.router):
-    app.include_router(router)
+    app.include_router(router, dependencies=[Depends(proteger_rotas)])
+
+app.include_router(auth.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,7 +43,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     )
 
 
-@app.get("/")
+@app.get("/", dependencies=[Depends(proteger_rotas)])
 async def root() -> dict[str, str]:
     return {"message": "API funcionando!"}
 

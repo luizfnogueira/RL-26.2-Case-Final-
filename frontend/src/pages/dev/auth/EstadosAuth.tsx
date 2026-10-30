@@ -9,12 +9,14 @@ export default function EstadosAuth({
   destino,
   aoNavegar,
   aoSair,
+  integrada = false,
 }: {
   etapa: EtapaAuth
   pessoa: PessoaExemplo
   destino: string
   aoNavegar: (etapa: EtapaAuth) => void
   aoSair: () => void
+  integrada?: boolean
 }) {
   if (etapa === 'confirmacao')
     return (
@@ -23,7 +25,9 @@ export default function EstadosAuth({
           <CircleCheck size={29} strokeWidth={1.5} aria-hidden="true" />
         </span>
         <div className="auth-account-summary">
-          <span className="auth-detail-label">Seu acesso de exemplo</span>
+          <span className="auth-detail-label">
+            {integrada ? 'Conta criada' : 'Seu acesso de exemplo'}
+          </span>
           <p>{pessoa.nome}</p>
           <span className="auth-account-email">{pessoa.email}</span>
         </div>
@@ -55,11 +59,11 @@ export default function EstadosAuth({
             <span>Situação</span>
             <strong>
               <i />
-              Sessão de exemplo
+              {integrada ? 'Sessão autenticada' : 'Sessão de exemplo'}
             </strong>
           </p>
           <p>
-            <span>Duração proposta</span>
+            <span>{integrada ? 'Validade máxima do token' : 'Duração proposta'}</span>
             <strong>60 minutos</strong>
           </p>
           <p>
@@ -73,21 +77,23 @@ export default function EstadosAuth({
             : `Continuar para ${nomeDoDestino(destino)}`}
           <ArrowRight size={17} aria-hidden="true" />
         </Link>
-        <Button
-          variante="fantasma"
-          onClick={() => aoNavegar('expirada')}
-          className="auth-secondary-action"
-          icone={<Clock3 size={16} aria-hidden="true" />}
-        >
-          Simular sessão expirada
-        </Button>
+        {!integrada && (
+          <Button
+            variante="fantasma"
+            onClick={() => aoNavegar('expirada')}
+            className="auth-secondary-action"
+            icone={<Clock3 size={16} aria-hidden="true" />}
+          >
+            Simular sessão expirada
+          </Button>
+        )}
         <Button
           variante="fantasma"
           onClick={aoSair}
           className="auth-secondary-action"
           icone={<LogOut size={16} aria-hidden="true" />}
         >
-          Sair da demonstração
+          {integrada ? 'Sair da conta' : 'Sair da demonstração'}
         </Button>
       </div>
     )

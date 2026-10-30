@@ -3,7 +3,7 @@ import { ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { NavLink } from 'react-router'
 import Select from '@/components/ui/Select'
 import { cx } from '@/utils/cx'
-import { CONVITE_EXEMPLO, rotaDaPrevia, type CenarioEnvio, type EtapaAuth } from './fluxo'
+import { rotaDaPrevia, type CenarioEnvio, type EtapaAuth } from './fluxo'
 
 export default function RevisaoAuth({
   etapa,
@@ -78,8 +78,7 @@ export default function RevisaoAuth({
           />
         )}
         <p className="auth-review-note">
-          Convite fictício: <code>{CONVITE_EXEMPLO}</code>. Sem criação de contas, emissão de token
-          ou chamadas à API. O fluxo continua em revisão.
+          Sem criação de contas, emissão de token ou chamadas à API. O fluxo continua em revisão.
         </p>
       </div>
     </section>

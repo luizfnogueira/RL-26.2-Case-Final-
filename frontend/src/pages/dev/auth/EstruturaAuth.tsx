@@ -66,7 +66,7 @@ export default function EstruturaAuth({ etapa }: { etapa: EtapaAuth }) {
       </div>
       <ol className="auth-journey" aria-label="Fluxo proposto">
         {[
-          { icone: KeyRound, titulo: 'Primeiro acesso', texto: 'Crie sua conta com um convite.' },
+          { icone: KeyRound, titulo: 'Primeiro acesso', texto: 'Crie sua conta para come?ar.' },
           { icone: LogIn, titulo: 'Entre no portal', texto: 'Acesse com seu e-mail e senha.' },
           { icone: ArrowUpRight, titulo: 'Sua visão 360', texto: 'Continue de onde você parou.' },
         ].map((item, i) => (

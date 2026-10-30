@@ -3,6 +3,7 @@ from sqlalchemy import text
 from app.db.base import PortalBase
 from app.db.session import engine
 from app.models import portal  # noqa: F401
+from app.models import usuario  # noqa: F401
 
 
 def main():

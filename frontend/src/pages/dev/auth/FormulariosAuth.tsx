@@ -3,8 +3,9 @@ import { ArrowRight, Check, Eye, EyeOff, Info } from 'lucide-react'
 import { Link } from 'react-router'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { normalizarErro } from '@/services/erro-api'
+import type { CadastroAuth } from './api'
 import {
-  CONVITE_EXEMPLO,
   EXEMPLO,
   mensagemDoCenario,
   rotaDaPrevia,
@@ -13,12 +14,13 @@ import {
   type PessoaExemplo,
 } from './fluxo'
 
-type Campos = 'nome' | 'email' | 'senha' | 'confirmacao' | 'convite'
+type Campos = 'nome' | 'email' | 'senha' | 'confirmacao'
 type Erros = Partial<Record<Campos, string>>
 
 function useFormularioVisual() {
   const formulario = useRef<HTMLFormElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const controle = useRef<AbortController | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [erros, atualizarErros] = useState<Erros>({})
   const deveFocar = useRef(false)
@@ -27,6 +29,7 @@ function useFormularioVisual() {
   useEffect(
     () => () => {
       if (timer.current !== null) clearTimeout(timer.current)
+      controle.current?.abort()
     },
     [],
   )
@@ -53,14 +56,24 @@ function useFormularioVisual() {
     deveFocar.current = true
     atualizarErros(novos)
   }
-  function enviar(concluir: () => void) {
-    if (timer.current !== null) return
+  function enviar(concluir: (sinal: AbortSignal) => void | Promise<void>) {
+    if (controle.current !== null) return
+    const requisicao = new AbortController()
+    controle.current = requisicao
     setEnviando(true)
     timer.current = setTimeout(
-      () => {
+      async () => {
         timer.current = null
-        setEnviando(false)
-        concluir()
+        try {
+          await concluir(requisicao.signal)
+        } catch (erro) {
+          if (!requisicao.signal.aborted) setErro(normalizarErro(erro).mensagem)
+        } finally {
+          if (!requisicao.signal.aborted) {
+            controle.current = null
+            setEnviando(false)
+          }
+        }
       },
       import.meta.env.MODE === 'test' ? 0 : 450,
     )
@@ -101,6 +114,7 @@ function Senha({
         value={valor}
         onChange={(e) => aoMudar(e.target.value)}
         autoComplete={cadastro ? 'new-password' : 'current-password'}
+        maxLength={128}
         required
         disabled={disabled}
         erro={erro}
@@ -141,11 +155,13 @@ export function FormularioLogin({
   cenario,
   destino,
   aoEntrar,
+  autenticar,
 }: {
   pessoa: PessoaExemplo
   cenario: CenarioEnvio
   destino: string
   aoEntrar: (pessoa: PessoaExemplo) => void
+  autenticar?: (email: string, senha: string, sinal: AbortSignal) => Promise<PessoaExemplo>
 }) {
   const [email, setEmail] = useState(pessoa === EXEMPLO ? '' : pessoa.email)
   const [senha, setSenha] = useState('')
@@ -169,7 +185,14 @@ export function FormularioLogin({
     setErro(null)
     setErros(erros)
     if (Object.keys(erros).length) return
-    enviar(() => {
+    enviar(async (sinal) => {
+      if (autenticar) {
+        const usuario = await autenticar(email.trim(), senha, sinal)
+        if (sinal.aborted) return
+        setSenha('')
+        aoEntrar(usuario)
+        return
+      }
       const mensagem = mensagemDoCenario(cenario)
       if (mensagem) {
         setErro(mensagem)
@@ -199,6 +222,7 @@ export function FormularioLogin({
         }}
         placeholder="seu.email@empresa.com.br"
         autoComplete="username"
+        maxLength={254}
         required
         disabled={enviando}
         erro={errosCampos.email}
@@ -223,30 +247,29 @@ export function FormularioLogin({
       <p className="auth-form-switch">
         Primeiro acesso?{' '}
         <Link to={rotaDaPrevia('cadastro', destino)}>
-          Criar acesso com convite <ArrowRight size={14} aria-hidden="true" />
+          Criar acesso <ArrowRight size={14} aria-hidden="true" />
         </Link>
       </p>
-      <div className="auth-form-bottom">
-        <button
-          type="button"
-          disabled={enviando}
-          className="auth-example"
-          onClick={() => {
-            setEmail(pessoa.email)
-            setSenha(SENHA_EXEMPLO)
-            limpar()
-          }}
-        >
-          Preencher exemplo
-        </button>
-        <span>Use somente dados fictícios</span>
-      </div>
+      {!autenticar && (
+        <div className="auth-form-bottom">
+          <button
+            type="button"
+            disabled={enviando}
+            className="auth-example"
+            onClick={() => {
+              setEmail(pessoa.email)
+              setSenha(SENHA_EXEMPLO)
+              limpar()
+            }}
+          >
+            Preencher exemplo
+          </button>
+          <span>Use somente dados fictícios</span>
+        </div>
+      )}
       <details className="auth-help">
         <summary>Precisa de ajuda para acessar?</summary>
-        <p>
-          Confira seu e-mail e tente novamente. Se ainda não tem um convite, solicite o acesso à
-          pessoa responsável na equipe.
-        </p>
+        <p>Confira seu e-mail e tente novamente. Se ainda não possui uma conta, crie seu acesso.</p>
       </details>
     </form>
   )
@@ -257,17 +280,18 @@ export function FormularioCadastro({
   cenario,
   destino,
   aoCadastrar,
+  registrar,
 }: {
   pessoa: PessoaExemplo
   cenario: CenarioEnvio
   destino: string
   aoCadastrar: (pessoa: PessoaExemplo) => void
+  registrar?: (dados: CadastroAuth, sinal: AbortSignal) => Promise<PessoaExemplo>
 }) {
   const [nome, setNome] = useState(pessoa === EXEMPLO ? '' : pessoa.nome)
   const [email, setEmail] = useState(pessoa === EXEMPLO ? '' : pessoa.email)
   const [senha, setSenha] = useState('')
   const [confirmacao, setConfirmacao] = useState('')
-  const [convite, setConvite] = useState('')
   const {
     formulario,
     enviando,
@@ -288,13 +312,18 @@ export function FormularioCadastro({
     if (senha.length < 8) erros.senha = 'Use pelo menos 8 caracteres.'
     if (!confirmacao) erros.confirmacao = 'Confirme sua senha.'
     else if (senha !== confirmacao) erros.confirmacao = 'As senhas precisam ser iguais.'
-    if (!convite.trim()) erros.convite = 'Informe o código de convite.'
-    else if (convite.trim() !== CONVITE_EXEMPLO)
-      erros.convite = 'Convite não reconhecido. Confira o código recebido.'
     setErro(null)
     setErros(erros)
     if (Object.keys(erros).length) return
-    enviar(() => {
+    enviar(async (sinal) => {
+      if (registrar) {
+        const usuario = await registrar({ nome: nome.trim(), email: email.trim(), senha }, sinal)
+        if (sinal.aborted) return
+        setSenha('')
+        setConfirmacao('')
+        aoCadastrar(usuario)
+        return
+      }
       if (cenario === 'indisponivel') {
         setErro(mensagemDoCenario(cenario))
         return
@@ -305,7 +334,6 @@ export function FormularioCadastro({
       }
       setSenha('')
       setConfirmacao('')
-      setConvite('')
       aoCadastrar({ nome: nome.trim(), email: email.trim() })
     })
   }
@@ -347,6 +375,7 @@ export function FormularioCadastro({
         required
         disabled={enviando}
         autoComplete="email"
+        maxLength={254}
         erro={errosCampos.email}
         className="auth-control"
       />
@@ -386,21 +415,6 @@ export function FormularioCadastro({
           Confirmação igual à senha
         </li>
       </ul>
-      <Input
-        rotulo="Código de convite"
-        name="convite"
-        value={convite}
-        onChange={(e) => {
-          setConvite(e.target.value)
-          limpar('convite')
-        }}
-        placeholder="Código recebido pela equipe"
-        required
-        disabled={enviando}
-        autoComplete="off"
-        erro={errosCampos.convite}
-        className="auth-control"
-      />
       <AvisoErro mensagem={erro} referencia={aviso} />
       <Button type="submit" carregando={enviando} className="auth-primary">
         {enviando ? 'Criando acesso…' : 'Criar acesso'}
@@ -412,24 +426,25 @@ export function FormularioCadastro({
           Entrar no portal <ArrowRight size={14} aria-hidden="true" />
         </Link>
       </p>
-      <div className="auth-form-bottom">
-        <button
-          type="button"
-          disabled={enviando}
-          className="auth-example"
-          onClick={() => {
-            setNome(EXEMPLO.nome)
-            setEmail(EXEMPLO.email)
-            setSenha(SENHA_EXEMPLO)
-            setConfirmacao(SENHA_EXEMPLO)
-            setConvite(CONVITE_EXEMPLO)
-            limpar()
-          }}
-        >
-          Preencher exemplo
-        </button>
-        <span>Use somente dados fictícios</span>
-      </div>
+      {!registrar && (
+        <div className="auth-form-bottom">
+          <button
+            type="button"
+            disabled={enviando}
+            className="auth-example"
+            onClick={() => {
+              setNome(EXEMPLO.nome)
+              setEmail(EXEMPLO.email)
+              setSenha(SENHA_EXEMPLO)
+              setConfirmacao(SENHA_EXEMPLO)
+              limpar()
+            }}
+          >
+            Preencher exemplo
+          </button>
+          <span>Use somente dados fictícios</span>
+        </div>
+      )}
     </form>
   )
 }

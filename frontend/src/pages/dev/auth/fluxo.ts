@@ -6,7 +6,6 @@ export type PessoaExemplo = { nome: string; email: string }
 
 export const EXEMPLO = { nome: 'Artur', email: 'artur@venergy.test' }
 export const SENHA_EXEMPLO = 'EnergiaDemo2026!'
-export const CONVITE_EXEMPLO = 'VENERGY-DEMO'
 
 export function etapaValida(etapa: string | undefined): etapa is EtapaAuth {
   return ETAPAS.some((valor) => valor === etapa)
