@@ -315,7 +315,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 with TestClient(app) as client:
     r = client.get('/inspecoes/candidatos', params={'periodo_atual':'2025-07/2026-06'})
-    assert r.status_code == 200 and r.json()['total'] == 0
+    assert r.status_code == 200 and r.json()['total'] == 1
+    assert r.json()['items'][0]['acao_recomendada'] == 'VALIDACAO_DOCUMENTAL'
     r = client.post('/inspecoes', json={'id_uc':'UC-TEST','equipe_responsavel':'SYNTHETIC'})
     assert r.status_code == 422
 """

@@ -53,14 +53,14 @@ def metadados(db: Session) -> dict:
     )
 
 
-@router.get('/candidatos', response_model=Candidatos, summary='Fila priorizada de candidatos',
+@router.get('/candidatos', response_model=Candidatos, summary='Fila de perdas elegíveis',
             description=(
                 'Fila lida da Gold/seed, sem stub. Filtros geográficos por AND; ordenação por score '
                 'decrescente, kWh estimado decrescente e ID crescente. A posição é global após os '
                 'filtros e antes da paginação. O resumo também ignora a paginação. O indicador de '
-                'ordem ativa é lido do schema portal. Com GOLD_SOURCE=real, somente UCs com '
-                'status_triagem=ELEGIVEL e acao_recomendada=INSPECAO_PRIORITARIA entram na fila. '
-                'Casos de VALIDACAO_DOCUMENTAL permanecem na Gold, fora desta fila de campo.'
+                'ordem ativa é lido do schema portal. A fila inclui UCs ELEGIVEL com ambas as ações '
+                'recomendadas. sem_ordem_ativa=true oculta UCs com ordem ABERTA ou EM_CAMPO; total e '
+                'resumo refletem esse filtro.'
             ),
             responses=respostas('candidatos', erros=('CENARIO_STUB_INDISPONIVEL',)))
 async def candidatos(
@@ -101,7 +101,7 @@ async def listar_inspecoes(
 
 @router.post('', response_model=Ordem, status_code=201, summary='Criar ordem de inspeção',
              description=PERSISTENCIA + ' UC inexistente retorna 404; UC já com ordem ativa retorna 409. '
-             'Com GOLD_SOURCE=real, UC marcada como VALIDACAO_DOCUMENTAL em gold.tb_fila_perdas '
+             'UC marcada como VALIDACAO_DOCUMENTAL em gold.tb_fila_perdas '
              'retorna 422 DADOS_INVALIDOS, sem criar ordem nem histórico.',
              responses=respostas('ordem_criada', status=201, erros=('UC_INEXISTENTE', 'ORDEM_ATIVA_EXISTENTE')))
 async def criar_inspecao(

@@ -59,7 +59,7 @@ afterEach(() => {
 describe('FilaPage', () => {
   it('exporta todos os candidatos filtrados em páginas e identifica os dados mockados', async () => {
     const todos = candidatosFixture as Candidatos
-    const exportacao = Array.from({ length: 101 }, (_, index) => ({
+    const exportacao = Array.from({ length: 201 }, (_, index) => ({
       ...todos.items[index % todos.items.length],
       id_uc: `UC-EXPORT-${String(index + 1).padStart(3, '0')}`,
       posicao: index + 1,
@@ -67,12 +67,12 @@ describe('FilaPage', () => {
     const chamadas = vi.mocked(buscarCandidatos)
     chamadas.mockImplementation((params: ParamsCandidatos) =>
       Promise.resolve(
-        params.page_size === 100
+        params.page_size === 200
           ? {
               ...todos,
-              items: exportacao.slice(((params.page ?? 1) - 1) * 100, (params.page ?? 1) * 100),
+              items: exportacao.slice(((params.page ?? 1) - 1) * 200, (params.page ?? 1) * 200),
               page: params.page ?? 1,
-              page_size: 100,
+              page_size: 200,
               total: exportacao.length,
             }
           : todos,
@@ -105,12 +105,13 @@ describe('FilaPage', () => {
       expect(screen.getAllByText('ALM-DEMO-001').length).toBeGreaterThan(0)
       fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
 
-      await screen.findByText('Dados fictícios: 101 candidatos exportados')
+      await screen.findByText('Dados fictícios: 201 candidatos exportados')
       expect(arquivoBaixado).toBe('fila-inspecao-mock.csv')
       const chamadasExportacao = chamadas.mock.calls
         .map(([params]) => params)
-        .filter((params) => params.page_size === 100)
+        .filter((params) => params.page_size === 200)
       expect(chamadasExportacao.map((params) => params.page)).toEqual([1, 2])
+      expect(chamadasExportacao.every((params) => params.sem_ordem_ativa === false)).toBe(true)
     } finally {
       HTMLAnchorElement.prototype.click = clickOriginal
       if (createObjectUrlOriginal) {
@@ -119,6 +120,45 @@ describe('FilaPage', () => {
         Reflect.deleteProperty(URL, 'createObjectURL')
       }
     }
+  })
+
+  it('representa ação recomendada e desabilita seleção para validação documental', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-003')
+    expect(screen.getAllByText('Validação documental').length).toBeGreaterThan(0)
+    expect(
+      screen.getByRole('checkbox', { name: 'Selecionar UC-DEMO-003' }).hasAttribute('disabled'),
+    ).toBe(true)
+    expect(
+      screen.getByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }).hasAttribute('disabled'),
+    ).toBe(false)
+  })
+
+  it('persiste sem_ordem_ativa na URL e reinicia a paginação', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila?page=2']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-001')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ocultar UCs com ordem ativa' }))
+
+    await waitFor(() => {
+      expect(buscarCandidatos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, sem_ordem_ativa: true }),
+        expect.anything(),
+      )
+    })
   })
 
   it('indica quando mantém resultados antigos enquanto os novos filtros carregam', async () => {
@@ -218,6 +258,8 @@ describe('gerarCsvCandidatos', () => {
     const csv = gerarCsvCandidatos([candidato])
 
     expect(csv).toContain('"Score (pontos)"')
+    expect(csv).toContain('"Ação recomendada"')
+    expect(csv).toContain('"INSPECAO_PRIORITARIA"')
     expect(csv).toContain('"66,0 pts"')
   })
 

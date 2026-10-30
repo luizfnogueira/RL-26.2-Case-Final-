@@ -257,6 +257,26 @@ describe('GET /inspecoes/candidatos', () => {
     const ativa = c.items.find((i) => i.id_uc === 'UC-DEMO-002')
     expect(ativa).toMatchObject({ ordem_ativa: true, id_ordem_ativa: 1 })
     expect(c.resumo.ordens_ativas.valor).toBe(c.items.filter((i) => i.ordem_ativa).length)
+    expect(c.items.map((i) => i.acao_recomendada)).toContain('VALIDACAO_DOCUMENTAL')
+  })
+
+  it('filtra ordens ativas antes de paginar e recalcula o resumo', async () => {
+    const c = await buscarCandidatos({
+      periodo_atual: ATUAL,
+      sem_ordem_ativa: true,
+      page_size: 200,
+    })
+    expect(c.page_size).toBe(200)
+    expect(c.total).toBe(6)
+    expect(c.items.every((i) => !i.ordem_ativa)).toBe(true)
+    expect(c.items.map((i) => i.posicao)).toEqual(c.items.map((_, i) => i + 1))
+    expect(c.resumo.ucs_priorizadas.valor).toBe(6)
+    expect(c.resumo.ordens_ativas.valor).toBe(0)
+  })
+
+  it('rejeita page_size acima de 200 na fila', async () => {
+    const erro = await erroDe(buscarCandidatos({ periodo_atual: ATUAL, page_size: 201 }))
+    expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
   })
 
   it('segue a regra da Gold: desempate por kWh estimado e resumo sem corte de score', async () => {
@@ -327,6 +347,11 @@ describe('ordens de inspeção', () => {
     expect(existente.status).toBe(409)
     const nenhuma = await erroDe(criarInspecao({ ...NOVA, id_uc: 'UC-XXX' }))
     expect([nenhuma.status, nenhuma.codigo]).toEqual([404, 'UC_INEXISTENTE'])
+  })
+
+  it('bloqueia ordem de campo para UC com validação documental', async () => {
+    const erro = await erroDe(criarInspecao({ ...NOVA, id_uc: 'UC-DEMO-003' }))
+    expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
   })
 
   it('valida os campos obrigatórios da criação (422)', async () => {

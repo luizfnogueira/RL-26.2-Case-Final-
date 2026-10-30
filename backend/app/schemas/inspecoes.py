@@ -13,8 +13,13 @@ StatusOrdem = Literal['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 TextoLongo = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
-class FiltrosCandidatos(Contexto, Paginacao):
-    pass
+class FiltrosCandidatos(Contexto):
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=50, ge=1, le=200)
+    sem_ordem_ativa: bool = False
+
+
+AcaoRecomendada = Literal['INSPECAO_PRIORITARIA', 'VALIDACAO_DOCUMENTAL']
 
 
 class Candidato(Schema):
@@ -25,6 +30,7 @@ class Candidato(Schema):
     alimentador: str
     posicao: int = Field(ge=1)
     motivos: list[str]
+    acao_recomendada: AcaoRecomendada
     energia_estimada: Indicador
     score: float = Field(ge=0, le=100)
     confianca_evidencia: Literal['ALTA', 'MEDIA', 'BAIXA', 'INDETERMINADA']
@@ -40,6 +46,7 @@ class ResumoCandidatos(Schema):
 
 
 class Candidatos(Pagina[Candidato]):
+    page_size: int = Field(default=50, ge=1, le=200)
     periodo_referencia: Periodo
     resumo: ResumoCandidatos
     metadados: Metadados

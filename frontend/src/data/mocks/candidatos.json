@@ -11,6 +11,7 @@
         "Queda de 42% no consumo sem geração distribuída",
         "Histórico de religação"
       ],
+      "acao_recomendada": "INSPECAO_PRIORITARIA",
       "energia_estimada": {
         "valor": 1840.0,
         "unidade": "kWh",
@@ -32,6 +33,7 @@
         "Consumo 38% acima do mesmo mês do ano anterior",
         "Leitura estimada no último mês"
       ],
+      "acao_recomendada": "INSPECAO_PRIORITARIA",
       "energia_estimada": {
         "valor": 520.0,
         "unidade": "kWh",
@@ -53,6 +55,7 @@
         "Consumo zerado em 2 meses",
         "Medidor com leitura retroativa"
       ],
+      "acao_recomendada": "VALIDACAO_DOCUMENTAL",
       "energia_estimada": {
         "valor": 610.0,
         "unidade": "kWh",
@@ -73,6 +76,7 @@
       "motivos": [
         "Queda de consumo após troca de titularidade"
       ],
+      "acao_recomendada": "INSPECAO_PRIORITARIA",
       "energia_estimada": {
         "valor": 1320.0,
         "unidade": "kWh",
@@ -93,6 +97,7 @@
       "motivos": [
         "Consumo abaixo da média do bairro"
       ],
+      "acao_recomendada": "VALIDACAO_DOCUMENTAL",
       "energia_estimada": {
         "valor": 280.0,
         "unidade": "kWh",
@@ -113,6 +118,7 @@
       "motivos": [
         "Variação atípica entre meses consecutivos"
       ],
+      "acao_recomendada": "INSPECAO_PRIORITARIA",
       "energia_estimada": {
         "valor": 190.0,
         "unidade": "kWh",
@@ -133,6 +139,7 @@
       "motivos": [
         "Medidor sem manutenção há mais de 5 anos"
       ],
+      "acao_recomendada": "VALIDACAO_DOCUMENTAL",
       "energia_estimada": {
         "valor": 2400.0,
         "unidade": "kWh",
@@ -153,6 +160,7 @@
       "motivos": [
         "Consumo abaixo da média da classe"
       ],
+      "acao_recomendada": "INSPECAO_PRIORITARIA",
       "energia_estimada": {
         "valor": 150.0,
         "unidade": "kWh",
@@ -165,7 +173,7 @@
     }
   ],
   "page": 1,
-  "page_size": 20,
+  "page_size": 50,
   "total": 8,
   "periodo_referencia": "2025-07/2026-06",
   "resumo": {
