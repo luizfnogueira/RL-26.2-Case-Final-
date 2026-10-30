@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatarCep,
   formatarEnergia,
   formatarIndicador,
   formatarNome,
@@ -67,5 +68,13 @@ describe('formatarIndicador', () => {
     expect(formatarIndicador({ valor: 1_500_000, unidade: 'kWh' })).toBe('1,5 GWh')
     expect(formatarIndicador({ valor: 48, unidade: 'UCs' })).toBe('48 UCs')
     expect(formatarIndicador({ valor: null, unidade: 'BRL' })).toBe('—')
+  })
+})
+
+describe('formatarCep', () => {
+  it('põe o hífen nos 8 dígitos da Gold e não estraga o que já vem mascarado ou fora do padrão', () => {
+    expect(formatarCep('50050000')).toBe('50050-000')
+    expect(formatarCep('50050-000')).toBe('50050-000')
+    expect(formatarCep('5005')).toBe('5005')
   })
 })

@@ -43,6 +43,11 @@ class Indicador(Schema):
     periodo_referencia: Periodo
 
 
+class IndicadorContagem(Indicador):
+    """Contagem (ex.: interrupções): inteiro no JSON, nunca 3.0. Medidas seguem em Indicador."""
+    valor: int | None
+
+
 class IndicadorNomeado(Indicador):
     nome: str
     rotulo: str

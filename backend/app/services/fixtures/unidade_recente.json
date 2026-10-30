@@ -1,0 +1,337 @@
+{
+  "periodo_referencia": "2025-07/2026-06",
+  "cadastro": {
+    "id_uc": "UC-DEMO-007",
+    "nome_titular": "Titular de exemplo 007",
+    "municipio": "OLINDA",
+    "bairro": "CASA CAIADA",
+    "classe": "RESIDENCIAL",
+    "alimentador": "ALM-DEMO-005",
+    "status": "ATIVA",
+    "cpf_cnpj_mascarado": "***.789.123-**",
+    "telefone": null,
+    "logradouro": "Avenida de Exemplo",
+    "numero": "700",
+    "uf": "PE",
+    "cep": "00000-000",
+    "subgrupo_tarifario": "B1",
+    "data_ligacao": "2026-01-05",
+    "latitude": -7.9986,
+    "longitude": -34.8417
+  },
+  "consumo": [
+    {
+      "mes": "2025-07",
+      "atual": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-07"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-07"
+      },
+      "tipo_leitura": null
+    },
+    {
+      "mes": "2025-08",
+      "atual": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-08"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-08"
+      },
+      "tipo_leitura": null
+    },
+    {
+      "mes": "2025-09",
+      "atual": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-09"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-09"
+      },
+      "tipo_leitura": null
+    },
+    {
+      "mes": "2025-10",
+      "atual": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-10"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-10"
+      },
+      "tipo_leitura": null
+    },
+    {
+      "mes": "2025-11",
+      "atual": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-11"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-11"
+      },
+      "tipo_leitura": null
+    },
+    {
+      "mes": "2025-12",
+      "atual": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-12"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2024-12"
+      },
+      "tipo_leitura": null
+    },
+    {
+      "mes": "2026-01",
+      "atual": {
+        "valor": 180.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-01"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-01"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-02",
+      "atual": {
+        "valor": 175.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-02"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-02"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-03",
+      "atual": {
+        "valor": 190.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-03"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-03"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-04",
+      "atual": {
+        "valor": 185.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-04"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-04"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-05",
+      "atual": {
+        "valor": 182.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-05"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-05"
+      },
+      "tipo_leitura": "REAL"
+    },
+    {
+      "mes": "2026-06",
+      "atual": {
+        "valor": 240.0,
+        "unidade": "kWh",
+        "periodo_referencia": "2026-06"
+      },
+      "ano_anterior": {
+        "valor": null,
+        "unidade": "kWh",
+        "periodo_referencia": "2025-06"
+      },
+      "tipo_leitura": "ESTIMADA"
+    }
+  ],
+  "diagnostico_conta": {
+    "periodo_referencia": "2026-06",
+    "conta_alta": null,
+    "veredito": {
+      "titulo": "Consumo acima da média",
+      "detalhe": "Jun/2026 ficou 32% acima da média dos 5 meses anteriores com consumo; não há o mesmo mês do ano anterior para comparar.",
+      "orientacao": "O aumento do consumo explica a conta mais alta."
+    },
+    "ultimo_mes": {
+      "valor": 240.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-06"
+    },
+    "mesmo_mes_ano_anterior": {
+      "valor": null,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-06"
+    },
+    "media_12_meses": {
+      "valor": 182.4,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-06/2026-05"
+    },
+    "meses_media": 5,
+    "variacao_percentual": {
+      "valor": null,
+      "unidade": "%",
+      "periodo_referencia": "2026-06"
+    },
+    "leitura_estimada": true,
+    "alerta": "Leitura estimada em jun/2026: o consumo pode ser ajustado na próxima leitura real."
+  },
+  "faturas_abertas": [
+    {
+      "id_fatura": "FT-DEMO-007-06",
+      "mes_referencia": "2026-06",
+      "valor_energia": 189.6,
+      "tributos": 58.78,
+      "valor_total": 248.38,
+      "bandeira_tarifaria": "VERDE",
+      "data_emissao": "2026-07-01",
+      "data_vencimento": "2026-07-12",
+      "data_pagamento": null,
+      "status": "EM ABERTO"
+    }
+  ],
+  "faturas_pagas": [
+    {
+      "id_fatura": "FT-DEMO-007-05",
+      "mes_referencia": "2026-05",
+      "valor_energia": 143.78,
+      "tributos": 44.57,
+      "valor_total": 188.35,
+      "bandeira_tarifaria": "VERDE",
+      "data_emissao": "2026-06-01",
+      "data_vencimento": "2026-06-12",
+      "data_pagamento": "2026-06-10",
+      "status": "PAGA"
+    },
+    {
+      "id_fatura": "FT-DEMO-007-04",
+      "mes_referencia": "2026-04",
+      "valor_energia": 146.15,
+      "tributos": 45.31,
+      "valor_total": 191.46,
+      "bandeira_tarifaria": "VERDE",
+      "data_emissao": "2026-05-01",
+      "data_vencimento": "2026-05-12",
+      "data_pagamento": "2026-05-10",
+      "status": "PAGA"
+    },
+    {
+      "id_fatura": "FT-DEMO-007-03",
+      "mes_referencia": "2026-03",
+      "valor_energia": 150.1,
+      "tributos": 46.53,
+      "valor_total": 196.63,
+      "bandeira_tarifaria": "VERDE",
+      "data_emissao": "2026-04-01",
+      "data_vencimento": "2026-04-12",
+      "data_pagamento": "2026-04-10",
+      "status": "PAGA"
+    },
+    {
+      "id_fatura": "FT-DEMO-007-02",
+      "mes_referencia": "2026-02",
+      "valor_energia": 138.25,
+      "tributos": 42.86,
+      "valor_total": 181.11,
+      "bandeira_tarifaria": "VERDE",
+      "data_emissao": "2026-03-01",
+      "data_vencimento": "2026-03-12",
+      "data_pagamento": "2026-03-10",
+      "status": "PAGA"
+    },
+    {
+      "id_fatura": "FT-DEMO-007-01",
+      "mes_referencia": "2026-01",
+      "valor_energia": 142.2,
+      "tributos": 44.08,
+      "valor_total": 186.28,
+      "bandeira_tarifaria": "VERDE",
+      "data_emissao": "2026-02-01",
+      "data_vencimento": "2026-02-12",
+      "data_pagamento": "2026-02-10",
+      "status": "PAGA"
+    }
+  ],
+  "medidor": {
+    "id_medidor": "MD-DEMO-007",
+    "modelo": "MODELO-DEMO",
+    "tipo": "SMART",
+    "data_instalacao": "2026-01-05",
+    "ultima_leitura": {
+      "data": "2026-06-27",
+      "leitura_kwh": 1152.0,
+      "tipo_leitura": "ESTIMADA"
+    }
+  },
+  "geracao_distribuida": null,
+  "interrupcoes_recentes": [],
+  "total_interrupcoes": {
+    "valor": 0,
+    "unidade": "interrupcoes",
+    "periodo_referencia": "2025-07/2026-06"
+  },
+  "chamados": [
+    {
+      "protocolo": "AT-DEMO-007",
+      "canal": "WHATSAPP",
+      "assunto": "FATURA",
+      "subassunto": "VALOR ALTO",
+      "data_abertura": "2026-07-03T09:15:00-03:00",
+      "data_fechamento": "2026-07-04T11:00:00-03:00",
+      "nota_satisfacao": null,
+      "tempo_atendimento_h": 25.75
+    }
+  ],
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
+}

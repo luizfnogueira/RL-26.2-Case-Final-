@@ -61,13 +61,23 @@ export interface ConsumoMes {
   tipo_leitura: TipoLeitura | null
 }
 
+/** Veredito do diagnóstico em três partes, montado pela API (regra 3×3 do contrato). */
+export interface Veredito {
+  /** Curto, ex.: "Consumo caiu". */
+  titulo: string
+  /** Os números: percentual contra o ano anterior e contra a média. */
+  detalhe: string
+  /** Frase para o atendente; null quando não se aplica. */
+  orientacao: string | null
+}
+
 /** Resposta à pergunta "a conta veio alta?" sobre o mês analisado. */
 export interface DiagnosticoConta {
   /** Mês analisado: o último da janela com dado da UC. null se a janela não tem dados. */
   periodo_referencia: Mes | null
   conta_alta: boolean | null
   /** null quando a janela não tem dados da UC. */
-  veredito: string | null
+  veredito: Veredito | null
   ultimo_mes: Indicador
   mesmo_mes_ano_anterior: Indicador
   /** Média dos 12 meses anteriores ao mês analisado, sem incluí-lo, só com consumo > 0. */

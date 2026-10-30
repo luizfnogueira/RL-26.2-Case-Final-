@@ -17,7 +17,8 @@ LIMIAR_MEDIA_PCT = 20
 MESES_MEDIA = 12
 LIMITE_INTERRUPCOES = 10
 HORA_LOCAL = timezone(timedelta(hours=-3))   # Recife, sem horário de verão
-UC_EXEMPLO = 'UC-DEMO-001'                   # única UC com visão detalhada no fixture (GOLD_SOURCE=seed)
+# UCs com visão detalhada no fixture (GOLD_SOURCE=seed): uma completa e uma recente, sem GD e estimada.
+UC_EXEMPLOS = {'UC-DEMO-001': 'unidade', 'UC-DEMO-007': 'unidade_recente'}
 
 
 def _indicador(valor: Decimal | float | None, unidade: str, periodo: str) -> dict:
@@ -28,6 +29,14 @@ def _indicador(valor: Decimal | float | None, unidade: str, periodo: str) -> dic
 def somar_meses(mes: str, n: int) -> str:
     total = int(mes[:4]) * 12 + int(mes[5:]) - 1 + n
     return f'{total // 12}-{total % 12 + 1:02d}'
+
+
+MESES_TEXTO = ('jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez')
+
+
+def mes_texto(mes: str) -> str:
+    """Mês para ler no veredito e no alerta: '2026-06' → 'jun/2026'."""
+    return f'{MESES_TEXTO[int(mes[5:]) - 1]}/{mes[:4]}'
 
 
 def periodo_media(mes_analisado: str) -> str:
@@ -51,42 +60,110 @@ def media_12_meses(meses: list[MesConsumo], mes_analisado: str) -> tuple[float |
 def _alerta(ultimo: MesConsumo | None, anterior: MesConsumo | None) -> str | None:
     avisos = []
     if ultimo and ultimo.tipo_leitura == 'ESTIMADA':
-        avisos.append(f'Leitura ESTIMADA em {ultimo.mes}: o consumo pode ser ajustado na próxima leitura real.')
+        avisos.append(f'Leitura estimada em {mes_texto(ultimo.mes)}: o consumo pode ser ajustado '
+                      'na próxima leitura real.')
     if anterior and anterior.tipo_leitura == 'ESTIMADA':
-        avisos.append(f'Leitura ESTIMADA em {anterior.mes}: a comparação com o ano anterior é fraca.')
+        avisos.append(f'Leitura estimada em {mes_texto(anterior.mes)}: a comparação com o ano anterior é fraca.')
     for mes in (ultimo, anterior):
         if mes and mes.troca_medidor:
-            avisos.append(f'Troca de medidor em {mes.mes}: a primeira leitura após a troca '
+            avisos.append(f'Troca de medidor em {mes_texto(mes.mes)}: a primeira leitura após a troca '
                           'pode distorcer a comparação.')
     return ' '.join(avisos) or None
 
 
-def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None,
-              media: float | None, meses_media: int) -> str:
+CAUSA_NAO_E_CONSUMO = ('Se o valor da conta subiu, a causa não é o consumo, '
+                       'e sim tarifa, bandeira tarifária ou tributos.')
+CONSUMO_EXPLICA = 'O aumento do consumo explica a conta mais alta.'
+# Regra 3×3 (ano anterior × média), cada lado acima, em linha ou abaixo: título e orientação ao
+# atendente. Os números ficam no detalhe, montado à parte.
+VEREDITOS = {
+    ('acima', 'acima'): ('Consumo subiu', CONSUMO_EXPLICA),
+    ('acima', 'em linha'): ('Consumo subindo ao longo do ano',
+                            'O aumento do consumo explica a conta mais alta: não é um pico só deste mês.'),
+    ('acima', 'abaixo'): ('Consumo caindo nos últimos meses',
+                          'Contra o ano anterior, o consumo explica a conta mais alta; '
+                          'contra os últimos meses, não.'),
+    ('em linha', 'acima'): ('Alta sazonal',
+                            'O consumo maior é típico desta época do ano e explica a conta mais alta.'),
+    ('em linha', 'em linha'): ('Consumo estável', CAUSA_NAO_E_CONSUMO),
+    ('em linha', 'abaixo'): ('Consumo caiu', CAUSA_NAO_E_CONSUMO),
+    ('abaixo', 'acima'): ('Consumo voltou a subir',
+                          'Contra os últimos meses, o consumo explica a conta mais alta; '
+                          'contra o ano anterior, não.'),
+    ('abaixo', 'em linha'): ('Consumo caiu', CAUSA_NAO_E_CONSUMO),
+    ('abaixo', 'abaixo'): ('Consumo caiu', CAUSA_NAO_E_CONSUMO),
+}
+# Sem o mesmo mês do ano anterior, só a média decide.
+VEREDITOS_SEM_ANO_ANTERIOR = {
+    'acima': ('Consumo acima da média', CONSUMO_EXPLICA),
+    'em linha': ('Consumo em linha com a média', CAUSA_NAO_E_CONSUMO),
+    'abaixo': ('Consumo abaixo da média', CAUSA_NAO_E_CONSUMO),
+}
+
+
+def _percentual(valor: Decimal | float) -> str:
+    """Percentual inteiro e sem sinal para o texto (−37,4 → '37%'); o meio arredonda para cima."""
+    return f'{int(abs(float(valor)) + 0.5)}%'
+
+
+def _contra(estado: str, percentual: str | None, de: str, com: str) -> str:
+    """Uma comparação no texto: '37% abaixo da média…', 'acima de jun/2025' ou 'em linha com …'."""
+    if estado == 'em linha':
+        return f'em linha {com}'
+    return f'{percentual} {estado} {de}' if percentual else f'{estado} {de}'
+
+
+def _base_media(meses_media: int) -> str:
+    """Base da média no texto; com menos de 12 meses, diz quantos tinham consumo."""
+    if meses_media == MESES_MEDIA:
+        return f'média dos {MESES_MEDIA} meses anteriores'
+    if meses_media == 1:
+        return 'média de 1 mês anterior com consumo'
+    return f'média dos {meses_media} meses anteriores com consumo'
+
+
+def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None, variacao: Decimal | None,
+              media: float | None, meses_media: int) -> dict:
+    """Veredito em três partes: título curto, detalhe com os números e orientação ao atendente."""
+    rotulo = mes_texto(mes).capitalize()
     if consumo is None or consumo <= 0:
-        return f'Sem consumo válido em {mes}: não é possível avaliar a conta.'
-    acima_media = media is not None and float(consumo) > media * (1 + LIMIAR_MEDIA_PCT / 100)
-    limiar = f'{LIMIAR_MEDIA_PCT}%'
-    base = f'média dos meses anteriores ({meses_media} {"mês" if meses_media == 1 else "meses"})'
+        return {'titulo': 'Sem consumo válido',
+                'detalhe': f'{rotulo} não tem consumo válido: não é possível avaliar a conta.',
+                'orientacao': None}
+    if conta_alta is None and media is None:
+        return {'titulo': 'Sem base de comparação',
+                'detalhe': f'{rotulo} não tem o mesmo mês do ano anterior nem meses anteriores com '
+                           'consumo para comparar.',
+                'orientacao': None}
+    # Média com três estados e o mesmo limiar nos dois sentidos: acima, abaixo ou em linha.
+    fator = LIMIAR_MEDIA_PCT / 100
+    acima_media = media is not None and float(consumo) > media * (1 + fator)
+    abaixo_media = media is not None and float(consumo) < media * (1 - fator)
+    estado_media = 'acima' if acima_media else 'abaixo' if abaixo_media else 'em linha'
+    desvio_media = None if media is None else _percentual((float(consumo) / media - 1) * 100)
+    base = _base_media(meses_media)
+    contra_media = _contra(estado_media, desvio_media, f'da {base}', f'com a {base}')
     if conta_alta is None:
-        if media is None:
-            return f'Sem base de comparação para {mes}: não há o mesmo mês do ano anterior nem meses anteriores com consumo.'
-        if acima_media:
-            return (f'Sem o mesmo mês do ano anterior para comparar; o consumo de {mes} ficou '
-                    f'mais de {limiar} acima da {base}.')
-        return (f'Sem o mesmo mês do ano anterior para comparar; o consumo de {mes} está '
-                f'em linha com a {base}.')
-    if conta_alta and acima_media:
-        return (f'Consumo subiu: {mes} ficou mais de {limiar} acima do mesmo mês do ano anterior '
-                f'e da {base}. O aumento do consumo explica a conta mais alta.')
-    if conta_alta:
-        return (f'Consumo mais de {limiar} acima do mesmo mês do ano anterior, mas em linha com a {base}: '
-                'o consumo vem subindo ao longo do ano, não só neste mês.')
-    if acima_media:
-        return (f'Consumo em linha com o mesmo mês do ano anterior, mas mais de {limiar} acima da {base}: '
-                'efeito sazonal do mês.')
-    return ('Consumo estável: se o valor da conta subiu, a causa não é o consumo, '
-            'e sim tarifa, bandeira tarifária ou tributos.')
+        titulo, orientacao = VEREDITOS_SEM_ANO_ANTERIOR[estado_media]
+        return {'titulo': titulo,
+                'detalhe': f'{rotulo} ficou {contra_media}; não há o mesmo mês do ano anterior para comparar.',
+                'orientacao': orientacao}
+    # Ano anterior também com três estados: acima (flag da Gold), abaixo (variacao_pct da Gold
+    # abaixo de −20%, estrito) ou em linha. Nenhum dos dois é recalculado aqui.
+    caiu_no_ano = conta_alta is False and variacao is not None and variacao < -LIMIAR_MEDIA_PCT
+    estado_ano = 'acima' if conta_alta else 'abaixo' if caiu_no_ano else 'em linha'
+    ano_anterior = mes_texto(somar_meses(mes, -12))
+    contra_ano = _contra(estado_ano, None if variacao is None else _percentual(variacao),
+                         f'de {ano_anterior}', f'com {ano_anterior}')
+    # O que mudou vem primeiro; sem mudança, uma frase só.
+    if estado_ano == estado_media == 'em linha':
+        corpo = f'em linha com {ano_anterior} e com a {base}'
+    elif estado_ano == 'em linha':
+        corpo = f'{contra_media} e {contra_ano}'
+    else:
+        corpo = f'{contra_ano} e {contra_media}'
+    titulo, orientacao = VEREDITOS[estado_ano, estado_media]
+    return {'titulo': titulo, 'detalhe': f'{rotulo} ficou {corpo}.', 'orientacao': orientacao}
 
 
 def diagnosticar_conta(meses: list[MesConsumo], periodo: str) -> dict:
@@ -107,7 +184,8 @@ def diagnosticar_conta(meses: list[MesConsumo], periodo: str) -> dict:
     return {
         'periodo_referencia': ultimo.mes if ultimo else None,
         'conta_alta': conta_alta,
-        'veredito': _veredito(analisado, ultimo.consumo_kwh, conta_alta, media, meses_media) if ultimo else None,
+        'veredito': (_veredito(analisado, ultimo.consumo_kwh, conta_alta, ultimo.variacao_pct, media, meses_media)
+                     if ultimo else None),
         'ultimo_mes': _indicador(ultimo.consumo_kwh if ultimo else None, 'kWh', analisado),
         'mesmo_mes_ano_anterior': _indicador(ultimo.consumo_kwh_ano_anterior if ultimo else None,
                                              'kWh', mes_anterior),
@@ -186,7 +264,7 @@ def _gd(ficha: FichaUC, periodo: str) -> dict | None:
 def _interrupcao(i: InterrupcaoUC) -> dict:
     return {'id_ocorrencia': i.id_ocorrencia, 'alimentador': i.alimentador, 'tipo': i.tipo, 'causa': i.causa,
             'data_abertura': hora_local(i.data_abertura), 'data_encerramento': hora_local(i.data_encerramento),
-            'duracao_min': _numero(i.duracao_min)}
+            'duracao_min': int(i.duracao_min)}
 
 
 def _chamado(c: ChamadoUC) -> dict:
@@ -244,25 +322,45 @@ class UnidadeService:
             'medidor': _medidor(ficha, repo.ultima_leitura(id_uc)),
             'geracao_distribuida': _gd(ficha, periodo),
             'interrupcoes_recentes': [_interrupcao(i) for i in interrupcoes],
-            'total_interrupcoes': _indicador(total_interrupcoes, 'interrupcoes', periodo),
+            # Contagem: inteiro, sem o round(float()) das medidas.
+            'total_interrupcoes': {'valor': total_interrupcoes, 'unidade': 'interrupcoes',
+                                   'periodo_referencia': periodo},
             'chamados': [_chamado(ch) for ch in repo.chamados(id_uc)],
             'metadados': repo.metadados(),
         }
+
+
+def relevancia_do_nome(nome: str, busca: str) -> int:
+    """Mesma regra da busca no banco: 1 começa com o termo, 2 outra palavra começa, 3 no meio de
+    uma palavra, 4 só o código casa."""
+    nome, busca = nome.casefold(), busca.casefold()
+    if nome.startswith(busca):
+        return 1
+    if f' {busca}' in nome:
+        return 2
+    return 3 if busca in nome else 4
 
 
 def _buscar_exemplo(filtros: FiltrosUnidades) -> dict:
     base = exemplo('unidades')
     unidades = filtrar_regiao(base['items'], filtros)
     if filtros.busca:
-        busca = filtros.busca.casefold()
+        busca = filtros.busca.strip().casefold()
         unidades = [uc for uc in unidades
                     if busca in uc['id_uc'].casefold() or busca in uc['nome_titular'].casefold()]
-    unidades.sort(key=lambda uc: uc['id_uc'])
+
+    def ordem(uc: dict) -> tuple:
+        if not filtros.busca:
+            return (0, '', uc['id_uc'])
+        grupo = relevancia_do_nome(uc['nome_titular'], filtros.busca.strip())
+        return (grupo, '' if grupo == 4 else uc['nome_titular'].casefold(), uc['id_uc'])
+
+    unidades.sort(key=ordem)
     return {**paginar(unidades, filtros), 'metadados': base['metadados']}
 
 
 def _detalhar_exemplo(id_uc: str, filtros: FiltroUnidade) -> dict:
     verificar_cenario(filtros.periodo_atual)
-    if id_uc != UC_EXEMPLO:
+    if id_uc not in UC_EXEMPLOS:
         raise UCInexistenteException(f"Unidade Consumidora '{id_uc}' não disponível no cenário.")
-    return exemplo('unidade')
+    return exemplo(UC_EXEMPLOS[id_uc])

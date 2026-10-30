@@ -162,12 +162,32 @@ describe('GET /unidades', () => {
     }
   })
 
-  it('só UC-DEMO-001 tem visão 360; outras UCs dão 404', async () => {
+  it('UC-DEMO-001 e UC-DEMO-007 têm visão 360; outras UCs dão 404', async () => {
     const uc = await buscarUnidade('UC-DEMO-001', { periodo_atual: ATUAL })
     expect(uc.consumo).toHaveLength(12)
     expect(uc.diagnostico_conta.leitura_estimada).toEqual(expect.any(Boolean))
-    const erro = await erroDe(buscarUnidade('UC-DEMO-002'))
-    expect([erro.status, erro.codigo]).toEqual([404, 'UC_INEXISTENTE'])
+    expect((await buscarUnidade('UC-DEMO-007')).cadastro.id_uc).toBe('UC-DEMO-007')
+    for (const id of ['UC-DEMO-002', 'constructor', 'toString']) {
+      const erro = await erroDe(buscarUnidade(id))
+      expect([erro.status, erro.codigo]).toEqual([404, 'UC_INEXISTENTE'])
+    }
+  })
+
+  it('a UC recente cobre meses nulos, ausência de GD e leitura estimada', async () => {
+    const uc = await buscarUnidade('UC-DEMO-007')
+    expect(uc.consumo).toHaveLength(12)
+    expect(
+      uc.consumo.slice(0, 6).every((m) => m.atual.valor === null && m.tipo_leitura === null),
+    ).toBe(true)
+    expect(uc.consumo.slice(6).every((m) => m.atual.valor !== null)).toBe(true)
+    expect(uc.geracao_distribuida).toBeNull()
+    expect(uc.interrupcoes_recentes).toEqual([])
+    expect(uc.total_interrupcoes.valor).toBe(0)
+    expect(uc.diagnostico_conta).toMatchObject({
+      conta_alta: null,
+      meses_media: 5,
+      leitura_estimada: true,
+    })
   })
 })
 
