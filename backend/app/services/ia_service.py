@@ -268,6 +268,23 @@ class AgenteReal:
             self._guardar_no_cache(dados.pergunta, gold["gold_atualizada_em"], nomes, para_o_cache)
         return resposta
 
+    def _guardar_no_cache(self, pergunta: str, versao_gold: Any, nomes: dict, resposta: dict) -> None:
+        """Como o log: o cache nunca derruba a resposta."""
+        try:
+            with self.sessao() as db:
+                cache_respostas.guardar(db, pergunta, versao_gold, nomes, resposta)
+        except SQLAlchemyError:
+            logger.warning("Não foi possível guardar a resposta no cache", exc_info=True)
+
+    def _gravar(self, dados: PerguntaIA, resposta: dict) -> None:
+        """O log não derruba a resposta: sem a tabela ou com o banco instável, só avisa."""
+        try:
+            with self.sessao() as db:
+                interacao_repository.registrar(db, dados.conversa_id, dados.pergunta, resposta)
+        except SQLAlchemyError:
+            logger.warning("Não foi possível gravar a troca em ia.interacao", exc_info=True)
+
+
 def obter_agente() -> Agente:
     """Agente do IA_MODO do .env; dependência da rota, trocada por um agente falso nos testes."""
     if config.IA_MODO == "mock":
