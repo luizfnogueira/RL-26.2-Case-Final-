@@ -42,8 +42,8 @@ class TestPeriodos:
     def test_periodo_invalido_retorna_422(self, params):
         erro(client.get('/dashboard', params=params), 422, 'DADOS_INVALIDOS')
 
-    def test_periodo_valido_fora_do_cenario(self):
-        erro(client.get('/operacao', params={'periodo_atual': '2024-07/2025-06'}), 422, 'CENARIO_STUB_INDISPONIVEL')
+    def test_periodo_operacional_invalido(self):
+        erro(client.get('/operacao', params={'periodo_atual': '2024-13'}), 422, 'DADOS_INVALIDOS')
 
     def test_bairro_exige_municipio(self):
         erro(client.get('/unidades', params={'bairro': 'Boa Vista'}), 422, 'DADOS_INVALIDOS')
@@ -106,44 +106,18 @@ class TestUnidades:
              'CENARIO_STUB_INDISPONIVEL')
 
 
-class TestOperacao:
-    def test_igual_ao_fixture(self):
-        assert get('/operacao', periodo_atual=PA) == exemplo('operacao')
-
-    def test_series_somam_rankings(self):
-        dados = get('/operacao', periodo_atual=PA)
-        series = {s['alimentador']: s['pontos'] for s in dados['serie_historica']}
-        for item in dados['ranking_alimentadores']['items']:
-            pontos = series[item['alimentador']]
-            assert len(pontos) == 12
-            assert sum(p['dec']['valor'] for p in pontos) == pytest.approx(item['dec']['valor'])
-
-    def test_ordenacao_e_paginacao_independentes(self):
-        dados = get('/operacao', periodo_atual=PA, ordenar_por='fec', nivel_regional='bairro', page_size=2)
-        fec = [a['fec']['valor'] for a in dados['ranking_alimentadores']['items']]
-        assert fec == sorted(fec, reverse=True) and dados['ranking_alimentadores']['total'] == 5
-        assert dados['ranking_regional']['total'] == 7 and len(dados['ranking_regional']['items']) == 2
-        assert len(dados['serie_historica']) == 5
-
-    def test_filtro_bairro_e_alimentador(self):
-        dados = get('/operacao', periodo_atual=PA, municipio='Olinda', bairro='Rio Doce', nivel_regional='bairro')
-        assert [a['alimentador'] for a in dados['ranking_alimentadores']['items']] == ['ALM-DEMO-005']
-        assert [r['bairro'] for r in dados['ranking_regional']['items']] == ['Rio Doce']
-        dados = get('/operacao', periodo_atual=PA, alimentador='ALM-DEMO-001')
-        assert [s['alimentador'] for s in dados['serie_historica']] == ['ALM-DEMO-001']
-
-    def test_sem_dia_critico_e_ranking_por_chi(self):
-        dados = get('/operacao', periodo_atual=PA, ordenar_por='chi')
-        alimentadores = dados['ranking_alimentadores']['items']
-        horas = [a['horas_interrupcao']['valor'] for a in alimentadores]
-        assert horas == sorted(horas, reverse=True)
-        for a in alimentadores:
-            assert a['dec_sem_dia_critico']['valor'] <= a['dec']['valor']
-            assert a['fec_sem_dia_critico']['valor'] <= a['fec']['valor']
-
-    def test_classe_retorna_erro(self):
-        erro(client.get('/operacao', params={'periodo_atual': PA, 'classe': 'Residencial'}), 422,
-             'CENARIO_STUB_INDISPONIVEL')
+class TestOperacaoValidacao:
+    # A leitura real e os rankings estão em test_operacao_service.py/test_operacao_db.py.
+    @pytest.mark.parametrize('params', [
+        {}, {'periodo_atual': PA, 'classe': 'RESIDENCIAL'},
+        {'periodo_atual': PA, 'bairro': 'CENTRO'},
+        {'periodo_atual': PA, 'ordenar_por': 'receita'},
+        {'periodo_atual': PA, 'nivel_regional': 'classe'},
+        {'periodo_atual': PA, 'page': 0}, {'periodo_atual': PA, 'page_size': 101},
+        {'periodo_atual': '2026-06/2026-01'},
+    ])
+    def test_consulta_invalida(self, params):
+        erro(client.get('/operacao', params=params), 422, 'DADOS_INVALIDOS')
 
 
 class TestIA:
