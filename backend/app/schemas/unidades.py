@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, Field, StringConstraints, model_validator
 
 from app.schemas.common import (
-    FiltrosRegiao, Indicador, Mes, Metadados, Pagina, Paginacao, Periodo, Schema, duracao,
+    FiltrosRegiao, Indicador, IndicadorContagem, Mes, Metadados, Pagina, Paginacao, Periodo, Schema, duracao,
 )
 
 # Domínio de tipo_leitura na Silver/Gold (silver_medicao)
@@ -61,10 +61,16 @@ class ConsumoMes(Schema):
     tipo_leitura: TipoLeitura | None          # mês da janela sem dado da UC: null, o mês não some
 
 
+class Veredito(Schema):
+    titulo: str                               # curto, ex.: "Consumo caiu"
+    detalhe: str                              # os números: percentuais contra o ano anterior e a média
+    orientacao: str | None                    # frase ao atendente; null quando não se aplica
+
+
 class DiagnosticoConta(Schema):
     periodo_referencia: Mes | None            # mês analisado: o último da janela com dado da UC
     conta_alta: bool | None
-    veredito: str | None
+    veredito: Veredito | None
     ultimo_mes: Indicador
     mesmo_mes_ano_anterior: Indicador
     media_12_meses: Indicador                 # 12 meses anteriores ao mês analisado, sem incluí-lo
@@ -115,7 +121,7 @@ class Interrupcao(Schema):
     causa: str
     data_abertura: AwareDatetime
     data_encerramento: AwareDatetime
-    duracao_min: float
+    duracao_min: int                           # minutos inteiros (duracao_efetiva_min da Gold)
 
 
 class Chamado(Schema):
@@ -139,6 +145,6 @@ class Unidade360(Schema):
     medidor: Medidor | None
     geracao_distribuida: GeracaoDistribuida | None   # bloco inteiro null para UC sem GD
     interrupcoes_recentes: list[Interrupcao]   # até 10, as mais recentes da janela
-    total_interrupcoes: Indicador              # todas as da janela, sem oscilação e sem anteriores à ligação
+    total_interrupcoes: IndicadorContagem      # todas as da janela, sem oscilação e sem anteriores à ligação
     chamados: list[Chamado]
     metadados: Metadados

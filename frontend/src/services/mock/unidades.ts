@@ -1,11 +1,15 @@
-// Porta de backend/app/routers/unidades.py (stub): só UC-DEMO-001 tem visão 360 detalhada.
+// Porta do modo seed de backend/app/services/unidade_service.py: duas UCs têm visão 360 detalhada.
 import type { Unidade360, Unidades } from '@/types/unidades'
 import { duracaoEmMeses } from '@/utils/periodos'
 import { fixtures } from './fixtures'
 import { erroApi, filtrarRegiao, paginar, verificarCenario, type Registro } from './util'
 import { invalido, paginacao, periodo, regiao, texto } from './validacao'
 
-export const UC_DETALHADA = 'UC-DEMO-001'
+/** UC completa (conta alta, GD) e UC recente (meses nulos, sem GD, leitura estimada). */
+export const UCS_DETALHADAS: Record<string, () => Promise<Unidade360>> = {
+  'UC-DEMO-001': fixtures.unidade,
+  'UC-DEMO-007': fixtures.unidadeRecente,
+}
 const MESES_JANELA = 12
 
 export async function listarUnidades(params: Registro): Promise<Unidades> {
@@ -34,8 +38,9 @@ export async function detalharUnidade(id: string, params: Registro): Promise<Uni
     throw invalido(`periodo_atual deve ter ${MESES_JANELA} meses.`)
   }
   verificarCenario(janela)
-  if (id !== UC_DETALHADA) {
+  const carregar = Object.hasOwn(UCS_DETALHADAS, id) ? UCS_DETALHADAS[id] : undefined
+  if (!carregar) {
     throw erroApi(404, 'UC_INEXISTENTE', `Unidade Consumidora '${id}' não disponível no cenário.`)
   }
-  return fixtures.unidade()
+  return carregar()
 }

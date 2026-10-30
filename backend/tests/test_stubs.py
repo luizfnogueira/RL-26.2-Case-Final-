@@ -84,6 +84,16 @@ class TestUnidades:
         assert dados == exemplo('unidade') == get('/unidades/UC-DEMO-001')
         assert len(dados['consumo']) == 12 and dados['cadastro']['telefone'] is None
 
+    def test_detalhe_da_uc_recente(self):
+        # Segundo exemplo: meses nulos, sem GD, leitura estimada e nenhuma interrupção.
+        dados = get('/unidades/UC-DEMO-007')
+        assert dados == exemplo('unidade_recente')
+        assert [m['atual']['valor'] is None for m in dados['consumo']] == [True] * 6 + [False] * 6
+        assert dados['geracao_distribuida'] is None and dados['interrupcoes_recentes'] == []
+        assert dados['total_interrupcoes']['valor'] == 0
+        d = dados['diagnostico_conta']
+        assert d['conta_alta'] is None and d['meses_media'] == 5 and d['leitura_estimada'] is True
+
     def test_detalhe_inexistente(self):
         erro(client.get('/unidades/UC-DEMO-002'), 404, 'UC_INEXISTENTE')
 

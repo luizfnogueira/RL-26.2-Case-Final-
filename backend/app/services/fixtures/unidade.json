@@ -192,7 +192,11 @@
   "diagnostico_conta": {
     "periodo_referencia": "2026-06",
     "conta_alta": true,
-    "veredito": "Consumo subiu: 2026-06 ficou mais de 20% acima do mesmo mês do ano anterior e da média dos meses anteriores (12 meses). O aumento do consumo explica a conta mais alta.",
+    "veredito": {
+      "titulo": "Consumo subiu",
+      "detalhe": "Jun/2026 ficou 38% acima de jun/2025 e 28% acima da média dos 12 meses anteriores.",
+      "orientacao": "O aumento do consumo explica a conta mais alta."
+    },
     "ultimo_mes": {
       "valor": 412.0,
       "unidade": "kWh",
@@ -215,7 +219,7 @@
       "periodo_referencia": "2026-06"
     },
     "leitura_estimada": true,
-    "alerta": "Leitura ESTIMADA em 2026-06: o consumo pode ser ajustado na próxima leitura real."
+    "alerta": "Leitura estimada em jun/2026: o consumo pode ser ajustado na próxima leitura real."
   },
   "faturas_abertas": [
     {
@@ -274,7 +278,7 @@
       "causa": "NAO INFORMADA",
       "data_abertura": "2026-06-14T19:20:00-03:00",
       "data_encerramento": "2026-06-14T21:05:00-03:00",
-      "duracao_min": 105.0
+      "duracao_min": 105
     },
     {
       "id_ocorrencia": "OC-DEMO-001",
@@ -283,7 +287,7 @@
       "causa": "DESCARGA ATMOSFERICA",
       "data_abertura": "2026-05-03T15:40:00-03:00",
       "data_encerramento": "2026-05-03T16:25:00-03:00",
-      "duracao_min": 45.0
+      "duracao_min": 45
     }
   ],
   "total_interrupcoes": {
