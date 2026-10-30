@@ -24,7 +24,7 @@ type Props = {
   pontos: readonly PontoComparado[]
   nomeAtual: string
   nomeAnterior: string
-  /** Valor curto, para o eixo e o rótulo da barra ("1,2 MWh"). */
+  /** Valor curto, para as marcas do eixo ("1,2 MWh"). */
   formatarValor: (valor: number) => string
   /** Valor completo, para o tooltip e leitores de tela ("1.234,5 kWh"). */
   formatarValorCompleto: (valor: number) => string
@@ -48,7 +48,6 @@ const ALTURA = 260
 const MARGEM = { esq: 64, dir: 8, topo: 22, base: 48 }
 const LARGURA_MAX_BARRA = 24
 const ESPACO_PAR = 2 // espaço na cor do fundo entre as duas barras do mês
-const ROTULO_MEIO = 36 // meia largura aproximada de "1.234 kWh" em text-legenda
 
 /** Variação do atual sobre o anterior, em pontos percentuais; null sem os dois valores > 0. */
 function variacao(atual: number | null, anterior: number | null): number | null {
@@ -73,8 +72,8 @@ function LinhaDica({ valor, nome, amostra }: { valor: string; nome: string; amos
 /**
  * Barras agrupadas em SVG: em cada ponto, o valor de comparação (claro) ao lado do atual (escuro),
  * na mesma escala. Valor ausente não vira barra zero: o ponto fica vazio, com "sem dado" quando
- * faltam os dois. Só o último valor atual leva rótulo; o tooltip (mouse e teclado), o eixo e a
- * tabela carregam o resto.
+ * faltam os dois. Nenhuma barra leva rótulo de valor: o tooltip (mouse e teclado), o eixo e a
+ * tabela carregam os números.
  */
 export default function BarrasComparadas({
   pontos,
@@ -112,8 +111,6 @@ export default function BarrasComparadas({
   const inicio = (i: number) => MARGEM.esq + faixa * i
   const centro = (i: number) => inicio(i) + faixa / 2
   const baseY = y(0)
-  // Último ponto com valor atual: o único que leva rótulo na barra (findLastIndex é ES2023).
-  const ultimoComValor = pontos.reduce((ultimo, p, i) => (p.atual !== null ? i : ultimo), -1)
   const valorOuSemDado = (valor: number | null) =>
     valor === null ? 'sem dado' : formatarValorCompleto(valor)
 
@@ -235,21 +232,6 @@ export default function BarrasComparadas({
                     className="fill-ink-3 text-legenda"
                   >
                     sem dado
-                  </text>
-                )}
-                {i === ultimoComValor && p.atual !== null && (
-                  // Perto da borda direita, alinha o rótulo pela direita da barra para não cortar.
-                  <text
-                    x={
-                      centro(i) + ROTULO_MEIO > largura - MARGEM.dir
-                        ? inicioPar + larguraBarra * 2 + ESPACO_PAR
-                        : inicioPar + larguraBarra * 1.5 + ESPACO_PAR
-                    }
-                    y={y(p.atual) - 6}
-                    textAnchor={centro(i) + ROTULO_MEIO > largura - MARGEM.dir ? 'end' : 'middle'}
-                    className="fill-ink text-legenda font-medium"
-                  >
-                    {formatarValor(p.atual)}
                   </text>
                 )}
                 <text

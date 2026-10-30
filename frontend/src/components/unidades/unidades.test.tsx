@@ -463,7 +463,7 @@ describe('gráfico de consumo de 12 meses', () => {
   const barras = (serie: 'atual' | 'anterior') =>
     document.querySelectorAll(`[data-serie="${serie}"]`).length
 
-  it('UC completa: 12 meses com as duas barras, legenda, aviso de estimada e um só rótulo de valor', async () => {
+  it('UC completa: 12 meses com as duas barras, legenda, aviso de estimada e nenhum rótulo de valor', async () => {
     abrir('/unidades/UC-DEMO-001')
     await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
     const c = regiaoConsumo()
@@ -473,7 +473,7 @@ describe('gráfico de consumo de 12 meses', () => {
     expect(c.getByText('Mesmo mês do ano anterior')).toBeTruthy()
     expect(c.getAllByText('estimada')).toHaveLength(1) // só jun/2026
     expect(c.getByText('“estimada”: leitura estimada no mês')).toBeTruthy()
-    expect(c.getByText('412 kWh')).toBeTruthy() // rótulo só no último mês
+    expect(c.queryByText('412 kWh')).toBeNull() // o valor do mês fica no tooltip
     expect(
       c.getByRole('img', {
         name: 'Jun/2026; Consumo do mês: 412 kWh; Mesmo mês do ano anterior: 298 kWh; Variação: +38,3%; Leitura estimada',
