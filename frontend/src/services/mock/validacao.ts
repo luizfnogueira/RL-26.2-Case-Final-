@@ -37,6 +37,21 @@ export function paginacao(params: Registro): { page: number; pageSize: number } 
   }
 }
 
+export function paginacaoCandidatos(params: Registro): { page: number; pageSize: number } {
+  return {
+    page: inteiro(params, 'page', { padrao: 1, min: 1 }),
+    pageSize: inteiro(params, 'page_size', { padrao: 50, min: 1, max: 200 }),
+  }
+}
+
+export function booleano(params: Registro, campo: string, padrao = false): boolean {
+  const valor = params[campo]
+  if (valor === undefined || valor === null || valor === '') return padrao
+  if (valor === true || valor === 'true') return true
+  if (valor === false || valor === 'false') return false
+  throw invalido(`${campo} deve ser true ou false.`)
+}
+
 export function periodo(params: Registro, campo: string, obrigatorio: boolean): string | undefined {
   const valor = texto(params, campo)
   if (valor === undefined) {

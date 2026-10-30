@@ -163,12 +163,16 @@ class SqlAlchemyOrdemInspecaoRepository:
         return self.db.get(UnidadeConsumidora, id_uc.strip()) is not None
 
     def validar_acao(self, id_uc: str) -> None:
-        if GOLD_SOURCE == 'real':
-            from app.models.gold_real import FilaPerdas
-            from app.core.exceptions import AppException
-            acao = self.db.scalar(select(FilaPerdas.acao_recomendada).where(FilaPerdas.id_uc == id_uc))
-            if acao == 'VALIDACAO_DOCUMENTAL':
-                raise AppException('UC requer validacao documental antes de gerar inspecao.', codigo='DADOS_INVALIDOS', status_code=422)
+        from app.models.gold_source import FilaPerdas
+        from app.core.exceptions import AppException
+
+        acao = self.db.scalar(select(FilaPerdas.acao_recomendada).where(FilaPerdas.id_uc == id_uc))
+        if acao == 'VALIDACAO_DOCUMENTAL':
+            raise AppException(
+                'UC requer validacao documental antes de gerar inspecao.',
+                codigo='DADOS_INVALIDOS',
+                status_code=422,
+            )
 
     def obter_por_id(self, id_ordem: int) -> Optional[OrdemInspecaoResponse]:
         modelo = self.db.get(OrdemInspecao, id_ordem)

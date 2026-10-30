@@ -35,6 +35,7 @@ class RepositorioFalso:
                     alimentador="ALM-REC-001",
                     posicao=1,
                     motivos=["Consumo abaixo da média da classe"],
+                    acao_recomendada="INSPECAO_PRIORITARIA",
                     kwh_estimado=Decimal("520.00"),
                     score=Decimal("87.20"),
                     confianca_evidencia="MEDIA",
@@ -70,6 +71,7 @@ class TestServico:
             "bairro": "Boa Vista",
             "classe": "Residencial",
             "alimentador": None,
+            "sem_ordem_ativa": False,
             "page": 2,
             "page_size": 5,
         }
@@ -78,6 +80,7 @@ class TestServico:
         assert dados["periodo_referencia"] == PA
         item = dados["items"][0]
         assert item["posicao"] == 1
+        assert item["acao_recomendada"] == "INSPECAO_PRIORITARIA"
         assert item["energia_estimada"] == {
             "valor": 520.0, "unidade": "kWh", "periodo_referencia": PA,
         }
@@ -166,17 +169,20 @@ class TestCandidatosNoBanco:
         esperados = self._esperados()
 
         assert dados["total"] == len(esperados)
-        assert dados["page"] == 1 and dados["page_size"] == 20
+        assert dados["page"] == 1 and dados["page_size"] == 50
         assert dados["periodo_referencia"] == PA
-        assert len(dados["items"]) == min(20, len(esperados))
+        assert len(dados["items"]) == min(50, len(esperados))
         assert [item["id_uc"] for item in dados["items"]] == [
-            linha["id_uc"] for linha in esperados[:20]
+            linha["id_uc"] for linha in esperados[:50]
         ]
         assert [item["posicao"] for item in dados["items"]] == list(
             range(1, len(dados["items"]) + 1)
         )
         for item in dados["items"]:
             assert item["motivos"]
+            assert item["acao_recomendada"] in {
+                "INSPECAO_PRIORITARIA", "VALIDACAO_DOCUMENTAL",
+            }
             assert item["energia_estimada"]["unidade"] == "kWh"
             assert item["energia_estimada"]["periodo_referencia"] == PA
             assert 0 <= item["score"] <= 100
@@ -186,12 +192,32 @@ class TestCandidatosNoBanco:
 
     def test_so_elegiveis_entram_na_fila(self, client):
         dados = self.get(client, page_size=100)
+        elegiveis = {
+            linha["id_uc"] for linha in DADOS[gold.FilaPerdas]
+            if linha["status_triagem"] == "ELEGIVEL"
+        }
         inelegiveis = {
             linha["id_uc"] for linha in DADOS[gold.FilaPerdas]
             if linha["status_triagem"] != "ELEGIVEL"
         }
         assert inelegiveis
         assert inelegiveis.isdisjoint(item["id_uc"] for item in dados["items"])
+        assert {item["id_uc"] for item in dados["items"]} == elegiveis
+        assert {item["acao_recomendada"] for item in dados["items"]} == {
+            "INSPECAO_PRIORITARIA", "VALIDACAO_DOCUMENTAL",
+        }
+
+    def test_paginacao_aceita_ate_200_e_rejeita_acima(self, client):
+        pagina = self.get(client, page_size=200)
+        assert pagina["page_size"] == 200
+        assert len(pagina["items"]) == pagina["total"]
+
+        response = client.get(
+            "/inspecoes/candidatos",
+            params={"periodo_atual": PA, "page_size": 201},
+        )
+        assert response.status_code == 422
+        assert response.json()["codigo"] == "DADOS_INVALIDOS"
 
     def test_paginacao_e_posicao_global_apos_filtros(self, client):
         por_municipio: dict[str, list[dict]] = {}
@@ -264,7 +290,10 @@ class TestCandidatosNoBanco:
         assert pagina_1["resumo"]["ordens_ativas"]["valor"] == 0
 
     def test_indicador_de_ordem_ativa_vem_do_portal(self, client):
-        primeiro = self.get(client, page_size=1)["items"][0]
+        primeiro = next(
+            item for item in self.get(client, page_size=200)["items"]
+            if item["acao_recomendada"] == "INSPECAO_PRIORITARIA"
+        )
 
         criada = client.post(
             "/inspecoes",
@@ -282,6 +311,11 @@ class TestCandidatosNoBanco:
         assert item["ordem_ativa"] is True
         assert item["id_ordem_ativa"] == id_ordem
         assert ativa["resumo"]["ordens_ativas"]["valor"] == 1
+        ocultando_ativas = self.get(client, page_size=100, sem_ordem_ativa=True)
+        assert ocultando_ativas["total"] == ativa["total"] - 1
+        assert all(not item["ordem_ativa"] for item in ocultando_ativas["items"])
+        assert ocultando_ativas["resumo"]["ucs_priorizadas"]["valor"] == ocultando_ativas["total"]
+        assert ocultando_ativas["resumo"]["ordens_ativas"]["valor"] == 0
 
         cancelada = client.patch(
             f"/inspecoes/{id_ordem}",
@@ -293,3 +327,20 @@ class TestCandidatosNoBanco:
         item = next(i for i in sem_ordem["items"] if i["id_uc"] == primeiro["id_uc"])
         assert item["ordem_ativa"] is False and item["id_ordem_ativa"] is None
         assert sem_ordem["resumo"]["ordens_ativas"]["valor"] == 0
+
+    def test_validacao_documental_nao_gera_ordem_de_campo(self, client):
+        candidato = next(
+            item for item in self.get(client, page_size=200)["items"]
+            if item["acao_recomendada"] == "VALIDACAO_DOCUMENTAL"
+        )
+
+        response = client.post(
+            "/inspecoes",
+            json={
+                "id_uc": candidato["id_uc"],
+                "equipe_responsavel": "Equipe A1",
+                "motivo": "Teste de bloqueio documental.",
+            },
+        )
+        assert response.status_code == 422
+        assert response.json()["codigo"] == "DADOS_INVALIDOS"
