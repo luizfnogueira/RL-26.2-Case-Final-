@@ -38,6 +38,7 @@ TEXTO_BLOQUEIO = {
     'prompt': 'Não compartilho minhas instruções internas nem credenciais. Posso ajudar com perguntas sobre os dados.',
     'dados_pessoais': 'Não tenho acesso a CPF, nome do titular, endereço ou contato dos clientes. '
                       'Posso responder por município, bairro, classe ou código da UC.',
+    'acesso': 'Só consulto as tabelas de dados da V-Energy liberadas para o assistente.',
 }
 
 # Cada regra é (nome, padrão sobre o texto normalizado). A primeira que casar decide.
@@ -68,6 +69,9 @@ REGRAS_BLOQUEIO = [
                        r'|\b(nome|nomes|telefone|telefones|celular|e-?mail|e-?mails|contato) d(o|os|a|as) '
                        r'(titular|titulares|cliente|clientes|consumidor|consumidores|dono|donos|morador|moradores)\b'
                        r'|\b(quem|qual) (e|eh|sao) o (titular|dono)\b'),
+    # Tabela de outro schema citada na pergunta (portal.ordens_inspecao, ia.interacao, gold.dim_uc):
+    # o agente só enxerga o schema agente, então isso só aparece em tentativa de ataque
+    ('acesso', r'\b(portal|ia|gold|silver|bronze|public|pg_catalog|information_schema)\.\w+'),
 ]
 
 # Só quando a mensagem INTEIRA é isso; "oi, qual a receita?" segue para o agente.
@@ -86,9 +90,8 @@ FORA_DO_ESCOPO = re.compile(r'\b(receita de (bolo|torta|pao|comida)|piada|poema|
 TEXTO_FORA_DO_ESCOPO = ('Essa pergunta está fora do que eu sei responder. Pergunte sobre receita, consumo, '
                         'continuidade, perdas, atendimento ou geração distribuída da V-Energy.')
 
-# Só as regras de escrita, injeção e prompt: um valor pode citar "endereço" sem ser ataque.
-REGRAS_DE_INSTRUCAO = [padrao for regra, padrao in REGRAS_BLOQUEIO if regra != 'dados_pessoais']
-
+# Só as regras de escrita, injeção e prompt: um valor pode citar "endereço" ou "gold.x" sem ser ataque.
+REGRAS_DE_INSTRUCAO = [padrao for regra, padrao in REGRAS_BLOQUEIO if regra not in ('dados_pessoais', 'acesso')]
 
 def parece_instrucao(texto: str) -> bool:
     normalizado = normalizar(limpar(texto))

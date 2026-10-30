@@ -10,8 +10,8 @@ import yaml
 
 from app.ai.guardrails import triar
 from app.ai.validador import validar_sql
-from app.core import config
 from app.services import esclarecimento_ia
+from tests.banco_do_agente import precisa_da_gold_real
 
 GOLDEN_SET = Path(__file__).resolve().parents[2] / 'ai-agent/avaliacao/perguntas.yaml'
 CATEGORIAS = {'liderancas', 'dia_a_dia', 'near_miss', 'regra_negocio', 'premissa_falsa',
@@ -65,7 +65,7 @@ def test_este_ano_pede_esclarecimento():
             assert esclarecimento_ia.detectar(item['pergunta'], [], {}) is not None, item['id']
 
 
-@pytest.mark.skipif(not config.AGENTE_DB_PASSWORD, reason='precisa da Gold carregada e do usuário do agente')
+@precisa_da_gold_real
 @pytest.mark.parametrize('item', com_sql(), ids=lambda i: i['id'])
 def test_gabarito_roda_no_banco_real(item):
     from app.ai.consulta import executar_consulta
