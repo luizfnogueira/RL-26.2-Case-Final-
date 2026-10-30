@@ -80,9 +80,17 @@ export default function DetalheUnidade({ id }: { id: string }) {
         pagas={dados.faturas_pagas}
         periodo={dados.periodo_referencia}
       />
-      <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      {/*
+        Cadastro 40%, medidor e GD 30% cada: em xl (1280 px) a leitura acumulada mais longa da Gold
+        ("2.705.855 kWh em 28/06/2026") e "Geração na própria UC" cabem numa linha.
+      */}
+      <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)]">
         <BlocoCadastro cadastro={dados.cadastro} />
-        <BlocoMedidor medidor={dados.medidor} />
+        <BlocoMedidor
+          medidor={dados.medidor}
+          periodo={dados.periodo_referencia}
+          dataLigacao={dados.cadastro.data_ligacao}
+        />
         <BlocoGeracao gd={dados.geracao_distribuida} />
       </div>
       <BlocoInterrupcoes
@@ -134,7 +142,7 @@ function CarregandoUnidade() {
       className="flex flex-col gap-4 md:gap-6"
     >
       <Skeleton className="h-32 w-full rounded-card" />
-      <div className="grid gap-4 md:gap-6 xl:grid-cols-[2fr_1fr_1fr]">
+      <div className="grid gap-4 md:gap-6 xl:grid-cols-[4fr_3fr_3fr]">
         <Skeleton className="h-64 rounded-card" />
         <Skeleton className="h-64 rounded-card" />
         <Skeleton className="h-64 rounded-card" />

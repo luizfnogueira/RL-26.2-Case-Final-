@@ -138,6 +138,10 @@ describe('detalhe da unidade (/unidades/:id)', () => {
     const medidor = within(screen.getByRole('region', { name: 'Medidor' }))
     expect(medidor.getByText('18.452 kWh em 28/06/2026')).toBeTruthy() // valor exato
     expect(medidor.getByText('Estimada')).toBeTruthy()
+    // Leitura do registrador, não o consumo do mês.
+    expect(medidor.getByText('Leitura acumulada')).toBeTruthy()
+    expect(medidor.queryByText('Última leitura')).toBeNull()
+    expect(medidor.queryByText(/^Medidor instalado durante/)).toBeNull() // instalado em 2018
 
     const gd = within(screen.getByRole('region', { name: 'Geração distribuída' }))
     expect(gd.getByText('5,0 kWp')).toBeTruthy()
@@ -321,11 +325,83 @@ describe('medidor: selo só para leitura estimada', () => {
           ...medidor,
           ultima_leitura: { ...medidor.ultima_leitura!, tipo_leitura: 'REAL' },
         }}
+        periodo="2025-07/2026-06"
+        dataLigacao="2018-03-12"
       />,
     )
     expect(screen.getByText('18.452 kWh em 28/06/2026')).toBeTruthy()
     expect(screen.queryByText('Real')).toBeNull()
     expect(screen.queryByText('Estimada')).toBeNull()
+  })
+
+  it('a leitura acumulada não quebra linha', () => {
+    render(
+      <BlocoMedidor
+        medidor={unidadeFixture.medidor as Medidor}
+        periodo="2025-07/2026-06"
+        dataLigacao="2018-03-12"
+      />,
+    )
+    expect(screen.getByText('18.452 kWh em 28/06/2026').className).toContain('whitespace-nowrap')
+  })
+})
+
+describe('medidor: nota de instalação no período', () => {
+  const NOTA = /^Medidor instalado durante o período analisado/
+  const comInstalacao = (dataInstalacao: string, dataLigacao: string | null) => {
+    render(
+      <BlocoMedidor
+        medidor={{ ...(unidadeFixture.medidor as Medidor), data_instalacao: dataInstalacao }}
+        periodo="2025-07/2026-06"
+        dataLigacao={dataLigacao}
+      />,
+    )
+    return screen.queryByText(NOTA)
+  }
+
+  it('instalado dentro da janela e depois da ligação: nota de rodapé com a data, no estilo da GD', () => {
+    const nota = comInstalacao('2026-03-10', '2018-03-12')
+    expect(nota!.textContent).toBe(
+      'Medidor instalado durante o período analisado. As leituras anteriores a 10/03/2026 são do medidor antigo.',
+    )
+    expect(nota!.className).toContain('text-legenda')
+    expect(nota!.className).toContain('text-ink-2')
+    expect(screen.queryByText('Trocado no período')).toBeNull() // sem selo
+  })
+
+  it.each([
+    ['primeiro mês da janela', '2025-07-01'],
+    ['último mês da janela', '2026-06-30'],
+  ])('nas bordas da janela também conta (%s)', (_, data) => {
+    expect(comInstalacao(data, '2018-03-12')).toBeTruthy()
+  })
+
+  it.each([
+    ['antes da janela', '2025-06-30', '2018-03-12'],
+    ['depois da janela', '2026-07-01', '2018-03-12'],
+    ['no dia da ligação (primeiro medidor, não há medidor antigo)', '2026-01-05', '2026-01-05'],
+    ['sem data de ligação (não dá para afirmar)', '2026-03-10', null],
+  ])('sem nota: %s', (_, data, ligacao) => {
+    expect(comInstalacao(data, ligacao)).toBeNull()
+  })
+
+  it('UC recente, ligada no período: o medidor da ligação não gera nota', async () => {
+    abrir('/unidades/UC-DEMO-007')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
+    const medidor = within(screen.getByRole('region', { name: 'Medidor' }))
+    expect(medidor.getByText('05/01/2026')).toBeTruthy()
+    expect(medidor.queryByText(NOTA)).toBeNull()
+  })
+})
+
+describe('cadastro, medidor e GD lado a lado', () => {
+  it('cadastro com 40% e medidor e GD com 30% cada', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    const grade = screen.getByRole('region', { name: 'Cadastro' }).parentElement!
+    expect(grade.className).toContain('xl:grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)]')
+    expect(within(grade).getByRole('region', { name: 'Medidor' })).toBeTruthy()
+    expect(within(grade).getByRole('region', { name: 'Geração distribuída' })).toBeTruthy()
   })
 })
 
