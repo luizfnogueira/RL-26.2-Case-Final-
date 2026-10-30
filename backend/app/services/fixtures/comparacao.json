@@ -1,0 +1,306 @@
+{
+  "filtros": {
+    "municipio": null,
+    "bairro": null,
+    "classe": null,
+    "alimentador": null,
+    "periodo_atual": "2025-07/2026-06",
+    "periodo_comparacao": "2022-07/2023-06",
+    "nivel": "municipio",
+    "itens": [
+      "RECIFE",
+      "OLINDA"
+    ]
+  },
+  "itens": [
+    {
+      "nome": "RECIFE",
+      "ucs_ativas": {
+        "rotulo": "UCs ativas",
+        "atual": {
+          "valor": 143.0,
+          "unidade": "UCs",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 141.0,
+          "unidade": "UCs",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 2.0,
+          "unidade": "UCs",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 1.4184,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "receita_media_uc": {
+        "rotulo": "Receita por UC",
+        "atual": {
+          "valor": 581.06,
+          "unidade": "BRL/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 514.07,
+          "unidade": "BRL/UC/mes",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 66.99,
+          "unidade": "BRL/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 13.0313,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "consumo_medio_uc": {
+        "rotulo": "Consumo por UC",
+        "atual": {
+          "valor": 593.18,
+          "unidade": "kWh/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 624.29,
+          "unidade": "kWh/UC/mes",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": -31.11,
+          "unidade": "kWh/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": -4.9833,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "valor_em_aberto_pct": {
+        "rotulo": "Valor em aberto (% da receita)",
+        "atual": {
+          "valor": 8.83,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 8.5307,
+          "unidade": "%",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 0.2993,
+          "unidade": "p.p.",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 3.5085,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "dec": {
+        "rotulo": "DEC médio",
+        "atual": {
+          "valor": 21.53,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 20.43,
+          "unidade": "h/UC",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 1.1,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 5.3842,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "fec": {
+        "rotulo": "FEC médio",
+        "atual": {
+          "valor": 7.91,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 7.42,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 0.49,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 6.6038,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      }
+    },
+    {
+      "nome": "OLINDA",
+      "ucs_ativas": {
+        "rotulo": "UCs ativas",
+        "atual": {
+          "valor": 76.0,
+          "unidade": "UCs",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 75.0,
+          "unidade": "UCs",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 1.0,
+          "unidade": "UCs",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 1.3333,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "receita_media_uc": {
+        "rotulo": "Receita por UC",
+        "atual": {
+          "valor": 548.29,
+          "unidade": "BRL/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 504.0,
+          "unidade": "BRL/UC/mes",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 44.29,
+          "unidade": "BRL/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 8.7877,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "consumo_medio_uc": {
+        "rotulo": "Consumo por UC",
+        "atual": {
+          "valor": 555.45,
+          "unidade": "kWh/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 607.56,
+          "unidade": "kWh/UC/mes",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": -52.11,
+          "unidade": "kWh/UC/mes",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": -8.5769,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "valor_em_aberto_pct": {
+        "rotulo": "Valor em aberto (% da receita)",
+        "atual": {
+          "valor": 9.64,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 6.1398,
+          "unidade": "%",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 3.5002,
+          "unidade": "p.p.",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 57.0084,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "dec": {
+        "rotulo": "DEC médio",
+        "atual": {
+          "valor": 18.94,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 16.11,
+          "unidade": "h/UC",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 2.83,
+          "unidade": "h/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 17.5667,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      },
+      "fec": {
+        "rotulo": "FEC médio",
+        "atual": {
+          "valor": 6.32,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "comparacao": {
+          "valor": 5.88,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2022-07/2023-06"
+        },
+        "diferenca": {
+          "valor": 0.44,
+          "unidade": "interrupcoes/UC",
+          "periodo_referencia": "2025-07/2026-06"
+        },
+        "variacao_percentual": {
+          "valor": 7.483,
+          "unidade": "%",
+          "periodo_referencia": "2025-07/2026-06"
+        }
+      }
+    }
+  ],
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": null,
+    "observacoes": [
+      "Dados fictícios do seed, com as regras da Gold."
+    ]
+  }
+}

@@ -22,6 +22,7 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | Rota | Query ou corpo |
 | --- | --- |
 | GET /dashboard | Ambos os períodos obrigatórios; município, bairro, classe, alimentador; `nivel=municipio|bairro|classe`, page, page_size |
+| GET /dashboard/comparacao | Ambos os períodos e `nivel=municipio|bairro|classe` obrigatórios; `itens` repetido de 2 a 4 vezes; município e bairro como filtros pai |
 | GET /unidades | busca (ID ou titular, 3–100 caracteres); município, bairro, classe, alimentador; page, page_size |
 | GET /unidades/{id} | periodo_atual opcional, sempre de 12 meses; sem ele, os 12 meses até o último mês da Gold |
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
@@ -90,6 +91,39 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&
 ```
 
 A API lê os efeitos pré-calculados em `gold.agg_preco_volume` e só os soma; não refaz a decomposição. A tabela existe para P1 × P2 (`periodo_atual=2025-07/2026-06`, `periodo_comparacao=2022-07/2023-06`) e por município, bairro e classe. Fora disso — outras janelas ou filtro de alimentador — `ponte_receita` vem com todos os valores null e `drill_down` com a lista vazia, e `metadados.observacoes` diz o motivo; os KPIs e a série seguem calculados normalmente.
+
+## 3.1 GET /dashboard/comparacao — Comparação de recortes (Tela 1)
+
+```http
+GET /dashboard/comparacao?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=municipio&itens=RECIFE&itens=OLINDA
+GET /dashboard/comparacao?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=bairro&municipio=RECIFE&itens=BOA%20VIAGEM&itens=BOA%20VISTA
+```
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/comparacao.json)**
+
+Coloca de 2 a 4 recortes do mesmo nível lado a lado. Cada item é calculado como o `GET /dashboard` filtrado por ele: os números de um item são os mesmos do painel com esse filtro.
+
+| Parâmetro | Regra |
+| --- | --- |
+| `periodo_atual`, `periodo_comparacao` | Obrigatórios, com a mesma validação do `GET /dashboard` |
+| `nivel` | Obrigatório: `municipio`, `bairro` ou `classe` |
+| `itens` | Repetido de 2 a 4 vezes, sem repetição, com os valores exatos do `GET /filtros` (ex.: `RECIFE`) |
+| `municipio`, `bairro` | Filtros pai: `nivel=municipio` não aceita nenhum; `nivel=bairro` exige `municipio`; `nivel=classe` aceita `municipio` e `bairro` (bairro exige município). `classe` e `alimentador` não são aceitos |
+
+Resposta: `filtros` (o pedido validado), `itens` na ordem pedida e `metadados`. Cada item tem `nome` e seis KPIs no formato do painel (`rotulo`, `atual`, `comparacao`, `diferenca`, `variacao_percentual`):
+
+| Campo | Cálculo | Unidade |
+| --- | --- | --- |
+| `ucs_ativas` | KPI `ucs_ativas` do painel: UCs ligadas até o fim da janela | `UCs` |
+| `receita_media_uc` | Receita faturada ÷ UCs ativas ÷ meses da janela | `BRL/UC/mes` |
+| `consumo_medio_uc` | Volume faturado ÷ UCs ativas ÷ meses da janela | `kWh/UC/mes` |
+| `valor_em_aberto_pct` | Valor em aberto em % da receita; `diferenca` em pontos percentuais (`p.p.`) | `%` |
+| `dec`, `fec` | KPIs `dec_medio` e `fec_medio` do painel | `h/UC`, `interrupcoes/UC` |
+
+- O denominador por UC é o das UCs ativas no fim de cada janela, como no KPI do painel.
+- DEC e FEC são null nos níveis `bairro` e `classe`, como no painel, e `metadados.observacoes` registra o motivo.
+- Item sem UCs no recorte (por exemplo, um nome que não está no cadastro): 200, com `ucs_ativas` 0, os demais indicadores null e o motivo em `metadados.observacoes`. Os outros itens seguem calculados.
+- Erros: **422 `DADOS_INVALIDOS`** com menos de 2 ou mais de 4 itens, item repetido, filtro pai incompatível com o nível, `classe` ou `alimentador` enviados, ou período inválido.
 
 ## 4. GET /unidades — busca da Tela 3
 
