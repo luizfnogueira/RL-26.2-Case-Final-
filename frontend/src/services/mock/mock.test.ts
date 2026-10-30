@@ -3,6 +3,7 @@ import { ApiError } from '../erro-api'
 import {
   atualizarInspecao,
   buscarCandidatos,
+  buscarComparacao,
   buscarDashboard,
   buscarFiltros,
   buscarOperacao,
@@ -17,7 +18,7 @@ import {
   perguntarIA,
 } from '..'
 import { atenderMock, reiniciarOrdens } from '.'
-import type { Comparacao } from '@/types/dashboard'
+import type { ParamsComparacao } from '@/types/dashboard'
 
 const ATUAL = '2025-07/2026-06'
 const COMPARACAO = '2022-07/2023-06'
@@ -141,9 +142,27 @@ describe('GET /filtros', () => {
 
 describe('GET /dashboard/comparacao', () => {
   const comparar = (params: Record<string, unknown>) =>
-    atenderMock('GET', '/dashboard/comparacao', {
-      params: { ...DASH, ...params },
-    }) as Promise<Comparacao>
+    buscarComparacao({ ...DASH, ...params } as unknown as ParamsComparacao)
+
+  it('funciona via buscarComparacao com VITE_USE_MOCKS=true e bate com o painel', async () => {
+    const { municipios } = await buscarFiltros()
+    const itens = municipios.slice(0, 2)
+    const resposta = await buscarComparacao({
+      periodo_atual: ATUAL,
+      periodo_comparacao: COMPARACAO,
+      nivel: 'municipio',
+      itens,
+    })
+    expect(resposta.itens.map((i) => i.nome)).toEqual(itens)
+    for (const item of resposta.itens) {
+      const painel = (await buscarDashboard({ ...DASH, municipio: item.nome })).indicadores
+      expect(item.ucs_ativas).toEqual(painel.ucs_ativas)
+      const esperado = painel.receita_faturada.atual.valor! / painel.ucs_ativas.atual.valor! / 12
+      expect(item.receita_media_uc.atual.valor).toBeCloseTo(esperado, 2)
+      expect(item.valor_em_aberto_pct.diferenca.unidade).toBe('p.p.')
+    }
+    expect(resposta.metadados.dados_ficticios).toBe(true)
+  })
 
   it('cada item bate com o painel filtrado por ele, por UC e por mês', async () => {
     const { municipios } = await buscarFiltros()

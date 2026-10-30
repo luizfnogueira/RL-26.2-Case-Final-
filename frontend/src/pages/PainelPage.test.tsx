@@ -159,4 +159,21 @@ describe('Tela 1 — Painel executivo', () => {
     expect(within(card).getByText('Sem comparação')).toBeTruthy()
     expect(screen.queryByText('Dado fictício')).toBeNull()
   })
+
+  it('abre a aba de comparação quando aba=comparar está na URL e exibe os itens comparados', async () => {
+    abrir('/painel?aba=comparar&nivel=municipio&itens=RECIFE&itens=OLINDA')
+    const abaComparar = screen.getByRole('tab', { name: 'Comparar' })
+    expect(abaComparar.getAttribute('aria-selected')).toBe('true')
+    const abaVisaoGeral = screen.getByRole('tab', { name: 'Visão geral' })
+    expect(abaVisaoGeral.getAttribute('aria-selected')).toBe('false')
+
+    expect(await screen.findByRole('tabpanel', { name: 'Aba de comparação' })).toBeTruthy()
+    expect(await screen.findByText('Recife')).toBeTruthy()
+    expect(await screen.findByText('Olinda')).toBeTruthy()
+    expect(screen.getByText('2 recortes comparados')).toBeTruthy()
+
+    fireEvent.click(abaVisaoGeral)
+    expect(screen.getByLabelText('Endereço atual').textContent).not.toContain('aba=comparar')
+    await screen.findByLabelText('Seis indicadores executivos')
+  })
 })

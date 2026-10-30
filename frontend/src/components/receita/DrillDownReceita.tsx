@@ -1,7 +1,10 @@
 import { ChevronRight } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import EmptyState from '@/components/ui/EmptyState'
 import Tabela, { type Coluna } from '@/components/ui/Tabela'
+import { construirUrlComparacao } from '@/hooks/useComparacaoUrl'
 import type { DrillDown, ItemBreadcrumb, LinhaDrill, NivelDrill } from '@/types/dashboard'
 import { cx } from '@/utils/cx'
 import {
@@ -28,6 +31,9 @@ type Props = {
   aoMudarPagina: (page: number) => void
   /** Por que a lista veio vazia (a API explica em `metadados.observacoes` fora de P1 × P2). */
   motivoVazio?: string
+  periodoAtual?: string
+  periodoComparacao?: string
+  aoComparar?: (itens: string[]) => void
 }
 
 /** Cor do número pelo sinal; o sinal escrito (+/−) garante que a cor não é a única pista. */
@@ -53,8 +59,41 @@ export default function DrillDownReceita({
   aoNavegar,
   aoMudarPagina,
   motivoVazio,
+  periodoAtual,
+  periodoComparacao,
+  aoComparar,
 }: Props) {
   const podeDescer = drill.nivel !== 'classe'
+  const navigate = useNavigate()
+
+  // Leva os itens visíveis (de 2 a 4) para a aba de comparação
+  const itensVisiveis = drill.items.slice(0, 4).map((l) => l.nome)
+  const podeComparar = itensVisiveis.length >= 2 && !carregando
+
+  const municipioPai =
+    drill.items[0]?.filtros.municipio ??
+    drill.breadcrumb.find((b) => b.filtros.municipio)?.filtros.municipio ??
+    undefined
+  const bairroPai =
+    drill.items[0]?.filtros.bairro ??
+    drill.breadcrumb.find((b) => b.filtros.bairro)?.filtros.bairro ??
+    undefined
+
+  const urlComparar = construirUrlComparacao({
+    aba: 'comparar',
+    periodo_atual: periodoAtual,
+    periodo_comparacao: periodoComparacao,
+    nivel: drill.nivel,
+    itens: itensVisiveis,
+    municipio: municipioPai,
+    bairro: bairroPai,
+  })
+
+  function lidarComComparar() {
+    if (!podeComparar) return
+    aoComparar?.(itensVisiveis)
+    navigate(urlComparar)
+  }
 
   const colunas: Coluna<LinhaDrill>[] = [
     {
@@ -130,7 +169,24 @@ export default function DrillDownReceita({
   return (
     <Card
       titulo="Onde o volume caiu?"
-      acoes={<p className="text-legenda text-ink-2">Ordenado por maior queda de volume</p>}
+      acoes={
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-legenda text-ink-2">Ordenado por maior queda de volume</p>
+          <Button
+            variante="secundario"
+            tamanho="sm"
+            disabled={!podeComparar}
+            onClick={lidarComComparar}
+            title={
+              itensVisiveis.length < 2
+                ? 'Necessário ao menos 2 itens visíveis para comparar'
+                : `Comparar ${itensVisiveis.length} itens visíveis`
+            }
+          >
+            Comparar
+          </Button>
+        </div>
+      }
       className={carregando ? 'opacity-70 transition-opacity' : 'transition-opacity'}
     >
       <nav aria-label="Caminho do drill-down" className="-mt-2 mb-4">

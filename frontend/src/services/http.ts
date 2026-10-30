@@ -24,13 +24,27 @@ export interface OpcoesRequisicao {
   sinal?: AbortSignal
 }
 
-type ValorQuery = string | number | boolean | null | undefined
+type ValorQuery =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly (string | number | boolean)[]
 
 export function construirQuery(params?: object): string {
   const busca = new URLSearchParams()
   for (const [chave, valor] of Object.entries((params ?? {}) as Record<string, ValorQuery>)) {
     if (valor === undefined || valor === null || valor === '') continue
-    busca.set(chave, String(valor))
+    if (Array.isArray(valor)) {
+      for (const item of valor) {
+        if (item !== undefined && item !== null && item !== '') {
+          busca.append(chave, String(item))
+        }
+      }
+    } else {
+      busca.set(chave, String(valor))
+    }
   }
   const texto = busca.toString()
   return texto ? `?${texto}` : ''
