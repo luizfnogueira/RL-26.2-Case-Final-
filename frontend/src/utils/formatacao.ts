@@ -39,6 +39,13 @@ export function formatarReaisCompleto(valor: number): string {
   return reaisCompleto.format(valor).replace(/\s/g, ' ').replace(/^-/, MENOS)
 }
 
+const energiaCompleta = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
+
+/** "1.234,56 kWh": sempre em kWh, sem abreviar, para tooltips, tabelas e leitores de tela. */
+export function formatarEnergiaCompleta(kwh: number): string {
+  return `${kwh < 0 ? MENOS : ''}${energiaCompleta.format(Math.abs(kwh))} kWh`
+}
+
 /** kWh em GWh, MWh ou kWh conforme a grandeza: "19,8 GWh". */
 export function formatarEnergia(kwh: number, { sinal }: OpcoesSinal = {}): string {
   const abs = Math.abs(kwh)

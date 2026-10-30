@@ -7,7 +7,8 @@ import type { ConsumoMes, DiagnosticoConta, Fatura, Medidor, Unidade360 } from '
 import BlocoDiagnostico from './BlocoDiagnostico'
 import { BlocoMedidor } from './BlocosCadastrais'
 import { BlocoFaturas } from './BlocosHistorico'
-import { caminhoBarra } from '@/components/graficos/geometria'
+import { caminhoBarra, posicaoDica } from '@/components/graficos/geometria'
+import { formatarEnergiaCompleta } from '@/utils/formatacao'
 import { mesesEstimados, pontosDoConsumo } from './consumo'
 import {
   estiloBandeira,
@@ -475,7 +476,7 @@ describe('gráfico de consumo de 12 meses', () => {
     expect(c.getByText('412 kWh')).toBeTruthy() // rótulo só no último mês
     expect(
       c.getByRole('img', {
-        name: 'Jun/2026; Consumo do mês: 412 kWh; Mesmo mês do ano anterior: 298 kWh; estimada',
+        name: 'Jun/2026; Consumo do mês: 412 kWh; Mesmo mês do ano anterior: 298 kWh; Variação: +38,3%; Leitura estimada',
       }),
     ).toBeTruthy()
   })
@@ -506,7 +507,118 @@ describe('gráfico de consumo de 12 meses', () => {
     const pontos = pontosDoConsumo((unidadeFixture as Unidade360).consumo)
     expect(pontos.map((p) => p.rotuloSecundario).filter(Boolean)).toEqual(['2025', '2026'])
     expect(pontos[0]).toMatchObject({ rotulo: 'Jul', rotuloCompleto: 'Jul/2025', aviso: null })
-    expect(pontos[11].aviso).toBe('estimada')
+    expect(pontos[11]).toMatchObject({ aviso: 'estimada', avisoCompleto: 'Leitura estimada' })
+  })
+
+  const ponto = (mes: string) => document.querySelector<SVGGElement>(`[data-ponto="${mes}"]`)!
+  const dica = () => document.querySelector<HTMLElement>('[data-dica]')
+  const apagados = () => document.querySelectorAll('[data-ponto] > g.opacity-60').length
+
+  it('mouse sobre o mês: tooltip com valores completos, variação e leitura estimada', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    expect(dica()).toBeNull()
+    fireEvent.pointerOver(ponto('2026-06'))
+    const d = within(dica()!)
+    expect(d.getByText('Jun/2026')).toBeTruthy()
+    expect(d.getByText('412 kWh')).toBeTruthy()
+    expect(d.getByText('Consumo do mês')).toBeTruthy()
+    expect(d.getByText('298 kWh')).toBeTruthy()
+    expect(d.getByText('Mesmo mês do ano anterior')).toBeTruthy()
+    expect(d.getByText('+38,3%')).toBeTruthy()
+    expect(d.getByText('Variação')).toBeTruthy()
+    expect(d.getByText('Leitura estimada')).toBeTruthy()
+    // Faixa de fundo só no mês em foco; as barras dos outros 11 meses ficam levemente apagadas.
+    expect(document.querySelectorAll('[data-faixa="ativa"]')).toHaveLength(1)
+    expect(ponto('2026-06').querySelector('rect')!.getAttribute('class')).toContain('fill-azul-50')
+    expect(apagados()).toBe(11)
+    fireEvent.pointerOut(ponto('2026-06'))
+    expect(dica()).toBeNull()
+    expect(apagados()).toBe(0)
+  })
+
+  it('foco pelo teclado mostra o mesmo tooltip; mês sem leitura estimada não traz o aviso', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    expect(ponto('2025-07').getAttribute('tabindex')).toBe('0')
+    fireEvent.focus(ponto('2025-07'))
+    const d = within(dica()!)
+    expect(d.getByText('Jul/2025')).toBeTruthy()
+    expect(d.getByText('305 kWh')).toBeTruthy()
+    expect(d.getByText('312 kWh')).toBeTruthy()
+    expect(d.getByText('−2,2%')).toBeTruthy()
+    expect(d.queryByText('Leitura estimada')).toBeNull()
+    fireEvent.blur(ponto('2025-07'))
+    expect(dica()).toBeNull()
+  })
+
+  it('mês sem ano anterior: "sem dado" no tooltip e sem variação', async () => {
+    abrir('/unidades/UC-DEMO-007')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
+    fireEvent.focus(ponto('2026-06'))
+    const d = within(dica()!)
+    expect(d.getByText('sem dado')).toBeTruthy()
+    expect(d.queryByText('Variação')).toBeNull()
+  })
+
+  it('meses das bordas: o tooltip abre para dentro do gráfico (jul à direita, jun à esquerda)', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    fireEvent.focus(ponto('2025-07'))
+    expect(dica()!.style.left).not.toBe('')
+    expect(dica()!.style.right).toBe('')
+    fireEvent.blur(ponto('2025-07'))
+    fireEvent.focus(ponto('2026-06'))
+    expect(dica()!.style.right).not.toBe('')
+    expect(dica()!.style.left).toBe('')
+  })
+
+  it('transições curtas (150 ms), desligadas com prefers-reduced-motion', async () => {
+    abrir('/unidades/UC-DEMO-001')
+    await screen.findByRole('heading', { name: 'Titular de exemplo 001' })
+    fireEvent.focus(ponto('2026-01'))
+    const animados = [
+      ponto('2026-01').querySelector('rect')!.getAttribute('class')!,
+      ponto('2025-07').querySelector('g')!.getAttribute('class')!,
+      dica()!.className,
+    ]
+    for (const classes of animados) {
+      expect(classes).toContain('duration-150')
+      expect(classes).toContain('motion-reduce:transition-none')
+    }
+  })
+})
+
+describe('posição do tooltip', () => {
+  // 12 faixas de 40 px a partir de x = 64, numa área de 560 px.
+  const faixa = (i: number) => [64 + 40 * i, 64 + 40 * (i + 1)] as const
+
+  it('do lado com mais espaço, sem cobrir a faixa e sem passar da área', () => {
+    for (let i = 0; i < 12; i++) {
+      const [inicio, fim] = faixa(i)
+      const p = posicaoDica(inicio, fim, 560)
+      if ('left' in p) {
+        expect(p.left).toBeGreaterThanOrEqual(fim)
+        expect(p.left + p.maxWidth).toBeLessThanOrEqual(560)
+      } else {
+        expect(560 - p.right).toBeLessThanOrEqual(inicio)
+        expect(560 - p.right - p.maxWidth).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('primeiro mês abre à direita e último à esquerda, com folga de 8 px', () => {
+    expect(posicaoDica(...faixa(0), 560)).toEqual({ left: 112, maxWidth: 440 })
+    expect(posicaoDica(...faixa(11), 560)).toEqual({ right: 64, maxWidth: 488 })
+  })
+})
+
+describe('energia completa', () => {
+  it('sempre em kWh, sem abreviar, com até duas casas', () => {
+    expect(formatarEnergiaCompleta(412)).toBe('412 kWh')
+    expect(formatarEnergiaCompleta(18452.5)).toBe('18.452,5 kWh')
+    expect(formatarEnergiaCompleta(1234.567)).toBe('1.234,57 kWh')
+    expect(formatarEnergiaCompleta(-5)).toBe('−5 kWh')
   })
 })
 

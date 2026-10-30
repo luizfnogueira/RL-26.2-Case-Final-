@@ -11,6 +11,7 @@ import type { Chamado, ConsumoMes, Fatura, Interrupcao } from '@/types/unidades'
 import { formatarData, formatarDataHora, formatarDuracao } from '@/utils/datas'
 import {
   formatarEnergia,
+  formatarEnergiaCompleta,
   formatarIndicador,
   formatarNome,
   formatarReaisCompleto,
@@ -106,6 +107,7 @@ export function BlocoConsumo({ consumo }: { consumo: readonly ConsumoMes[] }) {
           nomeAtual="Consumo do mês"
           nomeAnterior="Mesmo mês do ano anterior"
           formatarValor={formatarEnergia}
+          formatarValorCompleto={formatarEnergiaCompleta}
           descricao="Consumo de cada um dos 12 meses ao lado do mesmo mês do ano anterior, em kWh"
           legendaAviso={
             consumo.some((m) => m.tipo_leitura === 'ESTIMADA')

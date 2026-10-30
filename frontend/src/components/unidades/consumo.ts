@@ -53,6 +53,7 @@ export function pontosDoConsumo(consumo: readonly ConsumoMes[]): PontoComparado[
       atual: m.atual.valor,
       anterior: m.ano_anterior.valor,
       aviso: m.tipo_leitura === 'ESTIMADA' ? 'estimada' : null,
+      avisoCompleto: m.tipo_leitura === 'ESTIMADA' ? 'Leitura estimada' : null,
     }
   })
 }
