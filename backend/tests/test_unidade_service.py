@@ -15,7 +15,9 @@ from app.repositories.unidade_repository import (
 )
 from app.schemas.unidades import FiltroUnidade, FiltrosUnidades, Unidade360, Unidades
 from app.services.stubs import exemplo
-from app.services.unidade_service import UnidadeService, hora_local, janela_padrao, somar_meses
+from app.services.unidade_service import (
+    UnidadeService, hora_local, janela_padrao, relevancia_do_nome, somar_meses,
+)
 
 UTC = timezone.utc
 METADADOS = {'dados_ficticios': False, 'gold_atualizada_em': '2026-10-25T00:00:00Z', 'observacoes': ['real']}
@@ -229,6 +231,26 @@ class TestSeed:
         assert servico.detalhar('UC-DEMO-001', FiltroUnidade()) == exemplo('unidade')
         assert servico.detalhar('UC-DEMO-007', FiltroUnidade()) == exemplo('unidade_recente')
         assert servico.buscar(FiltrosUnidades(busca='UC-DEMO')) == exemplo('unidades')
+
+    def test_busca_por_nome_ordena_por_relevancia(self, monkeypatch):
+        """A mesma regra do banco no fixture: Andrés antes dos Alexandres, alfabética no grupo."""
+        base = exemplo('unidades')
+        modelo = base['items'][0]
+        nomes = {'UC-A01': 'ALEXANDRE DUARTE', 'UC-A02': 'JOSE ANDRE LIMA', 'UC-A03': 'ANDREIA LIMA',
+                 'UC-A04': 'ANDRE TORRES', 'UC-A05': 'PEDRO COSTA'}
+        itens = [{**modelo, 'id_uc': id_uc, 'nome_titular': nome} for id_uc, nome in nomes.items()]
+        monkeypatch.setattr('app.services.unidade_service.exemplo',
+                            lambda nome: {**base, 'items': itens})
+        r = UnidadeService(None, fonte='seed').buscar(FiltrosUnidades(busca='andre'))
+        assert [uc['nome_titular'] for uc in r['items']] == [
+            'ANDRE TORRES', 'ANDREIA LIMA', 'JOSE ANDRE LIMA', 'ALEXANDRE DUARTE']
+        r = UnidadeService(None, fonte='seed').buscar(FiltrosUnidades(busca='UC-A0'))
+        assert [uc['id_uc'] for uc in r['items']] == list(nomes)          # código: pelo ID
+
+    @pytest.mark.parametrize('nome, grupo', [
+        ('ANDRE TORRES', 1), ('JOSE ANDRE LIMA', 2), ('ALEXANDRE DUARTE', 3), ('PEDRO COSTA', 4)])
+    def test_relevancia_do_nome(self, nome, grupo):
+        assert relevancia_do_nome(nome, 'andre') == grupo
 
     def test_outra_uc_ou_outra_janela(self):
         servico = UnidadeService(None, fonte='seed')

@@ -97,7 +97,9 @@ GET /unidades?busca=UC-DEMO&page=1&page_size=20
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/unidades.json)**
 
-Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular, de 3 a 100 caracteres (fora disso, 422 `DADOS_INVALIDOS`), sem diferenciar maiúsculas. Filtros de região (município, bairro, classe, alimentador) comparam o valor exato da Gold, como o `GET /dashboard` (ex.: `RECIFE`; os valores vêm do `GET /filtros`). Ordenação por ID. Sem correspondência: lista vazia. Fonte: `gold.dim_uc`.
+Items: id_uc, nome_titular, município, bairro, classe, alimentador e status. Busca por ID/titular, de 3 a 100 caracteres (fora disso, 422 `DADOS_INVALIDOS`), sem diferenciar maiúsculas. Filtros de região (município, bairro, classe, alimentador) comparam o valor exato da Gold, como o `GET /dashboard` (ex.: `RECIFE`; os valores vêm do `GET /filtros`). Sem correspondência: lista vazia. Fonte: `gold.dim_uc`.
+
+**Ordenação.** Sem `busca`, por ID. Com `busca`, por relevância do titular, em quatro grupos: (1) o nome começa com o termo; (2) outra palavra do nome começa com ele; (3) o termo está no meio de uma palavra; (4) só o código da UC casa. Nos grupos 1 a 3, ordem alfabética pelo nome, palavra por palavra (`COLLATE "C"`: `ANDRE TORRES` antes de `ANDREIA LIMA`); no grupo 4, por ID, como antes. O ID desempata titulares homônimos, para a paginação ser estável. Ex.: `busca=andre` traz os `ANDRE …` e `… ANDRE …` antes dos `ALEXANDRE …`. Os nomes da Gold vêm em maiúsculas e sem acento e só separam palavras por espaço.
 
 ## 5. GET /unidades/{id} — Tela 3
 

@@ -330,14 +330,32 @@ class UnidadeService:
         }
 
 
+def relevancia_do_nome(nome: str, busca: str) -> int:
+    """Mesma regra da busca no banco: 1 começa com o termo, 2 outra palavra começa, 3 no meio de
+    uma palavra, 4 só o código casa."""
+    nome, busca = nome.casefold(), busca.casefold()
+    if nome.startswith(busca):
+        return 1
+    if f' {busca}' in nome:
+        return 2
+    return 3 if busca in nome else 4
+
+
 def _buscar_exemplo(filtros: FiltrosUnidades) -> dict:
     base = exemplo('unidades')
     unidades = filtrar_regiao(base['items'], filtros)
     if filtros.busca:
-        busca = filtros.busca.casefold()
+        busca = filtros.busca.strip().casefold()
         unidades = [uc for uc in unidades
                     if busca in uc['id_uc'].casefold() or busca in uc['nome_titular'].casefold()]
-    unidades.sort(key=lambda uc: uc['id_uc'])
+
+    def ordem(uc: dict) -> tuple:
+        if not filtros.busca:
+            return (0, '', uc['id_uc'])
+        grupo = relevancia_do_nome(uc['nome_titular'], filtros.busca.strip())
+        return (grupo, '' if grupo == 4 else uc['nome_titular'].casefold(), uc['id_uc'])
+
+    unidades.sort(key=ordem)
     return {**paginar(unidades, filtros), 'metadados': base['metadados']}
 
 
