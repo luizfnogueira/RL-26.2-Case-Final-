@@ -39,6 +39,13 @@ export function formatarReaisCompleto(valor: number): string {
   return reaisCompleto.format(valor).replace(/\s/g, ' ').replace(/^-/, MENOS)
 }
 
+const energiaCompleta = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
+
+/** "1.234,56 kWh": sempre em kWh, sem abreviar, para tooltips, tabelas e leitores de tela. */
+export function formatarEnergiaCompleta(kwh: number): string {
+  return `${kwh < 0 ? MENOS : ''}${energiaCompleta.format(Math.abs(kwh))} kWh`
+}
+
 /** kWh em GWh, MWh ou kWh conforme a grandeza: "19,8 GWh". */
 export function formatarEnergia(kwh: number, { sinal }: OpcoesSinal = {}): string {
   const abs = Math.abs(kwh)
@@ -73,6 +80,12 @@ export function formatarNome(nome: string): string {
         : palavra.charAt(0).toLocaleUpperCase('pt-BR') + palavra.slice(1),
     )
     .join(' ')
+}
+
+/** CEP da Gold (8 dígitos, sem hífen) → "50050-000". Fora desse padrão, volta como veio. */
+export function formatarCep(cep: string): string {
+  const m = /^(\d{5})-?(\d{3})$/.exec(cep)
+  return m ? `${m[1]}-${m[2]}` : cep
 }
 
 /** Formata um indicador da API pela unidade; null vira travessão (nunca zero). */

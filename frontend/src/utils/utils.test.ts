@@ -1,11 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { formatarAtualizacao } from './datas'
+import { formatarAtualizacao, formatarData, formatarDataHora, formatarDuracao } from './datas'
+
+describe('datas e durações da Visão 360', () => {
+  it('formatarData não passa por fuso', () => {
+    expect(formatarData('2018-03-12')).toBe('12/03/2018')
+  })
+
+  it('formatarDataHora mostra a hora de Recife, qualquer que seja o fuso da máquina', () => {
+    expect(formatarDataHora('2026-06-14T19:20:00-03:00')).toBe('14/06/2026, 19:20')
+    expect(formatarDataHora('2026-06-14T22:20:00Z')).toBe('14/06/2026, 19:20')
+    expect(formatarDataHora('nada')).toBe('—')
+  })
+
+  it('formatarDuracao em minutos e horas', () => {
+    expect(formatarDuracao(45)).toBe('45 min')
+    expect(formatarDuracao(120)).toBe('2 h')
+    expect(formatarDuracao(105)).toBe('1 h 45 min')
+  })
+})
+import { paraOpcoesBarra } from './filtros'
 import {
   duracaoEmMeses,
   formatarMes,
   formatarPeriodo,
   limitesDoPeriodo,
   mesNoPeriodo,
+  mesesRecentes,
   periodoValido,
 } from './periodos'
 
@@ -36,6 +56,44 @@ describe('periodos', () => {
     expect(mesNoPeriodo('2025-07', '2025-07/2026-06')).toBe(true)
     expect(mesNoPeriodo('2026-06', '2025-07/2026-06')).toBe(true)
     expect(mesNoPeriodo('2026-07', '2025-07/2026-06')).toBe(false)
+  })
+
+  it('lista meses recentes do mais novo para o mais antigo', () => {
+    expect(mesesRecentes(3, new Date(2026, 0, 15))).toEqual(['2026-01', '2025-12', '2025-11'])
+    expect(mesesRecentes(2, new Date(2026, 9, 28))).toEqual(['2026-10', '2026-09'])
+  })
+})
+
+describe('paraOpcoesBarra', () => {
+  it('agrupa bairros e alimentadores pelo município sem alterar os valores da Gold', () => {
+    const opcoes = paraOpcoesBarra({
+      municipios: ['OLINDA', 'RECIFE'],
+      bairros: [
+        { municipio: 'OLINDA', bairro: 'CENTRO' },
+        { municipio: 'RECIFE', bairro: 'BOA VISTA' },
+        { municipio: 'RECIFE', bairro: 'CENTRO' },
+      ],
+      classes: ['RESIDENCIAL'],
+      alimentadores: [
+        { alimentador: 'ALM-OLI-001', municipio: 'OLINDA' },
+        { alimentador: 'ALM-REC-001', municipio: 'RECIFE' },
+      ],
+      metadados: { dados_ficticios: false, gold_atualizada_em: null, observacoes: [] },
+    })
+
+    expect(opcoes.bairros).toEqual({
+      OLINDA: ['CENTRO'],
+      RECIFE: ['BOA VISTA', 'CENTRO'],
+    })
+    expect(opcoes.alimentadores).toEqual({
+      OLINDA: ['ALM-OLI-001'],
+      RECIFE: ['ALM-REC-001'],
+    })
+    expect(opcoes.municipios).toEqual(['OLINDA', 'RECIFE'])
+  })
+
+  it('devolve objeto vazio enquanto a consulta não carregou', () => {
+    expect(paraOpcoesBarra(null)).toEqual({})
   })
 })
 

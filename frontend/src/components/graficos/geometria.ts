@@ -90,3 +90,42 @@ export function angulosDasFatias(valores: number[], total: number) {
     return { i, valor, de, ate: acumulado, meio: (de + acumulado) / 2 }
   })
 }
+
+/** Posição do tooltip em px a partir de uma das bordas da área, com a largura máxima que cabe. */
+export type PosicaoDica = { left: number; maxWidth: number } | { right: number; maxWidth: number }
+
+/**
+ * Tooltip ao lado da faixa do ponto em foco, do lado com mais espaço: não cobre as barras do ponto
+ * e não passa da área do gráfico, nem nos pontos das bordas. A largura máxima é o espaço livre
+ * menos a folga dos dois lados; se o conteúdo não couber, o texto quebra em vez de vazar.
+ */
+export function posicaoDica(
+  inicioFaixa: number,
+  fimFaixa: number,
+  larguraArea: number,
+  folga = 8,
+): PosicaoDica {
+  const espacoDireita = larguraArea - fimFaixa
+  if (espacoDireita >= inicioFaixa) {
+    return { left: fimFaixa + folga, maxWidth: Math.max(0, espacoDireita - 2 * folga) }
+  }
+  return {
+    right: larguraArea - inicioFaixa + folga,
+    maxWidth: Math.max(0, inicioFaixa - 2 * folga),
+  }
+}
+
+/** Barra com o topo arredondado (raio de até 4 px) e a base reta, presa à linha do zero. */
+export function caminhoBarra(x: number, y: number, largura: number, altura: number): string {
+  const r = Math.min(4, altura, largura / 2)
+  const base = y + altura
+  return [
+    `M${x},${base}`,
+    `V${y + r}`,
+    `Q${x},${y} ${x + r},${y}`,
+    `H${x + largura - r}`,
+    `Q${x + largura},${y} ${x + largura},${y + r}`,
+    `V${base}`,
+    'Z',
+  ].join(' ')
+}

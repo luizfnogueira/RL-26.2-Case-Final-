@@ -4,7 +4,9 @@ import pytest
 
 from app.db.session import get_db
 from app.main import app
+from app.routers import unidades
 from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, exemplo
+from app.services.unidade_service import UnidadeService
 
 client = TestClient(app)
 PERIODOS = {'periodo_atual': PA, 'periodo_comparacao': PC}
@@ -40,8 +42,8 @@ class TestPeriodos:
     def test_periodo_invalido_retorna_422(self, params):
         erro(client.get('/dashboard', params=params), 422, 'DADOS_INVALIDOS')
 
-    def test_periodo_valido_fora_do_cenario(self):
-        erro(client.get('/operacao', params={'periodo_atual': '2024-07/2025-06'}), 422, 'CENARIO_STUB_INDISPONIVEL')
+    def test_periodo_operacional_invalido(self):
+        erro(client.get('/operacao', params={'periodo_atual': '2024-13'}), 422, 'DADOS_INVALIDOS')
 
     def test_bairro_exige_municipio(self):
         erro(client.get('/unidades', params={'bairro': 'Boa Vista'}), 422, 'DADOS_INVALIDOS')
@@ -54,12 +56,23 @@ class TestDashboard:
 
 
 class TestUnidades:
+    @pytest.fixture(autouse=True)
+    def modo_seed(self):
+        # Fixa o exemplo do contrato: a suíte passa com GOLD_SOURCE=seed ou real (real: test_unidades_db.py)
+        app.dependency_overrides[unidades.get_service] = lambda: UnidadeService(None, fonte='seed')
+        yield
+        app.dependency_overrides.pop(unidades.get_service, None)
+
     def test_busca_igual_ao_fixture(self):
         assert get('/unidades', busca='UC-DEMO') == exemplo('unidades')
 
     def test_busca_por_titular_e_vazia(self):
         assert [u['id_uc'] for u in get('/unidades', busca='comércio')['items']] == ['UC-DEMO-002', 'UC-DEMO-006']
         assert get('/unidades', busca='inexistente')['items'] == []
+
+    @pytest.mark.parametrize('busca', ['UC', '  ab  ', 'x' * 101])
+    def test_busca_fora_de_3_a_100_caracteres(self, busca):
+        erro(client.get('/unidades', params={'busca': busca}), 422, 'DADOS_INVALIDOS')
 
     def test_paginacao(self):
         dados = get('/unidades', page=3, page_size=3)
@@ -71,50 +84,40 @@ class TestUnidades:
         assert dados == exemplo('unidade') == get('/unidades/UC-DEMO-001')
         assert len(dados['consumo']) == 12 and dados['cadastro']['telefone'] is None
 
+    def test_detalhe_da_uc_recente(self):
+        # Segundo exemplo: meses nulos, sem GD, leitura estimada e nenhuma interrupção.
+        dados = get('/unidades/UC-DEMO-007')
+        assert dados == exemplo('unidade_recente')
+        assert [m['atual']['valor'] is None for m in dados['consumo']] == [True] * 6 + [False] * 6
+        assert dados['geracao_distribuida'] is None and dados['interrupcoes_recentes'] == []
+        assert dados['total_interrupcoes']['valor'] == 0
+        d = dados['diagnostico_conta']
+        assert d['conta_alta'] is None and d['meses_media'] == 5 and d['leitura_estimada'] is True
+
     def test_detalhe_inexistente(self):
         erro(client.get('/unidades/UC-DEMO-002'), 404, 'UC_INEXISTENTE')
-        erro(client.get('/unidades/UC-DEMO-001', params={'periodo_atual': '2026-06'}), 422,
+
+    @pytest.mark.parametrize('periodo', ['2026-06', '2026-01/2026-06', '2024-07/2026-06'])
+    def test_detalhe_exige_janela_de_12_meses(self, periodo):
+        erro(client.get('/unidades/UC-DEMO-001', params={'periodo_atual': periodo}), 422, 'DADOS_INVALIDOS')
+
+    def test_detalhe_outra_janela_de_12_meses_fora_do_stub(self):
+        erro(client.get('/unidades/UC-DEMO-001', params={'periodo_atual': '2024-07/2025-06'}), 422,
              'CENARIO_STUB_INDISPONIVEL')
 
 
-class TestOperacao:
-    def test_igual_ao_fixture(self):
-        assert get('/operacao', periodo_atual=PA) == exemplo('operacao')
-
-    def test_series_somam_rankings(self):
-        dados = get('/operacao', periodo_atual=PA)
-        series = {s['alimentador']: s['pontos'] for s in dados['serie_historica']}
-        for item in dados['ranking_alimentadores']['items']:
-            pontos = series[item['alimentador']]
-            assert len(pontos) == 12
-            assert sum(p['dec']['valor'] for p in pontos) == pytest.approx(item['dec']['valor'])
-
-    def test_ordenacao_e_paginacao_independentes(self):
-        dados = get('/operacao', periodo_atual=PA, ordenar_por='fec', nivel_regional='bairro', page_size=2)
-        fec = [a['fec']['valor'] for a in dados['ranking_alimentadores']['items']]
-        assert fec == sorted(fec, reverse=True) and dados['ranking_alimentadores']['total'] == 5
-        assert dados['ranking_regional']['total'] == 7 and len(dados['ranking_regional']['items']) == 2
-        assert len(dados['serie_historica']) == 5
-
-    def test_filtro_bairro_e_alimentador(self):
-        dados = get('/operacao', periodo_atual=PA, municipio='Olinda', bairro='Rio Doce', nivel_regional='bairro')
-        assert [a['alimentador'] for a in dados['ranking_alimentadores']['items']] == ['ALM-DEMO-005']
-        assert [r['bairro'] for r in dados['ranking_regional']['items']] == ['Rio Doce']
-        dados = get('/operacao', periodo_atual=PA, alimentador='ALM-DEMO-001')
-        assert [s['alimentador'] for s in dados['serie_historica']] == ['ALM-DEMO-001']
-
-    def test_sem_dia_critico_e_ranking_por_chi(self):
-        dados = get('/operacao', periodo_atual=PA, ordenar_por='chi')
-        alimentadores = dados['ranking_alimentadores']['items']
-        horas = [a['horas_interrupcao']['valor'] for a in alimentadores]
-        assert horas == sorted(horas, reverse=True)
-        for a in alimentadores:
-            assert a['dec_sem_dia_critico']['valor'] <= a['dec']['valor']
-            assert a['fec_sem_dia_critico']['valor'] <= a['fec']['valor']
-
-    def test_classe_retorna_erro(self):
-        erro(client.get('/operacao', params={'periodo_atual': PA, 'classe': 'Residencial'}), 422,
-             'CENARIO_STUB_INDISPONIVEL')
+class TestOperacaoValidacao:
+    # A leitura real e os rankings estão em test_operacao_service.py/test_operacao_db.py.
+    @pytest.mark.parametrize('params', [
+        {}, {'periodo_atual': PA, 'classe': 'RESIDENCIAL'},
+        {'periodo_atual': PA, 'bairro': 'CENTRO'},
+        {'periodo_atual': PA, 'ordenar_por': 'receita'},
+        {'periodo_atual': PA, 'nivel_regional': 'classe'},
+        {'periodo_atual': PA, 'page': 0}, {'periodo_atual': PA, 'page_size': 101},
+        {'periodo_atual': '2026-06/2026-01'},
+    ])
+    def test_consulta_invalida(self, params):
+        erro(client.get('/operacao', params=params), 422, 'DADOS_INVALIDOS')
 
 
 class TestIA:

@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db.gold_contract import COLUMNS, KEYS, ORDER, TABLES, GoldError, canonical, kind
 from app.db.gold_csv import MANIFEST_COLUMNS, iter_rows, validate_files
-from app.db.importar_gold_postgres import import_gold
+from app.db.importar_gold_postgres import import_gold, otimizar_leitura
 
 
 def write_manifest(directory):
@@ -63,6 +63,8 @@ def package(tmp_path):
                 row[c] = 'SYNTHETIC'
             elif c in {'municipio', 'bairro', 'classe', 'status'}:
                 row[c] = 'SYNTHETIC'
+            elif c in {'logradouro', 'numero', 'subgrupo_tarifario', 'modelo_medidor'}:
+                row[c] = 'SYNTHETIC'   # sem nulo na Gold real; a Visão 360 os exige
             elif c == 'cpf_cnpj':
                 row[c] = '***.***.***-00'
             elif c == 'acao_recomendada':
@@ -140,6 +142,20 @@ def test_bad_header(package, duplicate):
 def test_invalid_values(column, value):
     with pytest.raises(GoldError):
         canonical('dim_uc', column, value)
+
+
+def test_falha_do_vacuum_vira_aviso_e_nao_derruba_a_carga(caplog):
+    # Depois do COMMIT a Gold já está publicada: a falha não pode virar "transação revertida".
+    class EngineQuebrado:
+        def connect(self):
+            raise RuntimeError('detalhe interno do driver')
+
+    otimizar_leitura(EngineQuebrado())
+    aviso = caplog.records[-1]
+    assert aviso.levelname == 'WARNING'
+    assert 'Gold publicada com sucesso' in aviso.getMessage()
+    assert 'VACUUM (PARALLEL 0, ANALYZE)' in aviso.getMessage()
+    assert 'detalhe interno do driver' not in caplog.text
 
 
 def test_exact_values_nulls_booleans_json():

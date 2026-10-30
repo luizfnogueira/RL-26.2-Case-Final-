@@ -12,7 +12,7 @@ export type NivelRegional = 'municipio' | 'bairro'
 /** `chi` ordena pelas horas de interrupção (consumidor-hora interrompido). */
 export type OrdenarPor = 'dec' | 'fec' | 'chi'
 
-/** Query de GET /operacao. O filtro `classe` não existe no mock operacional (retorna erro). */
+/** Query de GET /operacao. A API não suporta `classe` e retorna 422 DADOS_INVALIDOS. */
 export interface ParamsOperacao extends FiltrosRegiao, ParamsPaginacao {
   periodo_atual: Periodo
   /** Padrão `dec`. */

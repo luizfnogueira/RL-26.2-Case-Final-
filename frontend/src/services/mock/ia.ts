@@ -3,6 +3,7 @@
 // as proteções da integração real.
 import type { IndicadorNomeado } from '@/types/comum'
 import type { RespostaIA, RespostaInsight } from '@/types/ia'
+import { formatarNome } from '@/utils/formatacao'
 import { fixtures } from './fixtures'
 import { agoraIso, erroApi, verificarCenario, type Registro } from './util'
 import { compararPeriodos, invalido, periodo, regiao, texto } from './validacao'
@@ -244,8 +245,12 @@ async function insightReceita(corpo: Registro, filtros: Registro): Promise<Respo
   ]
   conferir(corpo.indicadores, numeros)
   const v = Object.fromEntries(numeros.map((n) => [n.nome, n.valor ?? 0]))
+  // Como o insight_service._nome da API: o texto mostra "Olinda" mesmo com o filtro "OLINDA".
   const regional = (['municipio', 'bairro', 'classe', 'alimentador'] as const)
-    .map((c) => texto(filtros, c))
+    .map((c) => {
+      const valor = texto(filtros, c)
+      return valor && c !== 'alimentador' ? formatarNome(valor) : valor
+    })
     .filter(Boolean)
   let textoInsight =
     `${regional.length ? `Em ${regional.join(' / ')}` : 'No consolidado'}, a receita de energia passou de ${brl(v.receita_energia_comparacao)} para ${brl(v.receita_energia_atual)}. ` +

@@ -73,11 +73,18 @@ export function useFiltrosUrl(
             if (valor) proximo.set(campo, valor)
             else proximo.delete(campo)
           }
-          // Trocar o município invalida o bairro escolhido antes.
+          // Trocar o município invalida o bairro e o alimentador escolhidos antes: os dois
+          // pertencem ao município no cadastro da Gold.
           const trocouMunicipio =
             'municipio' in parcial && (parcial.municipio ?? '') !== (atual.get('municipio') ?? '')
           if (trocouMunicipio && !('bairro' in parcial)) proximo.delete('bairro')
-          if (!proximo.get('municipio')) proximo.delete('bairro')
+          if (trocouMunicipio && !('alimentador' in parcial)) proximo.delete('alimentador')
+          // Alimentador também pode ser consultado sozinho. Só apagar os dependentes
+          // quando o usuário remover explicitamente o município.
+          if ('municipio' in parcial && !proximo.get('municipio')) {
+            proximo.delete('bairro')
+            proximo.delete('alimentador')
+          }
           proximo.delete('page')
           return proximo
         },

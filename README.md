@@ -120,6 +120,18 @@ O portal abre em http://localhost:5173.
 | `VITE_USE_MOCKS`     | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend       |
 | `VITE_MOCK_DELAY_MS` | `350`                   | Atraso artificial dos mocks (ms), para ver os estados de carregamento |
 
+### Conectar o frontend ao backend e à Gold
+
+Para executar a fila e a gestão de ordens contra a API, configure `frontend/.env` com
+`VITE_USE_MOCKS=false` e `VITE_API_URL=http://localhost:8000`, então reinicie o Vite.
+Com `backend/.env` em `GOLD_SOURCE=real` e a carga da Gold concluída, as telas de fila
+e ordens buscam as opções regionais em `GET /filtros`, candidatos em
+`GET /inspecoes/candidatos` e leem/criam/atualizam ordens em `GET/POST /inspecoes` e
+`PATCH /inspecoes/{id}`. As ordens continuam persistidas no schema `portal`; os filtros
+e a fila vêm da Gold.
+Para validar a integração sem os CSVs privados, mantenha `GOLD_SOURCE=seed`; as mesmas
+rotas usam o cadastro fictício.
+
 ### Scripts
 
 `npm run dev` · `npm run build` · `npm run typecheck` · `npm run lint` · `npm run format` · `npm run format:check` · `npm test` · `npm run mocks:sync`
@@ -174,7 +186,7 @@ const { dados, erro, carregando, recarregar } = useConsulta(
 <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={OPCOES_FILTROS_MOCK} />
 ```
 
-`bairro` só habilita depois do município, e trocar o município limpa o bairro. Os domínios dos filtros (`opcoes`) vêm de `src/data/filtros.mock.ts`: o contrato ainda não tem rota para listá-los.
+`bairro` só habilita depois do município, e trocar o município limpa `bairro` e `alimentador`. As telas de fila e ordens leem os domínios de `GET /filtros` com `useOpcoesFiltros` e `paraOpcoesBarra` — os valores são os da Gold (maiúsculas) e só o rótulo exibido é ajustado. A tela de receita ainda usa `src/data/filtros.mock.ts`.
 
 ## Assistente de IA
 

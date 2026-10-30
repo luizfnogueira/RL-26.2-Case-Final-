@@ -70,10 +70,12 @@ def prepare(conn, migrate_legacy=False):
     for name in ORDER:
         for c in set(references(name)) | (set(COLUMNS[name]) & {'municipio', 'bairro', 'classe'}):
             conn.execute(text(f'CREATE INDEX IF NOT EXISTS "ix_gold_{name}_{c}" ON gold."{name}" ("{c}")'))
-    # Valor em aberto do dashboard: só as faturas EM ABERTO (~8% da fato_uc_mes), por mês.
+    # Valor em aberto do dashboard e da comparação: só as faturas EM ABERTO (~8% da fato_uc_mes), por mês.
+    # INCLUDE leva id_uc e valor_total no índice: a soma não lê a tabela (index-only scan).
+    conn.execute(text('DROP INDEX IF EXISTS gold."ix_gold_fato_uc_mes_em_aberto"'))
     conn.execute(text(
-        'CREATE INDEX IF NOT EXISTS "ix_gold_fato_uc_mes_em_aberto" ON gold."fato_uc_mes" ("mes_referencia") '
-        "WHERE status = 'EM ABERTO'"
+        'CREATE INDEX IF NOT EXISTS "ix_gold_fato_uc_mes_em_aberto_cobertura" ON gold."fato_uc_mes" '
+        "(\"mes_referencia\") INCLUDE (\"id_uc\", \"valor_total\") WHERE status = 'EM ABERTO'"
     ))
 
 
@@ -156,7 +158,28 @@ def import_gold(engine, source, batch_size=5000, migrate_legacy=False, after_pub
                 'ON CONFLICT (tabela) DO UPDATE SET metadata_json=EXCLUDED.metadata_json'
             ), {'tabela': name, 'meta': json.dumps(meta[name])})
         LOG.info('Validacao final concluida. COMMIT da Gold; nenhuma escrita em portal.')
+    otimizar_leitura(engine)
     return counts
+
+
+VACUUM_FATO = 'VACUUM (PARALLEL 0, ANALYZE) gold."fato_uc_mes"'
+
+
+def otimizar_leitura(engine):
+    """Depois do COMMIT: estatísticas novas e mapa de visibilidade, para o index-only scan valer já.
+
+    PARALLEL 0: o /dev/shm padrão do Docker (64 MB) não comporta o vacuum paralelo da fato_uc_mes.
+    A Gold já está publicada: uma falha aqui só deixa as consultas mais lentas até o autovacuum,
+    então vira aviso, sem derrubar a carga.
+    """
+    try:
+        with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as conn:
+            conn.execute(text(VACUUM_FATO))
+    except Exception as exc:
+        # Como no main(): a mensagem do driver não é impressa.
+        LOG.warning('Gold publicada com sucesso, mas o VACUUM ANALYZE da fato_uc_mes falhou (%s). '
+                    'As consultas funcionam; para acelerá-las já, rode no banco: %s;',
+                    type(exc).__name__, VACUUM_FATO)
 
 
 def main():

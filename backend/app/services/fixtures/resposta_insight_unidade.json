@@ -1,6 +1,6 @@
 {
   "titulo": "Resumo da UC-DEMO-001",
-  "texto": "A conta de jun/2026 veio alta: 412 kWh, contra 298 kWh no mesmo mês de 2025 (+38,3%) e média de 332,33 kWh nos últimos 12 meses. A leitura do mês foi ESTIMADA, então o valor pode ser ajustado na próxima leitura real.",
+  "texto": "A conta de jun/2026 veio alta: 412 kWh, contra 298 kWh no mesmo mês de 2025 (+38,3%) e média de 322,83 kWh nos 12 meses anteriores. A leitura do mês foi ESTIMADA, então o valor pode ser ajustado na próxima leitura real.",
   "numeros_utilizados": [
     {
       "valor": 412.0,
@@ -17,14 +17,14 @@
       "rotulo": "Mesmo mês do ano anterior"
     },
     {
-      "valor": 332.33,
+      "valor": 322.83,
       "unidade": "kWh",
-      "periodo_referencia": "2025-07/2026-06",
+      "periodo_referencia": "2025-06/2026-05",
       "nome": "media_12_meses",
       "rotulo": "Média de 12 meses"
     },
     {
-      "valor": 38.255,
+      "valor": 38.26,
       "unidade": "%",
       "periodo_referencia": "2026-06",
       "nome": "variacao_percentual",

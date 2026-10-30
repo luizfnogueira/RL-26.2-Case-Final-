@@ -12,12 +12,13 @@ export type TipoLeitura = 'REAL' | 'ESTIMADA' | 'MEDIA' | 'AUTENTICADA' | 'NAO R
 
 /** Query de GET /unidades. */
 export interface ParamsUnidades extends FiltrosRegiao, ParamsPaginacao {
-  /** ID da UC ou nome do titular, de 1 a 100 caracteres. */
+  /** ID da UC ou nome do titular, de 3 a 100 caracteres. */
   busca?: string
 }
 
 /** Query de GET /unidades/{id}. */
 export interface ParamsUnidade {
+  /** Janela de exatamente 12 meses. Sem ela, a API usa os 12 meses até o último mês da Gold. */
   periodo_atual?: Periodo
 }
 
@@ -45,25 +46,44 @@ export interface Cadastro extends Unidade {
   cep: string | null
   subgrupo_tarifario: string
   data_ligacao: string | null
-  latitude: number | null
-  longitude: number | null
+  latitude: number
+  longitude: number
 }
 
-/** Um dos 12 meses: valor do mês e do mesmo mês do ano anterior. */
+/**
+ * Um dos 12 meses da janela (sempre 12, eixo fixo): valor do mês e do mesmo mês do ano anterior.
+ * Mês sem dado da UC vem com os valores e `tipo_leitura` null, nunca some.
+ */
 export interface ConsumoMes {
   mes: Mes
   atual: Indicador
   ano_anterior: Indicador
-  tipo_leitura: TipoLeitura
+  tipo_leitura: TipoLeitura | null
 }
 
-/** Resposta à pergunta "a conta veio alta?". A regra real pertence à V1a. */
+/** Veredito do diagnóstico em três partes, montado pela API (regra 3×3 do contrato). */
+export interface Veredito {
+  /** Curto, ex.: "Consumo caiu". */
+  titulo: string
+  /** Os números: percentual contra o ano anterior e contra a média. */
+  detalhe: string
+  /** Frase para o atendente; null quando não se aplica. */
+  orientacao: string | null
+}
+
+/** Resposta à pergunta "a conta veio alta?" sobre o mês analisado. */
 export interface DiagnosticoConta {
+  /** Mês analisado: o último da janela com dado da UC. null se a janela não tem dados. */
+  periodo_referencia: Mes | null
   conta_alta: boolean | null
-  veredito: string
+  /** null quando a janela não tem dados da UC. */
+  veredito: Veredito | null
   ultimo_mes: Indicador
   mesmo_mes_ano_anterior: Indicador
+  /** Média dos 12 meses anteriores ao mês analisado, sem incluí-lo, só com consumo > 0. */
   media_12_meses: Indicador
+  /** Quantos meses entraram na média (0 a 12). */
+  meses_media: number
   variacao_percentual: Indicador
   leitura_estimada: boolean
   alerta: string | null
@@ -79,6 +99,7 @@ export interface Fatura {
   data_emissao: string
   data_vencimento: string
   data_pagamento: string | null
+  /** Domínio da Gold: 'PAGA' ou 'EM ABERTO'. */
   status: string
 }
 
@@ -110,19 +131,20 @@ export interface Interrupcao {
   tipo: string
   causa: string
   data_abertura: string
-  data_encerramento: string | null
-  duracao_min: number | null
+  data_encerramento: string
+  duracao_min: number
 }
 
 export interface Chamado {
   protocolo: string
   canal: string
   assunto: string
-  subassunto: string | null
+  subassunto: string
   data_abertura: string
-  data_fechamento: string | null
+  data_fechamento: string
+  /** Nota não preenchida: null, nunca 0. */
   nota_satisfacao: number | null
-  tempo_atendimento_h: number | null
+  tempo_atendimento_h: number
 }
 
 export interface Unidade360 {
@@ -130,11 +152,17 @@ export interface Unidade360 {
   cadastro: Cadastro
   consumo: ConsumoMes[]
   diagnostico_conta: DiagnosticoConta
+  /** Faturas EM ABERTO de qualquer mês: estado atual do cliente, sem filtro de período. */
   faturas_abertas: Fatura[]
+  /** Faturas PAGA com mes_referencia dentro da janela. */
   faturas_pagas: Fatura[]
   medidor: Medidor | null
+  /** Bloco inteiro null para UC sem GD. */
   geracao_distribuida: GeracaoDistribuida | null
+  /** Até 10, as mais recentes da janela, sem oscilação e sem anteriores à ligação. */
   interrupcoes_recentes: Interrupcao[]
+  /** Todas as interrupções da janela, com as mesmas regras. */
+  total_interrupcoes: Indicador
   chamados: Chamado[]
   metadados: Metadados
 }

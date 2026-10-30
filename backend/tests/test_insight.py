@@ -35,6 +35,8 @@ ENERGIA = {PA: Decimal('290000000'), PC: Decimal('300000000')}
 def gold_falsa(monkeypatch):
     """Sem banco: o repository devolve a decomposição e a energia de cada janela."""
     app.dependency_overrides[get_db] = lambda: None
+    monkeypatch.setattr(insight_service, 'metadados_gold', lambda db, tabela, obs: {
+        'dados_ficticios': True, 'gold_atualizada_em': None, 'observacoes': [obs]})
     chamadas = {'regiao': None}
 
     def linhas(db, regiao):
