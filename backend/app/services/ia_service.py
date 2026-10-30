@@ -20,6 +20,8 @@ from app.schemas.ia import GraficoIA, PerguntaIA, RespostaIA
 from app.repositories import vocabulario_gold
 from app.services import cache_respostas, esclarecimento_ia, grafico_ia, stub_ia
 from app.ai.consulta import descrever_tabela, valores_distintos
+from app.ai.entidades import resolver_entidades
+from app.ai.guardrails import resposta_da_triagem, triar
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +180,9 @@ class AgenteReal:
 
     def perguntar(self, dados: PerguntaIA) -> dict:
         try:
+            # Pré-filtro (GENAI-22): o óbvio é barrado ou respondido antes de tudo, sem gastar tokens
+            triagem = triar(dados.pergunta)
+            segue = triagem.acao == "seguir"
             responder = self.responder or _responder_do_agente()
             executar_sql = self.executar_sql or _executor_sql()
             
@@ -185,6 +190,8 @@ class AgenteReal:
             if self.executar_sql is None:
                 from app.ai.consulta import descrever_tabela, valores_distintos
                 extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
+                if segue:
+                    extras["entidades_resolvidas"] = resolver_entidades(triagem.pergunta)
             
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
@@ -195,13 +202,13 @@ class AgenteReal:
                 # Nomes da Gold (uma consulta por versão): esclarecimento e assinatura do cache
                 nomes = vocabulario_gold.nomes(db, gold["gold_atualizada_em"])
                 # Pergunta ambígua volta com opções antes de gastar tokens
-                esclarecer = esclarecimento_ia.detectar(
+                esclarecer = segue and esclarecimento_ia.detectar(
                     dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
-                sem_o_comeco = not esclarecer and (
+                sem_o_comeco = segue and not esclarecer and (
                     pede_o_comeco_da_conversa(dados.pergunta)
                     and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico) + len(resumo))
                 # Respostas pré-calculadas: pergunta igual ou parecida a uma já respondida, sem histórico
-                usa_cache = cache_ligado() and not historico and not esclarecer and not sem_o_comeco
+                usa_cache = cache_ligado() and segue and not historico and not esclarecer and not sem_o_comeco
                 reaproveitada = (cache_respostas.buscar(db, dados.pergunta, gold["gold_atualizada_em"], nomes)
                                  if usa_cache else None)
             para_o_cache = None
@@ -212,7 +219,13 @@ class AgenteReal:
                 resultado = executar_sql(sql)
                 resultados.append(resultado)
                 return resultado
-            if esclarecer:
+            if not segue:
+                resposta = resposta_da_triagem(
+                    triagem,
+                    conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
+                    gold_atualizada_em=gold["gold_atualizada_em"],
+                )
+            elif esclarecer:
                 resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
             elif sem_o_comeco:
                 resposta = resposta_sem_o_comeco_da_conversa(historico, resumo, gold["gold_atualizada_em"])
@@ -220,7 +233,7 @@ class AgenteReal:
                 resposta = reaproveitada
             else:
                 resposta = executar_com_prazo(lambda: responder(
-                    dados.pergunta,
+                    triagem.pergunta,
                     historico=historico,
                     resumo_conversa=resumo,
                     conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
@@ -254,23 +267,6 @@ class AgenteReal:
         if para_o_cache is not None:
             self._guardar_no_cache(dados.pergunta, gold["gold_atualizada_em"], nomes, para_o_cache)
         return resposta
-
-    def _guardar_no_cache(self, pergunta: str, versao_gold: Any, nomes: dict, resposta: dict) -> None:
-        """Como o log: o cache nunca derruba a resposta."""
-        try:
-            with self.sessao() as db:
-                cache_respostas.guardar(db, pergunta, versao_gold, nomes, resposta)
-        except SQLAlchemyError:
-            logger.warning("Não foi possível guardar a resposta no cache", exc_info=True)
-
-    def _gravar(self, dados: PerguntaIA, resposta: dict) -> None:
-        """O log não derruba a resposta: sem a tabela ou com o banco instável, só avisa."""
-        try:
-            with self.sessao() as db:
-                interacao_repository.registrar(db, dados.conversa_id, dados.pergunta, resposta)
-        except SQLAlchemyError:
-            logger.warning("Não foi possível gravar a troca em ia.interacao", exc_info=True)
-
 
 def obter_agente() -> Agente:
     """Agente do IA_MODO do .env; dependência da rota, trocada por um agente falso nos testes."""

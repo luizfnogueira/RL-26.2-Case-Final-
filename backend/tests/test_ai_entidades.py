@@ -75,3 +75,11 @@ def test_codigos_de_uc_e_alimentador():
 
 def test_sem_nada_reconhecido_devolve_vazio():
     assert resolver('Qual foi a inadimplência em 2025?') == {}
+
+
+def test_opcoes_do_esclarecimento_chegam_resolvidas():
+    # Botões do esclarecimento: um município escolhido, ou "Todos os municípios juntos"
+    assert resolver('Qual a receita do Centro (bairro Centro, em Olinda)?')['bairro'] == [
+        {'bairro': 'CENTRO', 'municipio': 'OLINDA'}]
+    resultado = resolver('Qual a receita do Centro (bairro Centro, somando todos os municípios)?')
+    assert len(resultado['bairro']) == 2 and 'somando todos os municípios' in resultado['avisos'][0]

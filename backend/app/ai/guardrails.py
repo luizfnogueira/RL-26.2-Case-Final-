@@ -56,7 +56,10 @@ REGRAS_BLOQUEIO = [
                 r'|\bignore (all |any |the )*(previous |prior |above )*instructions\b'
                 r'|\b(a partir de agora|agora) (voce|vc) (e|sera|vai ser)\b'
                 r'|\b(finja|fingir|pretend|act as|aja como|se comporte como)\b'
-                r'|\b(modo|mode) (desenvolvedor|developer|dev|admin|deus|god)\b|\bjailbreak\b'),
+                r'|\b(modo|mode) (desenvolvedor|developer|dev|admin|deus|god)\b|\bjailbreak\b'
+                r'|\b(disregard|forget|override)\b'
+                r'|\bnovas? (instrucao|instrucoes|regras|ordens)\b'
+                r'|(^|\s|\[|<)(system|sistema|assistant|assistente) ?(:|\]|>)|</?(instrucoes|instructions|system)>'),
     ('prompt', r'\b(system prompt|prompt (do|de) sistema|seu prompt|suas instrucoes|suas regras'
                r'|instrucoes (do sistema|internas|originais|iniciais|anteriores)|mensagem (de|do) sistema'
                r'|chave (de|da) api|api key|senha do banco|string de conexao|credenciais)\b|\.env\b'),
@@ -82,6 +85,14 @@ FORA_DO_ESCOPO = re.compile(r'\b(receita de (bolo|torta|pao|comida)|piada|poema|
                             r'|escreva (um|uma) (redacao|carta|historia)|traduza)\b')
 TEXTO_FORA_DO_ESCOPO = ('Essa pergunta está fora do que eu sei responder. Pergunte sobre receita, consumo, '
                         'continuidade, perdas, atendimento ou geração distribuída da V-Energy.')
+
+# Só as regras de escrita, injeção e prompt: um valor pode citar "endereço" sem ser ataque.
+REGRAS_DE_INSTRUCAO = [padrao for regra, padrao in REGRAS_BLOQUEIO if regra != 'dados_pessoais']
+
+
+def parece_instrucao(texto: str) -> bool:
+    normalizado = normalizar(limpar(texto))
+    return any(re.search(padrao, normalizado) for padrao in REGRAS_DE_INSTRUCAO)
 
 
 def triar(pergunta: str) -> Triagem:
