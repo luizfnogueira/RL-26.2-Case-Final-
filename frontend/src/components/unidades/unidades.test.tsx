@@ -421,8 +421,9 @@ describe('consumo, faturas, interrupções e chamados', () => {
     expect(within(consumo[0]).getByText('Jul/2025')).toBeTruthy()
     expect(within(consumo[0]).getByText('305 kWh')).toBeTruthy()
     expect(within(consumo[0]).getByText('312 kWh')).toBeTruthy()
-    expect(within(consumo[0]).getByText('Real')).toBeTruthy()
-    expect(within(consumo[11]).getByText('Estimada')).toBeTruthy()
+    // "Real" em tom discreto, para o selo "Estimada" se destacar.
+    expect(within(consumo[0]).getByText('Real').className).toContain('text-ink-2')
+    expect(within(consumo[11]).getByText('Estimada').className).toContain('bg-alerta-suave')
 
     const faturas = regiao('Faturas')
     expect(faturas.getByText('R$ 486,00')).toBeTruthy() // em aberto
@@ -808,13 +809,37 @@ describe('tabelas na largura do cartão com colunas proporcionais', () => {
       expect(tabela.className).toContain('w-full') // barra do cabeçalho de ponta a ponta
       expect(conteinerComClasse(tabela, '[&_table]:table-fixed')).toBeTruthy()
     }
-    // Recuo só no consumo (leitura depois de número à direita); nas faturas a bandeira é centralizada.
-    expect(tabelas.map((t) => Boolean(conteinerComClasse(t, '[&_td:nth-child(4)]:pl-8')))).toEqual([
-      true,
-      false,
-      false,
-      false,
-      false,
+    // Nenhuma tabela tem mais recuo: consumo e chamados centralizam, a bandeira das faturas também.
+    for (const tabela of tabelas) {
+      expect(conteinerComClasse(tabela, '[&_td:nth-child(4)]:pl-8')).toBeNull()
+    }
+  })
+
+  it('consumo: as três colunas de valores centralizadas e com a mesma largura', async () => {
+    abrir('/unidades/UC-DEMO-007') // UC recente: meses com e sem dado
+    await screen.findByRole('heading', { name: 'Titular de exemplo 007' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver como tabela' }))
+    const tabela = within(
+      screen.getByRole('region', { name: 'Consumo dos últimos 12 meses' }),
+    ).getByRole('table')
+    const cabecalhos = within(tabela).getAllByRole('columnheader')
+    expect(cabecalhos.map((th) => th.textContent)).toEqual([
+      'Mês',
+      'Consumo',
+      'Mesmo mês do ano anterior',
+      'Leitura',
     ])
+    expect(cabecalhos[0].className).toContain('text-left')
+    for (const indice of [1, 2, 3]) {
+      expect(cabecalhos[indice].className).toContain('text-center')
+      for (const linha of within(tabela).getAllByRole('row').slice(1)) {
+        expect(within(linha).getAllByRole('cell')[indice].className).toContain('text-center')
+      }
+    }
+    expect(larguras(tabela)).toEqual(['19%', '27%', '27%', '27%'])
+    // Mês sem dado continua com "—" nos valores e "Sem dado" na leitura.
+    const semDado = within(tabela).getAllByRole('row')[1]
+    expect(within(semDado).getAllByText('—')).toHaveLength(2)
+    expect(within(semDado).getByText('Sem dado').className).toContain('text-ink-2')
   })
 })

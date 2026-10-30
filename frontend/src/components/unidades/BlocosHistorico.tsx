@@ -23,13 +23,9 @@ import {
   LARGURAS_CONSUMO,
   LARGURAS_FATURAS,
   LARGURAS_INTERRUPCOES,
-  RECUO_QUARTA_COLUNA,
   TABELA_PROPORCIONAL,
 } from './larguras'
 import { estiloBandeira, formatarTempoAteFechamento, rotuloAssunto, rotuloCanal } from './rotulos'
-
-// Consumo: a 4ª coluna (leitura, texto) vem depois de um número alinhado à direita.
-const TABELA_COM_RECUO = `${TABELA_PROPORCIONAL} ${RECUO_QUARTA_COLUNA}`
 
 /** Bandeira tarifária como selo oval, com o nome dentro (a cor nunca é a única pista). */
 function SeloBandeira({ bandeira }: { bandeira: string }) {
@@ -45,8 +41,9 @@ const uma = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFr
 
 function SeloLeitura({ tipo }: { tipo: ConsumoMes['tipo_leitura'] }) {
   if (tipo === null) return <span className="text-ink-2">Sem dado</span>
-  // Como no medidor: só a leitura estimada leva selo.
-  return tipo === 'ESTIMADA' ? <Badge variante="alerta">Estimada</Badge> : <>{formatarNome(tipo)}</>
+  // Como no medidor: só a leitura estimada leva selo; as outras ficam em tom discreto.
+  if (tipo === 'ESTIMADA') return <Badge variante="alerta">Estimada</Badge>
+  return <span className="text-ink-2">{formatarNome(tipo)}</span>
 }
 
 const COLUNAS_CONSUMO: readonly Coluna<ConsumoMes>[] = [
@@ -54,20 +51,21 @@ const COLUNAS_CONSUMO: readonly Coluna<ConsumoMes>[] = [
   {
     id: 'atual',
     cabecalho: 'Consumo',
-    alinhar: 'direita',
+    alinhar: 'centro',
     largura: LARGURAS_CONSUMO.consumo,
     celula: (m) => formatarIndicador(m.atual),
   },
   {
     id: 'anterior',
     cabecalho: 'Mesmo mês do ano anterior',
-    alinhar: 'direita',
+    alinhar: 'centro',
     largura: LARGURAS_CONSUMO.anterior,
     celula: (m) => formatarIndicador(m.ano_anterior),
   },
   {
     id: 'leitura',
     cabecalho: 'Leitura',
+    alinhar: 'centro',
     largura: LARGURAS_CONSUMO.leitura,
     celula: (m) => <SeloLeitura tipo={m.tipo_leitura} />,
   },
@@ -99,7 +97,7 @@ export function BlocoConsumo({ consumo }: { consumo: readonly ConsumoMes[] }) {
           colunas={COLUNAS_CONSUMO}
           linhas={consumo}
           chaveLinha={(m) => m.mes}
-          className={TABELA_COM_RECUO}
+          className={TABELA_PROPORCIONAL}
         />
       ) : (
         <BarrasComparadas
