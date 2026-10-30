@@ -1,9 +1,11 @@
-import { CircleAlert, RotateCw, Shield, Sparkles, TriangleAlert } from 'lucide-react'
+import { CircleAlert, CircleHelp, RotateCw, Shield, Sparkles, TriangleAlert } from 'lucide-react'
 import { Fragment, type ReactNode } from 'react'
 import type { ApiError } from '@/services/erro-api'
 import { cx } from '@/utils/cx'
 import ComoCheguei from './ComoCheguei'
 import type { Mensagem } from './contexto'
+import GraficoResposta from './GraficoResposta'
+import TabelaResposta from './TabelaResposta'
 
 type MensagemDoAssistente = Extract<Mensagem, { autor: 'assistente' }>
 type Tom = 'neutro' | 'aviso' | 'perigo'
@@ -83,10 +85,16 @@ function semTitulo(texto: string, titulo: string): string {
     : texto
 }
 
-type Props = { mensagem: MensagemDoAssistente; aoTentarNovamente: () => void; enviando: boolean }
+type Props = {
+  mensagem: MensagemDoAssistente
+  aoTentarNovamente: () => void
+  /** Reenvia a pergunta completa de uma opção do esclarecimento. */
+  aoEscolher: (pergunta: string) => void
+  enviando: boolean
+}
 
-/** Uma resposta do assistente em um dos estados: carregando, ok, não sei, bloqueado ou erro. */
-export default function MensagemAssistente({ mensagem, aoTentarNovamente, enviando }: Props) {
+/** Uma resposta do assistente em um dos estados: carregando, ok, não sei, bloqueado, esclarecer ou erro. */
+export default function MensagemAssistente({ mensagem, aoTentarNovamente, aoEscolher, enviando }: Props) {
   if (mensagem.estado === 'carregando') {
     return (
       <Fala icone={<Sparkles {...ICONE} />}>
@@ -130,6 +138,7 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
         <Fala tom="perigo" icone={<Shield {...ICONE} />}>
           <p className="mb-1 font-medium">Pedido bloqueado</p>
           <p>{resposta.resposta}</p>
+          <ComoCheguei resposta={resposta} />
         </Fala>
         <p className="ml-[42px] inline-flex w-fit items-center gap-1.5 rounded-full bg-surface-alt px-3 py-1 text-legenda text-ink">
           <Shield size={13} aria-hidden="true" />
@@ -139,11 +148,34 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
     )
   }
 
+  if (resposta.status === 'esclarecer' && resposta.esclarecimento) {
+    return (
+      <Fala icone={<CircleHelp {...ICONE} />}>
+        <p className="mb-2">{resposta.esclarecimento.pergunta}</p>
+        <ul aria-label="Opções de esclarecimento" className="flex flex-wrap gap-2">
+          {resposta.esclarecimento.opcoes.map((opcao) => (
+            <li key={opcao.pergunta}>
+              <button
+                type="button"
+                onClick={() => aoEscolher(opcao.pergunta)}
+                disabled={enviando}
+                className="rounded-full border border-teal-escuro bg-surface-card px-3.5 py-1.5 text-corpo text-teal-escuro hover:bg-azul-50 disabled:opacity-60"
+              >
+                {opcao.rotulo}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Fala>
+    )
+  }
+
   if (resposta.status === 'nao_sei') {
     return (
       <Fala tom="aviso" icone={<TriangleAlert {...ICONE} />}>
         <p className="mb-1 font-medium">{TITULO_NAO_SEI}</p>
         <p>{semTitulo(resposta.resposta, TITULO_NAO_SEI)}</p>
+        <ComoCheguei resposta={resposta} />
       </Fala>
     )
   }
@@ -151,6 +183,12 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, envian
   return (
     <Fala icone={<Sparkles {...ICONE} />}>
       <TextoComDestaques texto={resposta.resposta} />
+      {resposta.apresentacao === 'tabela' && resposta.dados.linhas.length > 0 && (
+        <TabelaResposta dados={resposta.dados} />
+      )}
+      {resposta.apresentacao === 'grafico' && resposta.grafico && (
+        <GraficoResposta grafico={resposta.grafico} dados={resposta.dados} />
+      )}
       <ComoCheguei resposta={resposta} />
     </Fala>
   )

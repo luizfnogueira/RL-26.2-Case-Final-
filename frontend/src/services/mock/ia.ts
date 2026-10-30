@@ -12,6 +12,7 @@ import { montarDashboard } from './dashboard'
 const PERGUNTA_OK = 'qual foi a receita no período?'
 const PERGUNTA_BLOQUEADA = 'drop table clientes'
 const DESTRUTIVA = /\b(drop|delete|truncate|apague|apagar|exclua|excluir|remova|remover)\b/i
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const UC_INSIGHT = 'UC-DEMO-001'
 const NUMEROS_UNIDADE = [
   ['ultimo_mes', 'Último mês'],
@@ -38,12 +39,37 @@ function numero(valor: number, casas = 1): string {
 
 // ---------- POST /ia ----------
 
+/** Como `grafico_ia.ler_pedido` do backend: um exemplo por tipo (barras P1 × P2, pizza, linhas). */
+function tipoDeGraficoPedido(pergunta: string): 'barras' | 'pizza' | 'linhas' | null {
+  if (/\b(pizza|torta|rosca)\b/i.test(pergunta)) return 'pizza'
+  if (/\bbarras?\b/i.test(pergunta)) return 'barras'
+  const grafico = /\bgr[aá]fico/i.test(pergunta)
+  if (/\b(de|em)\s+linhas?\b/i.test(pergunta) || (grafico && /\blinhas?\b/i.test(pergunta)))
+    return 'linhas'
+  return grafico ? 'barras' : null
+}
+
+/**
+ * Como `esclarecimento_ia` do stub: "Centro" (bairro fictício em Recife, Olinda e Paulista) sem o
+ * município, ou "este ano" sem ano nem período, voltam com opções.
+ */
+function esclarecimentoPedido(pergunta: string): 'bairro' | 'ano' | null {
+  const texto = normalizar(pergunta)
+  if (/\bcentro\b/.test(texto) && !/\b(recife|olinda|paulista|todos os municipios)\b/.test(texto))
+    return 'bairro'
+  if (/\b(n|d)?(este|esse) ano\b|\b(no|do) ano atual\b/.test(texto) && !/\b(20\d{2}|p[12])\b/.test(texto))
+    return 'ano'
+  return null
+}
+
 /** Respostas extras do mock do front (não fazem parte dos fixtures do contrato), montadas com os mesmos dados fictícios. */
 async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
   const base = await fixtures.respostaIa()
   const montar = (r: Pick<RespostaIA, 'resposta' | 'sql' | 'tabelas' | 'dados'>): RespostaIA => ({
     ...r,
     status: 'ok',
+    // Mesma regra do agente (GENAI-14): várias linhas vão em tabela
+    apresentacao: r.dados.linhas.length > 1 ? 'tabela' : 'texto',
     gerado_em: agoraIso(),
     metadados: {
       ...base.metadados,
@@ -51,7 +77,7 @@ async function respostaExtra(pergunta: string): Promise<RespostaIA | null> {
     },
   })
 
-  if (pergunta === 'quais bairros tiveram mais falta de luz este ano') {
+  if (pergunta === 'quais bairros tiveram mais falta de luz em p2') {
     const { ranking_alimentadores } = await fixtures.operacao()
     const top = [...ranking_alimentadores.items]
       .sort((a, b) => (b.dec.valor ?? 0) - (a.dec.valor ?? 0))
@@ -116,15 +142,40 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
   if (typeof bruta !== 'string' || bruta.trim().length < 1 || bruta.length > 2000) {
     throw invalido('pergunta deve ter de 1 a 2000 caracteres.')
   }
-  // Como a API (extra='forbid'): o corpo é só {pergunta}
-  const extras = Object.keys(corpo).filter((campo) => campo !== 'pergunta')
+  // Como a API (extra='forbid'): o corpo é só {pergunta, conversa_id?}
+  const extras = Object.keys(corpo).filter(
+    (campo) => campo !== 'pergunta' && campo !== 'conversa_id',
+  )
   if (extras.length > 0) throw invalido(`Campo não permitido: ${extras.join(', ')}.`)
+  const conversa = corpo.conversa_id
+  if (
+    conversa !== undefined &&
+    conversa !== null &&
+    (typeof conversa !== 'string' || !UUID.test(conversa))
+  ) {
+    throw invalido('conversa_id deve ser um UUID.')
+  }
 
   const pergunta = bruta.trim().toLocaleLowerCase('pt-BR')
-  if (pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta))
-    return fixtures.respostaIaBloqueado()
-  if (pergunta === PERGUNTA_OK) return fixtures.respostaIa()
-  return (await respostaExtra(normalizar(bruta))) ?? fixtures.respostaIaNaoSei()
+  const grafico = tipoDeGraficoPedido(bruta)
+  const esclarecer = esclarecimentoPedido(bruta)
+  const resposta =
+    pergunta === PERGUNTA_BLOQUEADA || DESTRUTIVA.test(bruta)
+      ? await fixtures.respostaIaBloqueado()
+      : pergunta === PERGUNTA_OK
+        ? await fixtures.respostaIa()
+        : esclarecer
+          ? await (esclarecer === 'bairro'
+              ? fixtures.respostaIaEsclarecer()
+              : fixtures.respostaIaEsclarecerAno())
+          : grafico
+            ? await fixtures.respostaIaGrafico[grafico]()
+            : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
+  // Como a API: devolve o id recebido ou cria um na primeira pergunta.
+  return {
+    ...resposta,
+    conversa_id: (conversa as string | null | undefined) ?? crypto.randomUUID(),
+  }
 }
 
 // ---------- POST /ia/insight ----------

@@ -6,7 +6,7 @@ resumo montado por regra sobre os mesmos números, e `metadados.observacoes` avi
 """
 import logging
 from datetime import datetime
-from typing import Annotated, Protocol
+from typing import Annotated, Callable, Protocol
 
 import httpx
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
@@ -20,6 +20,7 @@ from app.schemas.common import limites
 from app.schemas.dashboard import FiltrosDashboard
 from app.schemas.ia import PedidoInsight
 from app.services import dashboard_service
+from app.services.ia_service import executar_com_prazo, prazo_ia_s
 from app.services.stubs import indicador
 
 logger = logging.getLogger(__name__)
@@ -124,13 +125,26 @@ def _nome(valor: str) -> str:
     return " ".join(p if i and p in _MINUSCULAS else p.capitalize() for i, p in enumerate(palavras))
 
 
-def texto_por_regra(filtros: FiltrosDashboard, numeros: list[dict]) -> TextoInsight:
-    """Resumo montado só com os números, sem IA. Serve ao modo mock e de texto alternativo."""
-    v = {n["nome"]: float(n["valor"]) for n in numeros}
+def _recorte(filtros: FiltrosDashboard) -> str:
     regiao = " / ".join(
         _nome(valor) for campo in ("municipio", "bairro", "classe")
         if (valor := getattr(filtros, campo)))
-    recorte = f"Em {regiao}" if regiao else "No consolidado"
+    return f"Em {regiao}" if regiao else "No consolidado"
+
+
+_MESES = ("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")
+
+
+def _periodo(periodo: str) -> str:
+    """'2025-07/2026-06' -> 'jul/2025 a jun/2026'."""
+    inicio, fim = (f"{_MESES[int(mes[5:]) - 1]}/{mes[:4]}" for mes in limites(periodo))
+    return f"{inicio} a {fim}"
+
+
+def texto_por_regra(filtros: FiltrosDashboard, numeros: list[dict]) -> TextoInsight:
+    """Resumo montado só com os números, sem IA. Serve ao modo mock e de texto alternativo."""
+    v = {n["nome"]: float(n["valor"]) for n in numeros}
+    recorte = _recorte(filtros)
     texto = (
         f"{recorte}, a receita de energia passou de {_brl(v['receita_energia_comparacao'])} "
         f"para {_brl(v['receita_energia_atual'])}. "
@@ -182,9 +196,52 @@ class GeradorReal:
         return resposta.json()
 
 
+def _escritor_ia() -> Callable[[dict[str, str]], dict]:
+    from app.ai.insights import escrever_insight  # o PydanticAI só é importado no modo real
+    return escrever_insight
+
+
+class GeradorIA:
+    """IA_MODO=real: agente de insight do PydanticAI dentro do backend (GENAI-25), no prazo da ponte de IA.
+
+    O modelo recebe os seis números já formatados e escreve com marcadores, que o código preenche. Qualquer
+    falha (provedor, prazo, número fora de marcador duas vezes) vira AgenteIndisponivelException, e o
+    caso de uso troca pelo texto por regra.
+    """
+
+    def __init__(self, escrever: Callable[[dict[str, str]], dict] | None = None,
+                 prazo_s: float | None = None) -> None:
+        self.escrever = escrever
+        self.prazo_s = prazo_s
+
+    def gerar(self, pedido: dict) -> dict:
+        filtros = pedido["filtros"]
+        v = {n["nome"]: float(n["valor"]) for n in pedido["numeros_utilizados"]}
+        valores = {
+            "recorte": _recorte(filtros),
+            "periodo_atual": _periodo(filtros.periodo_atual),
+            "periodo_base": _periodo(filtros.periodo_comparacao),
+            "receita_energia_atual": _brl(v["receita_energia_atual"]),
+            "receita_energia_base": _brl(v["receita_energia_comparacao"]),
+            "reajuste": _pct(v["reajuste"], sinal=False),
+            "variacao_volume": _pct(v["variacao_volume"]),
+            "efeito_preco": _brl(v["efeito_preco"]),
+            "efeito_volume": _brl(v["efeito_volume"]),
+        }
+        try:
+            escrever = self.escrever or _escritor_ia()
+            return executar_com_prazo(lambda: escrever(valores), self.prazo_s or prazo_ia_s())
+        except AgenteIndisponivelException:
+            raise
+        except Exception as erro:
+            # Só o tipo vai para o log: mensagens do provedor podem trazer URL ou cabeçalhos
+            logger.warning("Agente de insight indisponível (%s)", type(erro).__name__)
+            raise AgenteIndisponivelException() from erro
+
+
 def obter_gerador_insight() -> GeradorInsight:
     """Gerador do IA_MODO do .env; dependência da rota, trocada por um gerador falso nos testes."""
-    return GeradorMock() if config.IA_MODO == "mock" else GeradorReal()
+    return GeradorMock() if config.IA_MODO == "mock" else GeradorIA()
 
 
 # ---------- caso de uso ----------

@@ -2,7 +2,7 @@
 
 ## Backend
 
-Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do portal no schema `portal`; a recarga da Gold nunca toca no `portal`.
+Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold`, as ordens do portal no schema `portal` e as conversas do assistente de IA no schema `ia`; a recarga da Gold nunca toca no `portal` nem no `ia`.
 
 O fluxo de carga real é CSV → PostgreSQL, sem banco intermediário; use `GOLD_SOURCE=real`. O seed permanece somente para desenvolvimento em banco separado. A documentação técnica e o guia operacional são distribuídos separadamente pela equipe no Drive, junto das orientações de acesso aos dados privados.
 
@@ -187,3 +187,20 @@ const { dados, erro, carregando, recarregar } = useConsulta(
 ```
 
 `bairro` só habilita depois do município, e trocar o município limpa `bairro` e `alimentador`. As telas de fila e ordens leem os domínios de `GET /filtros` com `useOpcoesFiltros` e `paraOpcoesBarra` — os valores são os da Gold (maiúsculas) e só o rótulo exibido é ajustado. A tela de receita ainda usa `src/data/filtros.mock.ts`.
+
+## Assistente de IA
+
+Agente Text-to-SQL do portal (Tela 7 e painel flutuante, `POST /ia`) e insight da receita gerado por IA (Tela 2, `POST /ia/insight`). Arquitetura, segurança, como rodar e como avaliar: [ai-agent/README.md](ai-agent/README.md). Regras para agentes de código: [ai-agent/AGENTS.md](ai-agent/AGENTS.md).
+
+Decisões do módulo:
+
+- **PydanticAI dentro do backend**, sem serviço HTTP separado. O modelo vem de uma API gratuita de provedor arbitrário; trocar de provedor é mudar o `.env` (`LLM_PROVIDER`, `LLM_MODELO`, `LLM_API_KEY`).
+- **CHESS simplificado**: recuperação de valores e seleção de schema (skills) em código, um único agente gerador com três ferramentas, e o golden set no lugar dos testes gerados por LLM.
+- **Números nunca saem do modelo**: o texto usa marcadores (`{v1}`, `{efeito_preco}`) preenchidos pelo código com os valores do banco. Um validador de saída pede nova tentativa; se o erro se repetir, o chat responde "não sei" e o insight usa o texto por regra.
+- **Somente leitura em camadas**: usuário do banco só para o agente, validador de SQL, regras nas instruções, pré-filtro e front sem HTML vindo da resposta.
+- **Memória no servidor**: tabela `ia.interacao` com `conversa_id`. O front reenvia só o id. A mesma tabela serve de log de auditoria, com retenção de 30 dias e CPF, CNPJ e e-mail mascarados.
+- **Detalhes técnicos auditáveis**: o painel separa o que foi registrado (plano, ferramentas, SQL, tokens, tempo) do que o modelo declarou (justificativa), e as métricas do golden set das verificações da resposta.
+
+Suposições: o agente não vê nome, documento nem endereço do titular ("quem é o titular" fica para a Tela 3); o agente não lê o schema `portal`, que tem texto livre digitado por usuários; a conversa expira após 2 h sem perguntas; e "último ano" sem período explícito é tratado como premissa declarada na resposta.
+
+Resultados da avaliação (acurácia, taxa de invenção, bloqueio de ataques e configuração escolhida): a preencher com o primeiro run do `ai-agent/avaliacao/avaliar.py` (GENAI-27).

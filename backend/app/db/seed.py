@@ -14,8 +14,8 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import Engine, insert, text
 
-from app.db.base import GOLD_SCHEMA, PORTAL_SCHEMA, GoldBase, PortalBase
-from app.models import gold, portal  # noqa: F401
+from app.db.base import GOLD_SCHEMA, IA_SCHEMA, PORTAL_SCHEMA, GoldBase, IABase, PortalBase
+from app.models import gold, ia, portal  # noqa: F401
 
 FUSO = timezone(timedelta(hours=-3))  # Recife, sem horário de verão
 PRIMEIRO_MES = date(2022, 7, 1)
@@ -367,11 +367,13 @@ def _gerar_preco_volume(ucs: list[dict], dados: dict) -> None:
 
 
 def preparar_schemas(engine: Engine) -> None:
-    """Cria os schemas e as tabelas do portal que faltarem. Nunca apaga nada do portal."""
+    """Cria os schemas e as tabelas do portal e do assistente que faltarem. Nunca apaga nada deles."""
     with engine.begin() as conn:
-        for schema in (GOLD_SCHEMA, PORTAL_SCHEMA):
+        for schema in (GOLD_SCHEMA, PORTAL_SCHEMA, IA_SCHEMA):
             conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         PortalBase.metadata.create_all(conn)
+        IABase.metadata.create_all(conn)
+        ia.atualizar_restricoes(conn)
 
 
 def recarregar_gold(engine: Engine, dados: dict[type, list[dict]]) -> dict[str, int]:

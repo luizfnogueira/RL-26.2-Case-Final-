@@ -482,14 +482,23 @@ describe('POST /ia', () => {
     )
   })
 
-  it('recusa campo além da pergunta, como a API', async () => {
+  it('recusa campo além da pergunta e do conversa_id, como a API', async () => {
     const extra = atenderMock('POST', '/ia', { corpo: { pergunta: 'Oi', contexto: {} } })
     expect((await erroDe(extra)).codigo).toBe('DADOS_INVALIDOS')
+    const idRuim = atenderMock('POST', '/ia', { corpo: { pergunta: 'Oi', conversa_id: 'abc' } })
+    expect((await erroDe(idRuim)).codigo).toBe('DADOS_INVALIDOS')
+  })
+
+  it('cria o conversa_id na primeira pergunta e devolve o mesmo nas seguintes', async () => {
+    const primeira = await perguntarIA('Qual foi a receita no período?')
+    expect(primeira.conversa_id).toMatch(/^[0-9a-f-]{36}$/)
+    const seguinte = await perguntarIA('DROP TABLE clientes', undefined, primeira.conversa_id)
+    expect(seguinte.conversa_id).toBe(primeira.conversa_id)
   })
 
   it('responde as perguntas sugeridas da tela do assistente com dados consistentes', async () => {
     for (const pergunta of [
-      'Quais bairros tiveram mais falta de luz este ano?',
+      'Quais bairros tiveram mais falta de luz em P2?',
       'Quais UCs têm maior risco de perda?',
       'Por que a conta de luz aumentou?',
     ]) {

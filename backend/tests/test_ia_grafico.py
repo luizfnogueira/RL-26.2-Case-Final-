@@ -1,0 +1,354 @@
+"""Gráfico na conversa: o backend escolhe barras, pizza ou linhas pela forma dos dados (contrato, seção 9)."""
+from contextlib import nullcontext
+
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+from app.main import app
+from app.schemas.ia import RespostaIA
+from app.services import grafico_ia, ia_service
+from app.services.grafico_ia import (NOTA_LINHAS_SEM_TEMPO, NOTA_PIZZA_NAO_SOMA, NOTA_PIZZA_NEGATIVO,
+                                     NOTA_PIZZA_PARECIDAS, NOTA_UM_NUMERO, ler_pedido, montar_grafico)
+from app.services.ia_service import AgenteReal, obter_agente
+from app.services.stubs import exemplo
+
+MESES_P2 = [f"{a}-{m:02d}" for a, m in [(2025, m) for m in range(7, 13)] + [(2026, m) for m in range(1, 7)]]
+CIDADES = ["RECIFE", "JABOATAO DOS GUARARAPES", "OLINDA", "PAULISTA"] + [f"CIDADE {i:02d}" for i in range(10)]
+MUNICIPIOS = [["RECIFE", 182.4], ["OLINDA", 165.1], ["PAULISTA", 158.9], ["JABOATAO DOS GUARARAPES", 171.0]]
+
+
+def resposta(colunas, linhas, interpretada="Pergunta interpretada", sql="SELECT ..."):
+    r = exemplo("resposta_ia")
+    r.pop("grafico", None)
+    r.update(dados={"colunas": colunas, "linhas": linhas}, apresentacao="tabela", sql=sql)
+    r["detalhes_tecnicos"]["estrutura_pensamento"]["pergunta_interpretada"] = interpretada
+    return r
+
+
+def grafico(pergunta, colunas, linhas):
+    return montar_grafico(pergunta, resposta(colunas, linhas))
+
+
+@pytest.mark.parametrize("pergunta, esperado", [
+    ("Faça um gráfico de barras disso", (True, "barras")),
+    ("mostre num grafico de pizza", (True, "pizza")),
+    ("Gráfico de linhas da receita mês a mês", (True, "linhas")),
+    ("Faz um gráfico?", (True, None)),
+    ("Qual o DEC da linha de distribuição ALM-REC-001?", (False, None)),
+    ("Qual a receita de P2?", (False, None)),
+    # Casos reais: nome de bairro e rede elétrica não são pedido de gráfico
+    ("Consumo do bairro Barra de Jangada", (False, None)),
+    ("Interrupções em linhas de distribuição de Recife", (False, None)),
+    ("DEC da linha de distribuição ALM-REC-001 em gráfico", (True, None)),
+    ("agora em linhas", (True, "linhas")),
+    ("me dê isso em um grafico de barras", (True, "barras")),
+    ("gráfico de barra da receita", (True, "barras")),
+])
+def test_le_o_pedido_de_grafico(pergunta, esperado):
+    assert ler_pedido(pergunta) == esperado
+
+
+# ---------- automático: comparação e série no tempo ----------
+
+def test_p1_p2_numa_linha_vira_barras_verticais_na_ordem_dos_periodos():
+    g, _ = grafico("Compare a receita de energia de P1 com P2",
+                   ["receita_energia_p1_brl", "receita_energia_p2_brl"], [[2390029.77, 2692351.47]])
+    assert (g["tipo"], g["orientacao"], g["eixo"], g["origem"]) == ("barras", "vertical", "periodo", "automatico")
+    assert g["categorias"] == ["P1", "P2"] and g["series"][0]["valores"] == [2390029.77, 2692351.47]
+    assert g["unidade"] == "brl"
+
+
+def test_p1_p2_por_classe_vira_barras_agrupadas_ordenadas_pelo_p2():
+    g, _ = grafico("Compare P1 e P2 por classe", ["classe", "kwh_p1", "kwh_p2"],
+                   [["RURAL", 10.0, 12.0], ["RESIDENCIAL", 90.0, 95.0], ["COMERCIAL", 60.0, 55.0]])
+    assert (g["tipo"], g["orientacao"]) == ("barras", "horizontal")
+    assert [s["nome"] for s in g["series"]] == ["P1", "P2"]
+    assert g["categorias"] == ["RESIDENCIAL", "COMERCIAL", "RURAL"]
+    assert g["series"][1]["valores"] == [95.0, 55.0, 12.0] and g["unidade"] == "kwh"
+
+
+def test_coluna_periodo_com_categoria_vira_p1_e_p2_lado_a_lado():
+    g, _ = grafico("Receita por classe em P1 e P2", ["classe", "periodo", "receita_brl"],
+                   [["COMERCIAL", "P1", 60.0], ["COMERCIAL", "P2", 55.0], ["RESIDENCIAL", "P1", 90.0],
+                    ["RESIDENCIAL", "P2", 95.0]])
+    assert g["categorias"] == ["RESIDENCIAL", "COMERCIAL"]
+    assert [(s["nome"], s["valores"]) for s in g["series"]] == [("P1", [90.0, 60.0]), ("P2", [95.0, 55.0])]
+
+
+def test_serie_no_tempo_vira_linhas_em_ordem_e_mes_sem_dado_fica_vazio():
+    g, _ = grafico("Receita mês a mês", ["mes_referencia", "receita_energia_brl"],
+                   [["2025-09", 3.0], ["2025-07", 1.0], ["2025-08", None], ["2025-10", 4.0]])
+    assert (g["tipo"], g["eixo"]) == ("linhas", "tempo")
+    assert g["categorias"] == ["2025-07", "2025-08", "2025-09", "2025-10"]
+    assert g["series"][0]["valores"] == [1.0, None, 3.0, 4.0]
+
+
+def test_mes_numerico_ordena_por_numero_e_nao_por_texto():
+    g, _ = grafico("DEC por mês em 2025", ["ano", "mes", "dec_horas_uc"],
+                   [[2025, m, float(m)] for m in (10, 2, 1, 11, 3)])
+    assert g["categorias"] == ["2025/1", "2025/2", "2025/3", "2025/10", "2025/11"]
+    assert len(g["series"]) == 1 and g["unidade"] == "h"
+
+
+def test_varias_cidades_no_tempo_viram_uma_linha_por_cidade_ate_4():
+    linhas = [[c, m, v] for c, v in [("A", 5), ("B", 4), ("C", 3), ("D", 2), ("E", 1)] for m in ("2025-07", "2025-08", "2025-09")]
+    g, _ = grafico("Receita por município mês a mês", ["municipio", "mes_referencia", "receita_brl"], linhas)
+    assert g["tipo"] == "linhas" and [s["nome"] for s in g["series"]] == ["A", "B", "C", "D"]
+    assert g["omitidos"] == 1
+
+
+def test_ranking_sem_pedido_continua_tabela():
+    assert grafico("Quais municípios têm maior consumo médio?", ["municipio", "consumo_medio_kwh"], MUNICIPIOS) == (None, None)
+
+
+# ---------- com pedido ----------
+
+def test_exemplo_das_duas_perguntas_vira_barras_horizontais_do_maior_para_o_menor():
+    g, _ = grafico("Agora faça um gráfico de barras mostrando essa diferença",
+                   ["municipio", "consumo_medio_kwh"], MUNICIPIOS)
+    assert (g["tipo"], g["orientacao"], g["origem"], g["unidade"]) == ("barras", "horizontal", "pedido", "kwh")
+    assert g["categorias"] == ["RECIFE", "JABOATAO DOS GUARARAPES", "OLINDA", "PAULISTA"]
+
+
+def test_ordem_do_sql_e_respeitada_quando_ja_vem_ordenada():
+    g, _ = grafico("Gráfico dos municípios com menor consumo", ["municipio", "consumo_kwh"],
+                   [["A", 1.0], ["B", 2.0], ["C", 3.0]])
+    assert g["categorias"] == ["A", "B", "C"]
+
+
+def test_barras_param_em_20_e_contam_as_omitidas():
+    # Fora de ordem: o gráfico ordena do maior para o menor e corta nas 20 maiores
+    g, _ = grafico("gráfico de barras por bairro", ["bairro", "receita_brl"],
+                   [[f"B{i}", float(i * 7 % 25)] for i in range(25)])
+    assert len(g["categorias"]) == 20 and g["omitidos"] == 5
+    assert g["series"][0]["valores"][0] == 24.0 and g["series"][0]["valores"][-1] == 5.0
+
+
+def test_pizza_de_totais_tem_ate_5_fatias_com_outros_no_fim():
+    linhas = [["RESIDENCIAL", 104.1], ["COMERCIAL", 58.9], ["INDUSTRIAL", 31.8], ["RURAL", 10.4],
+              ["PODER PUBLICO", 7.6], ["SERVICO PUBLICO", 4.2]]
+    g, _ = grafico("gráfico de pizza da receita por classe", ["classe", "receita_energia_brl"], linhas)
+    assert g["tipo"] == "pizza" and g["categorias"][-1] == "Outros" and len(g["categorias"]) == 5
+    assert g["series"][0]["valores"][-1] == pytest.approx(11.8)
+
+
+def test_pizza_de_media_vira_barras_com_nota():
+    g, _ = grafico("gráfico de pizza do consumo médio", ["municipio", "consumo_medio_kwh"], MUNICIPIOS)
+    assert g["tipo"] == "barras" and g["nota"] == NOTA_PIZZA_NAO_SOMA
+
+
+def test_pizza_com_fatias_parecidas_vira_barras_com_nota():
+    g, _ = grafico("pizza da receita por classe", ["classe", "receita_brl"], [["A", 33.0], ["B", 34.0], ["C", 33.5]])
+    assert g["tipo"] == "barras" and g["nota"] == NOTA_PIZZA_PARECIDAS
+
+
+def test_linhas_pedidas_sem_tempo_viram_barras_com_nota():
+    g, _ = grafico("gráfico de linhas do consumo por município", ["municipio", "consumo_kwh"], MUNICIPIOS)
+    assert g["tipo"] == "barras" and g["nota"] == NOTA_LINHAS_SEM_TEMPO
+
+
+def test_varios_indicadores_da_mesma_unidade_numa_linha_viram_barras():
+    g, _ = grafico("gráfico da receita total e de energia", ["receita_total_brl", "receita_energia_brl"],
+                   [[169683458.59, 127262595.65]])
+    assert g["categorias"] == ["Receita total", "Receita energia"]
+
+
+def test_um_numero_so_fica_em_texto_com_nota():
+    assert grafico("faça um gráfico do DEC de P2", ["dec_horas_uc"], [[3.2992]]) == (None, NOTA_UM_NUMERO)
+
+
+def test_resposta_sem_status_ok_nao_tem_grafico():
+    r = exemplo("resposta_ia_nao_sei")
+    assert montar_grafico("gráfico de barras", r) == (None, None)
+
+
+# ---------- contrato e ponte ----------
+
+def test_contrato_exige_grafico_junto_com_apresentacao_grafico():
+    r = exemplo("resposta_ia_grafico_barras")
+    RespostaIA.model_validate(r)
+    with pytest.raises(ValidationError):
+        RespostaIA.model_validate({**r, "grafico": None})
+    with pytest.raises(ValidationError):
+        RespostaIA.model_validate({**r, "grafico": {**r["grafico"], "categorias": ["P1"]}})
+
+
+def test_ponte_acrescenta_o_grafico_na_resposta_do_agente(monkeypatch):
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, c: [])
+    monkeypatch.setattr(ia_service.interacao_repository, "registrar", lambda *a: None)
+    monkeypatch.setattr("app.repositories.gold_metadata.GOLD_SOURCE", "seed")
+    agente = AgenteReal(responder=lambda *a, **k: resposta(["municipio", "consumo_medio_kwh"], MUNICIPIOS),
+                        executar_sql=lambda sql: None, sessao=nullcontext)
+    corpo = agente.perguntar(ia_service.PerguntaIA(pergunta="Faça um gráfico de barras disso"))
+    assert corpo["apresentacao"] == "grafico" and corpo["grafico"]["tipo"] == "barras"
+    RespostaIA.model_validate(corpo)
+
+
+# ---------- título e motivo do tipo ----------
+
+@pytest.mark.parametrize("interpretada, titulo", [
+    # Casos reais do teste ao vivo: o título dizia "formatado para gráfico de pizza" em cima de barras
+    ("Qual foi o DEC total (acumulado) por município no período P2 (julho de 2025 a junho de 2026), "
+     "formatado para visualização em gráfico de pizza?",
+     "Qual foi o DEC total (acumulado) por município no período P2 (julho de 2025 a junho de 2026)"),
+    ("Compare a receita total e a receita de energia entre P1 e P2 em um gráfico de pizza.",
+     "Compare a receita total e a receita de energia entre P1 e P2"),
+    ("Qual foi o consumo de Recife em junho de 2026, segmentado por classe para visualização em gráfico?",
+     "Qual foi o consumo de Recife em junho de 2026, segmentado por classe"),
+    ("Qual a receita por município em P2?", "Qual a receita por município em P2"),
+])
+def test_titulo_nao_cita_o_tipo_de_grafico(interpretada, titulo):
+    g, _ = montar_grafico("gráfico de barras", resposta(["municipio", "consumo_kwh"], MUNICIPIOS, interpretada))
+    assert g["titulo"] == titulo
+
+
+def test_titulo_longo_e_cortado_numa_palavra_inteira():
+    g, _ = montar_grafico("gráfico", resposta(["municipio", "consumo_kwh"], MUNICIPIOS, "Receita mensal " * 20))
+    assert len(g["titulo"]) <= 150 and g["titulo"].endswith(" Receita…")
+
+
+def test_pizza_com_valor_negativo_explica_o_motivo():
+    # Caso real: efeito preço (+) e efeito volume (−) em pizza
+    g, _ = grafico("Efeito preço e efeito volume em pizza", ["categoria", "valor_brl"],
+                   [["Efeito Preço", 14425857.02], ["Efeito Volume", -4993655.75]])
+    assert g["tipo"] == "barras" and g["nota"] == NOTA_PIZZA_NEGATIVO
+
+
+def test_pizza_recusada_comeca_dizendo_que_foi_pedida():
+    g, _ = grafico("DEC por município em pizza", ["municipio", "dec_total_horas_uc"], MUNICIPIOS)
+    assert g["nota"].startswith("Você pediu pizza, mas o gráfico está em barras: ")
+
+
+# ---------- o que fica fora do desenho vai na nota ----------
+
+MESES_4_ANOS = [f"{a}-{m:02d}" for a in range(2022, 2027) for m in range(1, 13)
+                if "2022-07" <= f"{a}-{m:02d}" <= "2026-06"]
+
+
+def test_barras_no_tempo_mostram_24_meses_e_avisam_os_anteriores():
+    # Caso real: consumo de jul/2022 a jun/2026 em barras mostrava só os últimos 24, sem aviso
+    g, _ = grafico("Consumo mensal de jul/2022 a jun/2026 em barras", ["mes_referencia", "consumo_kwh"],
+                   [[m, 1.0e6] for m in MESES_4_ANOS])
+    assert g["tipo"] == "barras" and len(g["categorias"]) == 24 and g["omitidos"] == 24
+    assert g["nota"].startswith("Barras mostram até 24 meses: aparecem os últimos 24 (jul/2024 a jun/2026); "
+                                "os 24 anteriores estão em “Ver como tabela”.")
+
+
+def test_linhas_por_municipio_mostram_4_e_avisam_os_outros():
+    g, _ = grafico("Receita mensal por município em P2", ["mes_referencia", "municipio", "receita_total_brl"],
+                   [[mes, cidade, 1000.0 * (14 - i)] for mes in MESES_P2 for i, cidade in enumerate(CIDADES)])
+    assert g["tipo"] == "linhas" and len(g["categorias"]) == 12 and [s["nome"] for s in g["series"]] == CIDADES[:4]
+    assert g["nota"] == "O gráfico mostra os 4 municípios de maior valor; os outros 10 estão em “Ver como tabela”."
+
+
+def test_coluna_de_outra_unidade_fica_fora_com_aviso():
+    # Caso real: receita (R$) e consumo (kWh) por município; o consumo sumia sem aviso
+    g, _ = grafico("Receita e consumo por município em gráfico", ["municipio", "receita_energia_brl", "consumo_kwh"],
+                   [[c, v, v * 2] for c, v in MUNICIPIOS])
+    assert [s["nome"] for s in g["series"]] == ["Receita energia"] and g["unidade"] == "brl"
+    assert g["nota"] == "Consumo ficou fora do gráfico, que tem um eixo só (em R$); os valores estão em “Ver como tabela”."
+
+
+def test_mes_que_a_consulta_nao_trouxe_fica_em_branco_e_e_avisado():
+    meses = [m for m in MESES_P2 if m not in ("2025-08", "2026-05", "2026-06")]
+    g, _ = grafico("Consumo mensal em P2", ["mes_referencia", "consumo_kwh"], [[m, 1.0] for m in meses])
+    assert len(g["categorias"]) == 10  # sem SQL, o eixo vai do primeiro ao último mês que veio
+    r = resposta(["mes_referencia", "consumo_kwh"], [[m, 1.0] for m in meses],
+                 sql="SELECT ... WHERE mes_referencia BETWEEN '2025-07' AND '2026-06'")
+    g, _ = montar_grafico("Consumo mensal em P2", r)
+    assert g["categorias"] == MESES_P2 and g["series"][0]["valores"][1] is None
+    assert g["nota"] == ("A consulta não trouxe 3 meses (ago/2025, mai/2026 a jun/2026); no gráfico, ficam em branco.")
+
+
+def test_p1_e_p2_no_tempo_deixam_o_intervalo_em_branco():
+    p1 = [m for m in MESES_4_ANOS if m <= "2023-06"]
+    r = resposta(["mes_referencia", "consumo_kwh"], [[m, 1.0] for m in p1 + MESES_P2],
+                 sql="SELECT ... WHERE mes_referencia BETWEEN '2022-07' AND '2023-06' "
+                     "OR mes_referencia BETWEEN '2025-07' AND '2026-06'")
+    g, _ = montar_grafico("Consumo mensal de P1 e P2", r)
+    assert g["tipo"] == "linhas" and len(g["categorias"]) == 48
+    assert "A consulta não trouxe 24 meses (jul/2023 a jun/2025)" in g["nota"]
+
+
+def test_consulta_cortada_pelo_limit_avisa_que_o_grafico_pode_estar_incompleto():
+    linhas = [[mes, cidade, 1.0] for mes in MESES_P2 for cidade in CIDADES][:100]
+    r = resposta(["mes_referencia", "municipio", "consumo_kwh"], linhas,
+                 sql="SELECT ... WHERE mes_referencia BETWEEN '2025-07' AND '2026-06' ORDER BY 1 LIMIT 100;")
+    g, _ = montar_grafico("Consumo mensal por município em P2 em gráfico", r)
+    assert g["nota"].startswith("A consulta parou no limite de 100 linhas (LIMIT)")
+    assert "não trouxe" not in g["nota"]
+
+
+def test_barras_por_categoria_acima_de_20_avisam_quantas_ficaram_de_fora():
+    g, _ = grafico("gráfico de barras", ["municipio", "consumo_kwh"], [[f"CIDADE {i:02d}", 100.0 - i] for i in range(25)])
+    assert g["nota"] == "Aparecem os 20 primeiros municípios; os outros 5 estão em “Ver como tabela”."
+
+
+# ---------- todas as linhas da consulta (a resposta leva só 50) ----------
+
+
+def test_ponte_monta_o_grafico_com_todas_as_linhas_e_manda_a_tabela_completa(monkeypatch):
+    # Caso real: 14 municípios × 12 meses = 168 linhas; com as 50 primeiras, o gráfico parava em out/2025
+    from app.ai.contratos import ResultadoConsulta
+    monkeypatch.setattr(ia_service.interacao_repository, "carregar_historico", lambda db, c: [])
+    monkeypatch.setattr(ia_service.interacao_repository, "registrar", lambda *a: None)
+    monkeypatch.setattr("app.repositories.gold_metadata.GOLD_SOURCE", "seed")
+    colunas = ["mes_referencia", "municipio", "receita_total_brl"]
+    linhas = [[mes, cidade, 1000.0 * (14 - i)] for mes in MESES_P2 for i, cidade in enumerate(CIDADES)]
+
+    def executar(sql):
+        return ResultadoConsulta(colunas=colunas, linhas=linhas, n_linhas=len(linhas))
+
+    def responder(pergunta, executar_sql_fn, **k):
+        executar_sql_fn("SELECT ... (outra consulta)")
+        resultado = executar_sql_fn("SELECT ...")
+        r = resposta(colunas, resultado.linhas[:50])
+        r["resposta"] = "Evolução mensal. (Mostrando os primeiros 50 de 168 registros no total.)"
+        r["metadados"]["observacoes"] = ["Exibindo as primeiras 50 linhas de um total de 168 registros encontrados."]
+        return r
+
+    agente = AgenteReal(responder=responder, executar_sql=executar, sessao=nullcontext)
+    corpo = agente.perguntar(ia_service.PerguntaIA(pergunta="Receita mensal por município em P2 em gráfico de linhas"))
+    RespostaIA.model_validate(corpo)
+    assert corpo["grafico"]["tipo"] == "linhas" and len(corpo["grafico"]["categorias"]) == 12
+    assert len(corpo["dados"]["linhas"]) == 168
+    assert corpo["resposta"] == "Evolução mensal."
+    assert not any("primeiras 50" in o for o in corpo["metadados"]["observacoes"])
+
+
+def test_resultado_completo_so_vale_para_a_consulta_da_resposta_e_sem_corte():
+    from app.ai.contratos import ResultadoConsulta
+    r = resposta(["municipio", "consumo_kwh"], [["RECIFE", 1.0]])
+    outra = ResultadoConsulta(colunas=["municipio", "receita_brl"], linhas=[["RECIFE", 1.0], ["OLINDA", 2.0]])
+    certa = ResultadoConsulta(colunas=["municipio", "consumo_kwh"], linhas=[["RECIFE", 1.0], ["OLINDA", 2.0]])
+    cortada = certa.model_copy(update={"truncado": True})
+    assert ia_service.resultado_completo(r, [certa, outra]) == [["RECIFE", 1.0], ["OLINDA", 2.0]]
+    assert ia_service.resultado_completo(r, [cortada]) is None
+    assert ia_service.resultado_completo(r, [outra]) is None
+
+
+def test_sem_grafico_a_tabela_continua_com_50_linhas():
+    linhas = [[f"CIDADE {i:03d}", float(i)] for i in range(60)]
+    r = resposta(["municipio", "consumo_kwh"], linhas[:50])
+    ia_service.acrescentar_grafico("Consumo por município", r, linhas)
+    assert "grafico" not in r and len(r["dados"]["linhas"]) == 50
+
+
+def test_erro_ao_montar_o_grafico_so_tira_o_grafico(monkeypatch):
+    monkeypatch.setattr(grafico_ia, "montar_grafico", lambda p, r: ({"tipo": "radar"}, None))
+    r = resposta(["municipio", "consumo_kwh"], MUNICIPIOS)
+    ia_service.acrescentar_grafico("gráfico", r)
+    assert "grafico" not in r and r["apresentacao"] == "tabela"
+
+
+@pytest.mark.parametrize("pergunta, tipo", [("Faça um gráfico de pizza da receita", "pizza"),
+                                            ("gráfico de linhas da receita", "linhas"),
+                                            ("Me mostra um gráfico de barras", "barras")])
+def test_modo_mock_responde_com_um_exemplo_de_cada_tipo(pergunta, tipo):
+    app.dependency_overrides[obter_agente] = lambda: ia_service.AgenteMock()
+    try:
+        corpo = TestClient(app).post("/ia", json={"pergunta": pergunta}).json()
+    finally:
+        app.dependency_overrides.pop(obter_agente, None)
+    assert corpo["apresentacao"] == "grafico" and corpo["grafico"]["tipo"] == tipo

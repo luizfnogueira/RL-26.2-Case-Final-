@@ -15,6 +15,8 @@ export default function AssistenteProvider({ children }: { children: ReactNode }
   const [enviando, setEnviando] = useState(false)
   const [painelAberto, setPainelAberto] = useState(false)
   const emAndamento = useRef<AbortController | null>(null)
+  // Id criado pelo backend na primeira resposta; reenviado para o agente lembrar a conversa.
+  const conversaId = useRef<string | null>(null)
 
   useEffect(() => () => emAndamento.current?.abort(), [])
 
@@ -25,7 +27,8 @@ export default function AssistenteProvider({ children }: { children: ReactNode }
     const trocar = (nova: Mensagem) =>
       setMensagens((atuais) => atuais.map((m) => (m.id === id ? nova : m)))
     try {
-      const resposta = await perguntarIA(pergunta, controlador.signal)
+      const resposta = await perguntarIA(pergunta, controlador.signal, conversaId.current)
+      conversaId.current = resposta.conversa_id ?? conversaId.current
       trocar({ id, autor: 'assistente', estado: 'resposta', pergunta, resposta })
     } catch (erro) {
       if (foiCancelada(erro)) return
@@ -77,9 +80,11 @@ export default function AssistenteProvider({ children }: { children: ReactNode }
     [mensagens, responder],
   )
 
+  // "Limpar conversa" também esquece o id: a próxima pergunta começa uma conversa nova no agente.
   const limpar = useCallback(() => {
     emAndamento.current?.abort()
     emAndamento.current = null
+    conversaId.current = null
     setEnviando(false)
     setMensagens([])
   }, [])

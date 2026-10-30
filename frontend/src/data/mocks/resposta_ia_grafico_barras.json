@@ -1,0 +1,181 @@
+{
+  "resposta": "No cenário fictício, a receita de energia residencial passou de R$ 98,4 milhões em P1 para R$ 104,1 milhões em P2; a comercial, de R$ 61,2 milhões para R$ 58,9 milhões.",
+  "sql": "SELECT classe, SUM(receita_energia_p1) AS receita_energia_p1_brl, SUM(receita_energia_p2) AS receita_energia_p2_brl FROM gold_receita_demo GROUP BY classe ORDER BY 3 DESC",
+  "tabelas": [
+    "gold_receita_demo"
+  ],
+  "dados": {
+    "colunas": [
+      "classe",
+      "receita_energia_p1_brl",
+      "receita_energia_p2_brl"
+    ],
+    "linhas": [
+      [
+        "RESIDENCIAL",
+        98400000.0,
+        104100000.0
+      ],
+      [
+        "COMERCIAL",
+        61200000.0,
+        58900000.0
+      ],
+      [
+        "INDUSTRIAL",
+        30500000.0,
+        31800000.0
+      ],
+      [
+        "RURAL",
+        9800000.0,
+        10400000.0
+      ],
+      [
+        "PODER PUBLICO",
+        7100000.0,
+        7600000.0
+      ]
+    ]
+  },
+  "status": "ok",
+  "gerado_em": "2026-10-21T09:12:00-03:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Resposta pré-definida do stub; não há agente conectado nem SQL executado."
+    ]
+  },
+  "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d",
+  "apresentacao": "grafico",
+  "detalhes_tecnicos": {
+    "estrutura_pensamento": {
+      "pergunta_interpretada": "Receita de energia (sem tributos) por classe, P1 × P2",
+      "plano": {
+        "tabelas": [
+          "gold_receita_demo"
+        ],
+        "colunas": [
+          "periodo",
+          "receita_faturada_brl"
+        ],
+        "filtros": [
+          "mes entre 2025-07 e 2026-06 ou entre 2022-07 e 2023-06"
+        ],
+        "agregacao": "SUM",
+        "ordenacao": "periodo DESC",
+        "limite": null,
+        "periodo": "P2 (2025-07 a 2026-06) e P1 (2022-07 a 2023-06)"
+      },
+      "skills": [
+        "receita"
+      ],
+      "premissas": [
+        "Receita faturada inclui tributos (soma de valor_total)."
+      ],
+      "justificativa": "Somei a receita faturada de cada janela padrão de comparação."
+    },
+    "acoes": [
+      {
+        "ordem": 1,
+        "ferramenta": "consultar_gold",
+        "argumentos": {
+          "sql": "SELECT CASE WHEN mes BETWEEN '2025-07' AND '2026-06' THEN '2025-07/2026-06' ELSE '2022-07/2023-06' END AS periodo,\n       SUM(receita_faturada) AS receita_faturada_brl\nFROM gold_receita_demo\nWHERE mes BETWEEN '2025-07' AND '2026-06'\n   OR mes BETWEEN '2022-07' AND '2023-06'\nGROUP BY 1\nORDER BY 1 DESC;"
+        },
+        "resumo_retorno": "2 linhas: periodo, receita_faturada_brl",
+        "sucesso": true
+      }
+    ],
+    "consulta": {
+      "sql_executado": "SELECT classe, SUM(receita_energia_p1) AS receita_energia_p1_brl, SUM(receita_energia_p2) AS receita_energia_p2_brl FROM gold_receita_demo GROUP BY classe ORDER BY 3 DESC",
+      "tentativas": 1,
+      "linhas": 5
+    },
+    "tokens_tempo": {
+      "tokens_entrada": 1840,
+      "tokens_saida": 212,
+      "tokens_raciocinio": 0,
+      "chamadas": 2,
+      "latencia_total_ms": 2350,
+      "etapas_ms": {
+        "ss_ms": 3,
+        "agente_ms": 2290,
+        "validacao_ms": 2
+      },
+      "modelo": "mock",
+      "provedor": "mock",
+      "cache": false
+    },
+    "verificacoes": {
+      "sql_validado": true,
+      "numeros_conferidos": true,
+      "confianca": "alta"
+    },
+    "avaliacao": {
+      "executado_em": "2026-10-30T18:00:00-03:00",
+      "n_perguntas": 40,
+      "configuracao": "skills por domínio · raciocínio baixo",
+      "acuracia_execucao": 0.85,
+      "taxa_invencao": 0.0,
+      "bloqueio_ataques": 1.0,
+      "f1_macro": 0.9,
+      "por_status": {
+        "ok": {
+          "precisao": 0.94,
+          "recall": 0.89,
+          "f1": 0.91
+        },
+        "nao_sei": {
+          "precisao": 0.8,
+          "recall": 0.89,
+          "f1": 0.84
+        },
+        "bloqueado": {
+          "precisao": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      }
+    }
+  },
+  "grafico": {
+    "tipo": "barras",
+    "titulo": "Receita de energia (sem tributos) por classe, P1 × P2",
+    "eixo": "categoria",
+    "orientacao": "horizontal",
+    "unidade": "brl",
+    "categorias": [
+      "RESIDENCIAL",
+      "COMERCIAL",
+      "INDUSTRIAL",
+      "RURAL",
+      "PODER PUBLICO"
+    ],
+    "series": [
+      {
+        "nome": "P1",
+        "valores": [
+          98400000.0,
+          61200000.0,
+          30500000.0,
+          9800000.0,
+          7100000.0
+        ]
+      },
+      {
+        "nome": "P2",
+        "valores": [
+          104100000.0,
+          58900000.0,
+          31800000.0,
+          10400000.0,
+          7600000.0
+        ]
+      }
+    ],
+    "origem": "pedido",
+    "omitidos": 0,
+    "nota": null
+  }
+}

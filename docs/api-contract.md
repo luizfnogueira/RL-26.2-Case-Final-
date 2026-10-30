@@ -330,14 +330,90 @@ Content-Type: application/json
 
 ```json
 {
-  "pergunta": "Qual foi a receita no período?"
+  "pergunta": "Qual foi a receita no período?",
+  "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d"
 }
 ```
 
+`conversa_id` (UUID) é opcional. Na primeira pergunta o front não envia o campo: o backend cria o id e o devolve na resposta. Nas perguntas seguintes, o front reenvia o mesmo id, e o agente usa as últimas trocas daquela conversa (até 3, guardadas no servidor) para entender perguntas de continuação ("E só comercial?"). Em conversa mais longa, ele recebe também a lista das 10 perguntas anteriores, montada pelo backend a partir do log (sem chamar o modelo e sem sair do servidor), para responder "qual foi o primeiro município que perguntei?". “Limpar conversa” no front começa uma conversa nova. Um id desconhecido ou expirado (mais de 2 h sem perguntas) abre uma conversa nova, sem erro.
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_ia.json)**
 
-Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
+Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`, `esclarecer`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
+
+Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem eles continuam válidos:
+
+| Campo | Tipo | Para quê |
+| --- | --- | --- |
+| `conversa_id` | UUID | Memória da conversa (ver acima). |
+| `apresentacao` | `"texto"`, `"tabela"` ou `"grafico"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. Com `grafico`, a Tela 7 desenha o campo `grafico` (abaixo) e `dados` leva todas as linhas da consulta (até 500). |
+| `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
+| `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
+| `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
+
+**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta dois casos:
+
+| Caso | Exemplo | Opções |
+| --- | --- | --- |
+| Bairro que existe em 2 municípios ou mais, sem nenhum município na pergunta. A troca anterior só resolve numa continuação ("E no Centro?") logo depois de uma pergunta com um município só | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 10) e "Todos os municípios juntos". Um município citado resolve, mesmo sem esse bairro: aí o agente responde que não há dados |
+| "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
+
+```json
+{
+  "status": "esclarecer",
+  "resposta": "O bairro Centro existe em 3 municípios. De qual você quer saber?",
+  "esclarecimento": {
+    "pergunta": "O bairro Centro existe em 3 municípios. De qual você quer saber?",
+    "opcoes": [
+      {"rotulo": "Centro de Recife", "pergunta": "Qual a receita do Centro (bairro Centro, em Recife)?"},
+      {"rotulo": "Todos os municípios juntos", "pergunta": "Qual a receita do Centro (bairro Centro, somando todos os municípios)?"}
+    ]
+  }
+}
+```
+
+`opcoes` tem de 2 a 11 itens. Cada `pergunta` já vem completa: o front a envia como uma pergunta nova, na mesma conversa, e ela não pede esclarecimento de novo. A troca `esclarecer` vai para o log em `ia.interacao`, mas não entra na memória da conversa. [Exemplo completo (bairro)](../backend/app/services/fixtures/resposta_ia_esclarecer.json), [exemplo do ano](../backend/app/services/fixtures/resposta_ia_esclarecer_ano.json).
+
+**Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Com gráfico, `dados` leva todas as linhas da consulta (até 500, o limite da ferramenta), não só as 50 da tabela: o gráfico é montado com todas, e o "Ver como tabela" da Tela 7 mostra `dados` inteiro, com as colunas e linhas que ficaram fora do desenho. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
+
+| Situação | Gráfico |
+| --- | --- |
+| Comparação P1 × P2 (colunas `..._p1`/`..._p2` ou coluna `periodo`), sem pedido | Barras: verticais com P1 e P2; horizontais com P1 e P2 lado a lado quando há uma categoria. Ordem natural (P1 → P2), categorias do maior para o menor pelo P2 |
+| Série no tempo (`mes_referencia`, `ano`, `mes`, `data_*`), sem pedido | Linhas com 3 meses ou mais, até 48 pontos e 4 linhas; 2 pontos viram barras verticais (até 24). O eixo mensal vai do primeiro ao último mês, ou até a faixa `BETWEEN` do SQL; mês que a consulta não trouxe é `null` (buraco na linha) e é citado em `nota` |
+| Pessoa pede "gráfico", "barras", "pizza" ou "linhas" | O tipo pedido quando faz sentido. Categorias viram barras horizontais, do maior para o menor (ou na ordem do SQL, quando já vem ordenada), até 20. "Barra" no singular (bairro Barra de Jangada) e "linhas de distribuição" não contam como pedido |
+| Pizza pedida | Só com totais somáveis (receita, kWh, contagens), nunca médias, taxas, DEC ou percentuais; até 5 fatias, da maior para a menor, com "Outros" no fim. Fatias quase iguais, médias, valores negativos, períodos ou indicadores diferentes viram barras, e a `nota` começa com "Você pediu pizza, mas o gráfico está em barras:" seguido do motivo |
+| Linhas pedidas sem tempo | Barras, com a explicação em `nota` |
+| Ranking ou lista sem pedido, ou um número só | Sem gráfico (tabela ou texto). Com pedido e um número só, `metadados.observacoes` explica |
+
+Campos de `grafico`:
+
+| Campo | Valores | Para quê |
+| --- | --- | --- |
+| `tipo` | `barras`, `pizza`, `linhas` | Forma do gráfico |
+| `titulo` | texto (até 150) | A pergunta interpretada, sem a menção ao gráfico ("formatado para gráfico de pizza") e cortada numa palavra inteira |
+| `eixo` | `categoria`, `tempo`, `periodo` | Como o front formata as categorias: nomes da Gold (`formatarNome`), meses (`2025-07` → `Jul/2025`) ou P1/P2 como estão |
+| `orientacao` | `horizontal`, `vertical` ou `null` | Obrigatória nas barras; `null` na pizza e nas linhas |
+| `unidade` | `brl`, `kwh`, `pct`, `h` ou `null` | Uma unidade por gráfico, pelo sufixo do alias do SQL; nunca dois eixos |
+| `categorias` | 1 a 48 textos | Eixo das barras e das linhas, ou as fatias |
+| `series` | 1 a 4 itens `{nome, valores[]}` | Um valor (número ou `null`) por categoria, na mesma ordem. Pizza: 1 série, sem negativos nem `null` |
+| `origem` | `automatico`, `pedido` | Se veio da forma dos dados ou de um pedido da pessoa |
+| `omitidos` | inteiro ≥ 0 | Categorias ou séries fora do limite; a tabela completa segue em `dados` ("Ver como tabela") e no CSV |
+| `nota` | texto ou `null` | Por que o tipo pedido não foi usado (ex.: pizza de média) e o que ficou fora do desenho: meses além do limite ("aparecem os últimos 24"), municípios além de 4 linhas, colunas de outra unidade ("Consumo ficou fora do gráfico, que tem um eixo só"), meses que a consulta não trouxe e consulta cortada por `LIMIT`. A Tela 7 mostra a nota acima do gráfico |
+
+Exemplos completos (valores fictícios): [barras P1 × P2](../backend/app/services/fixtures/resposta_ia_grafico_barras.json), [pizza](../backend/app/services/fixtures/resposta_ia_grafico_pizza.json), [linhas](../backend/app/services/fixtures/resposta_ia_grafico_linhas.json). Um gráfico que não passe nessas regras é descartado e a resposta sai como tabela ou texto, nunca 503.
+
+Blocos de `detalhes_tecnicos`. Campos novos da telemetria são aceitos e o front os ignora:
+
+| Bloco | Conteúdo |
+| --- | --- |
+| `estrutura_pensamento` | `pergunta_interpretada`, `plano` (`tabelas`, `colunas`, `filtros`, `agregacao`, `ordenacao`, `limite`, `periodo`), `skills`, `premissas` e `justificativa` (declarada pelo modelo, e assim rotulada na tela) |
+| `acoes[]` | Ferramentas chamadas pelo agente, em ordem: `ordem`, `ferramenta`, `argumentos`, `resumo_retorno`, `sucesso` |
+| `consulta` | `sql_executado`, `tentativas` e `linhas` |
+| `tokens_tempo` | `tokens_entrada`, `tokens_saida`, `tokens_raciocinio`, `chamadas`, `latencia_total_ms`, `etapas_ms{}`, `modelo`, `provedor` e `cache` |
+| `verificacoes` | `sql_validado`, `numeros_conferidos` e `confianca` (`alta`, `media` ou `baixa`) |
+| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). |
+
+As métricas de `avaliacao` medem o conjunto de perguntas com gabarito, não esta resposta. As verificações desta resposta ficam em `verificacoes`.
 
 Cenários demonstrativos:
 
@@ -346,13 +422,17 @@ Cenários demonstrativos:
 | Qual foi a receita no período? | ok — exemplo acima |
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
+| Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
+| Qual a receita do Centro? / Qual foi a receita deste ano? | esclarecer — exemplos acima (no mock, "Centro" é um bairro fictício de Recife, Olinda e Paulista) |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
-- `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
-- `real`: a pergunta vai para o agente, que gera e executa a consulta somente leitura na Gold.
+- `mock` (padrão): os cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
+- `real`: a pergunta vai para o agente PydanticAI da Equipe 3, que roda dentro do backend, sem chamada HTTP. Ele gera e executa a consulta somente leitura na Gold, com o usuário do banco próprio do agente. A API carrega as últimas trocas da conversa e grava cada resposta, inclusive `bloqueado` e `nao_sei`, em `ia.interacao`, que também serve de log de auditoria.
 
-Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. Chaves e endereço do agente ficam só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos; validar os nomes reais com a Equipe 3.
+**Respostas pré-calculadas.** Em `IA_MODO=real`, uma resposta `ok` de pergunta sem histórico fica guardada em `ia.resposta_cache`, por versão da Gold. Uma pergunta nova igual ou muito parecida (texto 90% semelhante, sem acento, pontuação e palavras vazias) e com os mesmos nomes da Gold, números, P1/P2, meses e qualificadores (maior/menor, média/total, gráfico) recebe essa resposta sem chamar o modelo. "Receita comercial em Jaboatão" e "em Olinda" nunca se confundem. No reaproveitamento, `detalhes_tecnicos.tokens_tempo.cache` vem `true`, com tokens e chamadas zerados, e `metadados.observacoes` cita a pergunta original. O gráfico é montado de novo para a pergunta nova. Recarregar a Gold esvazia o cache; `AI_CACHE_ENABLED=0` desliga.
+
+Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` (o agente tem 5 s a menos, para sobrar tempo de gravar) ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. A chave do modelo fica só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos.
 
 ## 10. POST /ia/insight — Telas 2 e 3
 
@@ -427,9 +507,9 @@ Resposta separada do chat: `titulo`, `texto`, `numeros_utilizados[]` (nome, rót
 
 Receita usa **seis números**: receita de energia atual, receita de energia base, variação do volume, reajuste, efeito-preço e efeito-volume (os mesmos da `ponte_receita` e dos KPIs do `GET /dashboard`, lidos da Gold). Os números enviados são opcionais; se presentes, precisam corresponder aos da Gold para o recorte (senão 422 `DADOS_INVALIDOS`). A API nunca confia em valores do navegador nem do módulo de IA: os números da resposta são sempre os da Gold.
 
-**Insight da receita (B5).** Só existe para `periodo_atual=2025-07/2026-06` × `periodo_comparacao=2022-07/2023-06`, sem `alimentador` e em recorte com decomposição na Gold; fora disso, 422 `DECOMPOSICAO_INDISPONIVEL`. Nomes de município e bairro vão como estão no banco (a Gold usa maiúsculas, ex.: `RECIFE`, `BOA VISTA`). O texto vem do módulo da Equipe 3 (`IA_MODO=real`, `IA_INSIGHT_URL`, `IA_TIMEOUT_S`) ou de um texto por regra (`IA_MODO=mock`). **Diferente do chat, falha do módulo não vira 503:** fora do ar, lento além do `IA_TIMEOUT_S`, erro HTTP ou resposta fora de `{titulo, texto}` devolvem 200 com um texto alternativo montado por regra sobre os mesmos números, e `metadados.observacoes` ganha uma linha começando por `Texto alternativo:`. O front usa esse prefixo para não rotular o texto como gerado por IA.
+**Insight da receita (B5).** Só existe para `periodo_atual=2025-07/2026-06` × `periodo_comparacao=2022-07/2023-06`, sem `alimentador` e em recorte com decomposição na Gold; fora disso, 422 `DECOMPOSICAO_INDISPONIVEL`. Nomes de município e bairro vão como estão no banco (a Gold usa maiúsculas, ex.: `RECIFE`, `BOA VISTA`). O texto vem do agente de insight da Equipe 3 (`IA_MODO=real`, dentro do backend, com prazo de `IA_TIMEOUT_S` − 5 s) ou de um texto por regra (`IA_MODO=mock`). **Diferente do chat, falha do módulo não vira 503:** fora do ar, lento além do `IA_TIMEOUT_S`, erro HTTP ou resposta fora de `{titulo, texto}` devolvem 200 com um texto alternativo montado por regra sobre os mesmos números, e `metadados.observacoes` ganha uma linha começando por `Texto alternativo:`. O front usa esse prefixo para não rotular o texto como gerado por IA.
 
-Formato assumido para o módulo da Equipe 3 (a confirmar até 29/10): `POST IA_INSIGHT_URL` com `{contexto, filtros, numeros_utilizados[]}` e `Authorization: Bearer IA_API_KEY`, resposta `{titulo, texto}`.
+Agente de insight (GENAI-25, `backend/app/ai/insights.py`): recebe os seis números já formatados (mais o recorte e os períodos) e escreve título e texto com marcadores, como `{efeito_preco}`. O código troca cada marcador pelo valor da Gold, então nenhum número do texto sai do modelo. Algarismo fora de marcador ou marcador inexistente pedem uma nova tentativa; se o erro se repetir, vale o texto alternativo. `IA_INSIGHT_URL` não é mais usada.
 
 Para UC360:
 
