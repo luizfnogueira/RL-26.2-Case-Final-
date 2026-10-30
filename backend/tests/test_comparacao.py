@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from app.core.config import GOLD_SOURCE
 from app.db import seed
 from app.db.session import get_db
 from app.main import app
@@ -21,6 +22,11 @@ from app.services.stubs import PERIODO_ATUAL as PA, PERIODO_COMPARACAO as PC, ex
 
 PERIODOS = {'periodo_atual': PA, 'periodo_comparacao': PC}
 URL_TESTE = os.getenv('TEST_DATABASE_URL')
+
+
+def proveniencia_do_seed(db, tabela, observacao_seed):
+    """Sem banco: a proveniência do seed, também com GOLD_SOURCE=real no .env."""
+    return {'dados_ficticios': True, 'gold_atualizada_em': None, 'observacoes': [observacao_seed]}
 
 
 def test_exemplo_do_contrato_segue_o_schema():
@@ -113,9 +119,7 @@ class TestCalculo:
                 return indicadores_falsos((None, None), (None, None), (0, 0), aberto=(None, None), dec=(None, None))
             return indicadores_falsos((Decimal(1200), Decimal(1200)), (Decimal(10), Decimal(10)), (1, 1))
         monkeypatch.setattr(comparacao_service, 'montar_indicadores', falso)
-        # Sem banco: a proveniência é a do seed, também com GOLD_SOURCE=real no .env
-        monkeypatch.setattr(comparacao_service, 'metadados_gold', lambda db, tabela, obs: {
-            'dados_ficticios': True, 'gold_atualizada_em': None, 'observacoes': [obs]})
+        monkeypatch.setattr(comparacao_service, 'metadados_gold', proveniencia_do_seed)
         f = FiltrosComparacao(**PERIODOS, nivel='municipio', itens=['RECIFE', 'NAO EXISTE', 'OLINDA'])
         resposta = comparacao_service.montar_comparacao(None, f)
         Comparacao.model_validate(resposta)
@@ -147,6 +151,8 @@ def client():
 
 
 @pytest.mark.skipif(not URL_TESTE, reason='defina TEST_DATABASE_URL para testar contra o PostgreSQL')
+@pytest.mark.skipif(GOLD_SOURCE == 'real', reason='conferência sobre o banco do seed: com GOLD_SOURCE=real a API '
+                    'lê tabelas que só a Gold importada tem (agg_receita_mensal, _carga_metadata); rode com seed')
 class TestContraODashboard:
     def comparar(self, client, nivel, itens, **pais):
         comparacao = client.get('/dashboard/comparacao',

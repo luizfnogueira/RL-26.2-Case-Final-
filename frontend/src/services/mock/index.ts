@@ -1,6 +1,7 @@
 ﻿// Mock da API V2: atende as mesmas rotas e erros do stub do backend, sem rede. Carregado sob
 // demanda por services/http.ts quando VITE_USE_MOCKS=true.
 import type { Metodo, OpcoesRequisicao } from '../http'
+import { montarComparacao } from './comparacao'
 import { montarDashboard } from './dashboard'
 import { listarFiltros } from './filtros'
 import { gerarInsightMock, responderPergunta } from './ia'
@@ -40,7 +41,7 @@ export async function atenderMock(
       return { status: 'ok' }
     case 'dashboard':
       exigirMetodo(metodo, 'GET')
-      return montarDashboard(consulta)
+      return segundo === 'comparacao' ? montarComparacao(consulta) : montarDashboard(consulta)
     case 'filtros':
       exigirMetodo(metodo, 'GET')
       return listarFiltros()

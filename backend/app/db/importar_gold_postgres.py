@@ -158,11 +158,28 @@ def import_gold(engine, source, batch_size=5000, migrate_legacy=False, after_pub
                 'ON CONFLICT (tabela) DO UPDATE SET metadata_json=EXCLUDED.metadata_json'
             ), {'tabela': name, 'meta': json.dumps(meta[name])})
         LOG.info('Validacao final concluida. COMMIT da Gold; nenhuma escrita em portal.')
-    # Fora da transação: estatísticas novas e mapa de visibilidade, para o index-only scan valer já.
-    # PARALLEL 0: o /dev/shm padrão do Docker (64 MB) não comporta o vacuum paralelo da fato_uc_mes.
-    with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as conn:
-        conn.execute(text('VACUUM (PARALLEL 0, ANALYZE) gold."fato_uc_mes"'))
+    otimizar_leitura(engine)
     return counts
+
+
+VACUUM_FATO = 'VACUUM (PARALLEL 0, ANALYZE) gold."fato_uc_mes"'
+
+
+def otimizar_leitura(engine):
+    """Depois do COMMIT: estatísticas novas e mapa de visibilidade, para o index-only scan valer já.
+
+    PARALLEL 0: o /dev/shm padrão do Docker (64 MB) não comporta o vacuum paralelo da fato_uc_mes.
+    A Gold já está publicada: uma falha aqui só deixa as consultas mais lentas até o autovacuum,
+    então vira aviso, sem derrubar a carga.
+    """
+    try:
+        with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as conn:
+            conn.execute(text(VACUUM_FATO))
+    except Exception as exc:
+        # Como no main(): a mensagem do driver não é impressa.
+        LOG.warning('Gold publicada com sucesso, mas o VACUUM ANALYZE da fato_uc_mes falhou (%s). '
+                    'As consultas funcionam; para acelerá-las já, rode no banco: %s;',
+                    type(exc).__name__, VACUUM_FATO)
 
 
 def main():
