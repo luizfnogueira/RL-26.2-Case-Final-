@@ -18,6 +18,23 @@ from app.services.stubs import PERIODO_ATUAL as PA
 
 DADOS = seed.gerar(n_ucs=60, semente=21)
 
+# O sorteio do seed não garante linha inelegível (com esta semente a fila sai 100% ELEGIVEL).
+# Força uma UC que ficou fora da fila como DESCLASSIFICADO para exercitar o filtro do endpoint.
+_na_fila = {linha["id_uc"] for linha in DADOS[gold.FilaPerdas]}
+_uc_livre = next(
+    uc["id_uc"] for uc in DADOS[gold.UnidadeConsumidora] if uc["id_uc"] not in _na_fila
+)
+DADOS[gold.FilaPerdas].append({
+    "id_uc": _uc_livre,
+    "posicao_fila": None,
+    "status_triagem": "DESCLASSIFICADO",
+    "acao_recomendada": "NAO_APLICAVEL",
+    "score": Decimal("50.00"),
+    "kwh_estimado": Decimal("100.00"),
+    "motivos_json": "[]",
+    "confianca_evidencia": "INDETERMINADA",
+})
+
 
 class RepositorioFalso:
     def __init__(self) -> None:
