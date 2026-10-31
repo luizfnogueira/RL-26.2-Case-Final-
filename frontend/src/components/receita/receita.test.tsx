@@ -243,12 +243,13 @@ describe('sem decomposição na Gold (fora de P1 × P2 ou com alimentador)', () 
 })
 
 describe('nomes em maiúsculas vindos do banco', () => {
+  const indicador = (valor: number, unidade: string) => ({
+    valor,
+    unidade,
+    periodo_referencia: ATUAL,
+  })
+
   it('a tabela e o breadcrumb mostram "Boa Vista", mas a URL leva o valor do banco', () => {
-    const indicador = (valor: number, unidade: string) => ({
-      valor,
-      unidade,
-      periodo_referencia: ATUAL,
-    })
     const linha = {
       nivel: 'bairro' as const,
       nome: 'BOA VISTA',
@@ -265,27 +266,93 @@ describe('nomes em maiúsculas vindos do banco', () => {
     const vazio = { municipio: null, bairro: null, classe: null }
     const selecionadas: unknown[] = []
     render(
-      <DrillDownReceita
-        drill={{
-          nivel: 'bairro',
-          page: 1,
-          page_size: 10,
-          total: 1,
-          items: [linha],
-          breadcrumb: [
-            { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
-            { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
-          ],
-        }}
-        aoSelecionar={(l) => selecionadas.push(l.filtros)}
-        aoNavegar={() => undefined}
-        aoMudarPagina={() => undefined}
-      />,
+      <MemoryRouter>
+        <DrillDownReceita
+          drill={{
+            nivel: 'bairro',
+            page: 1,
+            page_size: 10,
+            total: 1,
+            items: [linha],
+            breadcrumb: [
+              { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
+              { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
+            ],
+          }}
+          aoSelecionar={(l) => selecionadas.push(l.filtros)}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+        />
+      </MemoryRouter>,
     )
     expect(screen.getByRole('cell', { name: 'Boa Vista' })).toBeTruthy()
     expect(screen.getByText('Recife')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
     fireEvent.click(screen.getByRole('cell', { name: 'Boa Vista' }))
     expect(selecionadas).toEqual([{ municipio: 'RECIFE', bairro: 'BOA VISTA', classe: null }])
+  })
+
+  it('botão "Comparar" no drill-down leva os itens visíveis para a aba de comparação', () => {
+    function Rastreador() {
+      const loc = useLocation()
+      return <output aria-label="Endereço">{loc.pathname + loc.search}</output>
+    }
+
+    const linha1 = {
+      nivel: 'bairro' as const,
+      nome: 'BOA VISTA',
+      receita_energia_atual: indicador(10, 'BRL'),
+      receita_energia_comparacao: indicador(9, 'BRL'),
+      energia_atual: indicador(90, 'kWh'),
+      energia_comparacao: indicador(100, 'kWh'),
+      variacao_energia_percentual: indicador(-10, '%'),
+      queda_kwh: indicador(10, 'kWh'),
+      efeito_preco: indicador(2, 'BRL'),
+      efeito_volume: indicador(-1, 'BRL'),
+      filtros: { municipio: 'RECIFE', bairro: 'BOA VISTA', classe: null },
+    }
+    const linha2 = {
+      ...linha1,
+      nome: 'BOA VIAGEM',
+      filtros: { municipio: 'RECIFE', bairro: 'BOA VIAGEM', classe: null },
+    }
+    const vazio = { municipio: null, bairro: null, classe: null }
+
+    render(
+      <MemoryRouter initialEntries={['/receita']}>
+        <DrillDownReceita
+          drill={{
+            nivel: 'bairro',
+            page: 1,
+            page_size: 10,
+            total: 2,
+            items: [linha1, linha2],
+            breadcrumb: [
+              { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
+              { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
+            ],
+          }}
+          periodoAtual="2025-07/2026-06"
+          periodoComparacao="2022-07/2023-06"
+          aoSelecionar={() => undefined}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+        />
+        <Rastreador />
+      </MemoryRouter>,
+    )
+
+    const botao = screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement
+    expect(botao.disabled).toBe(false)
+    fireEvent.click(botao)
+    const endereco = screen.getByLabelText('Endereço').textContent ?? ''
+    expect(endereco).toContain('/painel?aba=comparar')
+    expect(endereco).toContain('nivel=bairro')
+    expect(endereco).toContain('municipio=RECIFE')
+    expect(endereco).toContain('itens=BOA+VISTA')
+    expect(endereco).toContain('itens=BOA+VIAGEM')
   })
 })
 

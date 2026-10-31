@@ -19,6 +19,7 @@ function validar(params: Registro) {
   if (!nivel || !NIVEIS.includes(nivel))
     throw invalido('nivel deve ser municipio, bairro ou classe.')
   const bruto = params.itens
+  // Como a API: cada item é um parâmetro repetido; "A,B" é um item só
   const itens = (Array.isArray(bruto) ? bruto : bruto ? [bruto] : []).map((i) => String(i).trim())
   if (itens.length < 2 || itens.length > 4) throw invalido('Informe de 2 a 4 itens.')
   if (new Set(itens).size !== itens.length) throw invalido('itens repetidos.')
