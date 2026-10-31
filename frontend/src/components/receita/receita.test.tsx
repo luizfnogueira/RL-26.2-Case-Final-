@@ -445,6 +445,44 @@ describe('ReceitaPage (com mocks)', () => {
     expect(screen.getByText('Ordenado pela perda de receita por volume')).toBeTruthy()
   })
 
+  it('com classe ativa, "Comparar" fica desabilitado e explica que a comparação não aplica a classe', async () => {
+    abrir('/receita?classe=Residencial')
+    expect(await screen.findByRole('columnheader', { name: 'Município' })).toBeTruthy()
+    const comparar = screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement
+    expect(comparar.disabled).toBe(true)
+    expect(comparar.title).toMatch(/não aplica o filtro de classe/)
+    // O aviso também aparece como texto, para quem não consegue passar o mouse no botão
+    expect(screen.getByText('Comparar não aplica o filtro de classe')).toBeTruthy()
+  })
+
+  it('escolher um bairro tira o "ver" da URL: voltar pelo breadcrumb mostra os bairros', async () => {
+    const { busca } = abrir('/receita?municipio=Recife&bairro=Boa+Viagem&ver=classe')
+    expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
+    await waitFor(() => expect(busca()).not.toContain('ver='))
+    const caminho = screen.getByRole('navigation', { name: 'Caminho do drill-down' })
+    fireEvent.click(within(caminho).getByRole('button', { name: 'Recife' }))
+    expect(await screen.findByRole('columnheader', { name: 'Bairro' })).toBeTruthy()
+  })
+
+  it('sem perda por volume no recorte, o bloco das maiores perdas diz isso', async () => {
+    const dados = await consolidado()
+    const semPerda = dados.drill_down.items.map((l) => ({
+      ...l,
+      efeito_volume: { ...l.efeito_volume, valor: Math.abs(l.efeito_volume.valor ?? 0) },
+    }))
+    render(
+      <MemoryRouter>
+        <DrillDownReceita
+          drill={{ ...dados.drill_down, items: semPerda }}
+          aoSelecionar={() => undefined}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Nenhuma perda por volume neste recorte.')).toBeTruthy()
+  })
+
   it('com bairro escolhido, o seletor "Ver por" some: já é o ranking de classes do bairro', async () => {
     abrir('/receita?municipio=OLINDA&bairro=RIO+DOCE')
     expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()

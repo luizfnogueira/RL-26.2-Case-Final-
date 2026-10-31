@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
 import AnaliseIA from '@/components/receita/AnaliseIA'
@@ -44,6 +44,20 @@ export default function ReceitaPage() {
   // O nível do drill-down acompanha os filtros: sem município lista municípios, e assim por diante.
   // Com "Ver por: Classes" (ver=classe na URL), lista as classes do recorte sem precisar descer até o bairro.
   const visao: Visao = params.get('ver') === 'classe' && !bairro ? 'classe' : 'regiao'
+  const verNaUrl = params.get('ver')
+
+  // Com bairro escolhido a tabela já é de classes: o "ver" sai da URL para o breadcrumb voltar aos bairros
+  useEffect(() => {
+    if (!bairro || !verNaUrl) return
+    setParams(
+      (atual) => {
+        const novo = new URLSearchParams(atual)
+        novo.delete('ver')
+        return novo
+      },
+      { replace: true },
+    )
+  }, [bairro, verNaUrl, setParams])
   const nivel: NivelDrill =
     visao === 'classe' ? 'classe' : !municipio ? 'municipio' : !bairro ? 'bairro' : 'classe'
 
@@ -184,6 +198,7 @@ export default function ReceitaPage() {
             visao={visao}
             aoMudarVisao={bairro ? undefined : mudarVisao}
             podeDescer={visao === 'classe' || undefined}
+            classeAtiva={classe}
             aoSelecionar={(linha) =>
               visao === 'classe'
                 ? filtrarClasse(linha.nome)

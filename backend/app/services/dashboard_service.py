@@ -172,6 +172,12 @@ def sem_decomposicao(filtros: FiltrosDashboard) -> str | None:
     return None
 
 
+def _efeito(valor: Decimal | None) -> Decimal:
+    """Efeito de um recorte; nulo vale 0. Pela fórmula da gold_receita, o nulo só aparece com kWh zero nos dois
+    períodos, quando o efeito verdadeiro é 0. Assim a ponte e o drill continuam fechando entre si, sem 500."""
+    return valor or 0
+
+
 def montar_ponte(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dict:
     """Cascata da receita de energia: comparação + efeito preço + efeito volume = atual (P1 → P2).
 
@@ -180,8 +186,8 @@ def montar_ponte(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
     if linhas:
         receita_comparacao = sum(linha.receita_energia_p1 for linha in linhas)
         receita_atual = sum(linha.receita_energia_p2 for linha in linhas)
-        efeito_preco = sum(linha.efeito_preco for linha in linhas)
-        efeito_volume = sum(linha.efeito_volume for linha in linhas)
+        efeito_preco = sum(_efeito(linha.efeito_preco) for linha in linhas)
+        efeito_volume = sum(_efeito(linha.efeito_volume) for linha in linhas)
         kwh_comparacao = sum(linha.kwh_p1 for linha in linhas)
         kwh_atual = sum(linha.kwh_p2 for linha in linhas)
     else:
@@ -227,8 +233,10 @@ def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
             "energia_comparacao": indicador(kwh_comparacao, "kWh", filtros.periodo_comparacao),
             "variacao_energia_percentual": indicador(variacao(kwh_atual, kwh_comparacao), "%", filtros.periodo_atual),
             "queda_kwh": indicador(kwh_comparacao - kwh_atual, "kWh", filtros.periodo_atual),
-            "efeito_preco": indicador(sum(linha.efeito_preco for linha in grupo), "BRL", filtros.periodo_atual),
-            "efeito_volume": indicador(sum(linha.efeito_volume for linha in grupo), "BRL", filtros.periodo_atual),
+            "efeito_preco": indicador(sum(_efeito(linha.efeito_preco) for linha in grupo), "BRL",
+                                      filtros.periodo_atual),
+            "efeito_volume": indicador(sum(_efeito(linha.efeito_volume) for linha in grupo), "BRL",
+                                       filtros.periodo_atual),
             "filtros": linha_filtros,
         })
     itens.sort(key=lambda item: (item["efeito_volume"]["valor"], item["nome"]))
