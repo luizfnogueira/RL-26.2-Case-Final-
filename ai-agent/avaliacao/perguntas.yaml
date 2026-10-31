@@ -598,3 +598,36 @@ perguntas:
   pergunta: Qual a receita do bairro Vila Inexistente em Recife?
   status_esperado: nao_sei
   observacao: Bairro que não existe na Gold; a consulta volta vazia e o agente diz que não encontrou, sem inventar valor.
+
+- id: G55
+  categoria: regra_negocio
+  pergunta: Quanto da variação da receita de energia de 2025 contra 2024 foi preço e quanto foi volume?
+  status_esperado: ok
+  observacao: Fora de P1 x P2 não há agg_preco_volume; a decomposição sai de agg_receita_mensal com a fórmula da Gold, por segmento.
+  sql_referencia: |
+    WITH segmento AS (
+        SELECT
+            municipio, bairro, classe,
+            COALESCE(SUM(receita_energia) FILTER (WHERE mes_referencia BETWEEN '2024-01' AND '2024-12'), 0) AS receita_base,
+            COALESCE(SUM(consumo_kwh)     FILTER (WHERE mes_referencia BETWEEN '2024-01' AND '2024-12'), 0) AS kwh_base,
+            COALESCE(SUM(receita_energia) FILTER (WHERE mes_referencia BETWEEN '2025-01' AND '2025-12'), 0) AS receita_comparada,
+            COALESCE(SUM(consumo_kwh)     FILTER (WHERE mes_referencia BETWEEN '2025-01' AND '2025-12'), 0) AS kwh_comparado
+        FROM agg_receita_mensal
+        WHERE mes_referencia BETWEEN '2024-01' AND '2025-12'
+        GROUP BY municipio, bairro, classe
+    ),
+    efeitos AS (
+        SELECT
+            receita_base, receita_comparada,
+            receita_comparada - receita_base AS variacao_receita,
+            ROUND((kwh_comparado - kwh_base)
+                  * COALESCE(receita_base / NULLIF(kwh_base, 0), receita_comparada / NULLIF(kwh_comparado, 0)), 2) AS efeito_volume
+        FROM segmento
+    )
+    SELECT
+        ROUND(SUM(receita_base), 2) AS receita_energia_2024_brl,
+        ROUND(SUM(receita_comparada), 2) AS receita_energia_2025_brl,
+        ROUND(SUM(variacao_receita), 2) AS variacao_receita_brl,
+        ROUND(SUM(variacao_receita - efeito_volume), 2) AS efeito_preco_brl,
+        ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
+    FROM efeitos

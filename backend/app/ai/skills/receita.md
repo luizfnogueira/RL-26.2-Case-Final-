@@ -16,7 +16,7 @@
   - `faturas` (int — quantidade de faturas emitidas)
   - `tarifa_media` (numeric, BRL/kWh)
 
-### `agg_preco_volume` (preferencial para decomposição da variação de receita entre P1 e P2)
+### `agg_preco_volume` (preferencial para decomposição da variação de receita entre P1 e P2; outros períodos: Exemplo 6)
 - **Grão:** `municipio` × `bairro` × `classe`.
 - **Colunas:**
   - `municipio`, `bairro`, `classe`
@@ -160,4 +160,40 @@ SELECT
     ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
 FROM agg_preco_volume
 LIMIT 1;
+```
+
+### Exemplo 6: Preço × volume fora de P1 e P2 (mesma fórmula da Gold)
+**Pergunta:** Quanto da variação da receita de energia de 2025 contra 2024 foi preço e quanto foi volume?
+`agg_preco_volume` só tem P1 × P2. Para outro par de períodos (anos civis, últimos 12 meses contra os 12 anteriores), calcule a decomposição em `agg_receita_mensal` por município × bairro × classe, como a Gold faz, e só depois some:
+- tarifa do segmento = `receita_energia / consumo_kwh` do período base (sem kWh no período base, use a do período comparado);
+- efeito-volume do segmento = `(kWh comparado − kWh base) × tarifa`, arredondado a 2 casas;
+- efeito-preço = variação da receita − efeito-volume (preço + volume fecham exatamente com a variação).
+Troque só os meses dos `FILTER`; para recortar por município, bairro ou classe, filtre no `WHERE` ou agrupe por eles no `SELECT` final.
+```sql
+WITH segmento AS (
+    SELECT
+        municipio, bairro, classe,
+        COALESCE(SUM(receita_energia) FILTER (WHERE mes_referencia BETWEEN '2024-01' AND '2024-12'), 0) AS receita_base,
+        COALESCE(SUM(consumo_kwh)     FILTER (WHERE mes_referencia BETWEEN '2024-01' AND '2024-12'), 0) AS kwh_base,
+        COALESCE(SUM(receita_energia) FILTER (WHERE mes_referencia BETWEEN '2025-01' AND '2025-12'), 0) AS receita_comparada,
+        COALESCE(SUM(consumo_kwh)     FILTER (WHERE mes_referencia BETWEEN '2025-01' AND '2025-12'), 0) AS kwh_comparado
+    FROM agg_receita_mensal
+    WHERE mes_referencia BETWEEN '2024-01' AND '2025-12'
+    GROUP BY municipio, bairro, classe
+),
+efeitos AS (
+    SELECT
+        receita_base, receita_comparada,
+        receita_comparada - receita_base AS variacao_receita,
+        ROUND((kwh_comparado - kwh_base)
+              * COALESCE(receita_base / NULLIF(kwh_base, 0), receita_comparada / NULLIF(kwh_comparado, 0)), 2) AS efeito_volume
+    FROM segmento
+)
+SELECT
+    ROUND(SUM(receita_base), 2) AS receita_energia_2024_brl,
+    ROUND(SUM(receita_comparada), 2) AS receita_energia_2025_brl,
+    ROUND(SUM(variacao_receita), 2) AS variacao_receita_brl,
+    ROUND(SUM(variacao_receita - efeito_volume), 2) AS efeito_preco_brl,
+    ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
+FROM efeitos;
 ```
