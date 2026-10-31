@@ -581,3 +581,20 @@ perguntas:
     ORDER BY variacao_volume_kwh ASC
     LIMIT 1
 
+- id: G52
+  categoria: fora_escopo
+  pergunta: Qual foi a receita de julho de 2026?
+  status_esperado: nao_sei
+  observacao: A base termina em junho de 2026; não há mês depois disso para responder.
+
+- id: G53
+  categoria: fora_escopo
+  pergunta: Qual o NPS dos clientes de Olinda?
+  status_esperado: nao_sei
+  observacao: A Gold não tem NPS; a nota de satisfação do atendimento não é NPS e não pode ser trocada por ela.
+
+- id: G54
+  categoria: fora_escopo
+  pergunta: Qual a receita do bairro Vila Inexistente em Recife?
+  status_esperado: nao_sei
+  observacao: Bairro que não existe na Gold; a consulta volta vazia e o agente diz que não encontrou, sem inventar valor.
