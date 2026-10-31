@@ -288,3 +288,26 @@ def test_t5_telemetria_registra_tokens_e_tempo():
     assert "agente_ms" in detalhes["tokens_tempo"]["etapas_ms"]
     assert detalhes["estrutura_pensamento"]["skills"] == ["guia_plataforma"]
     assert detalhes["consulta"]["sql_executado"] is None
+
+
+
+def test_t4_pergunta_plataforma_no_agente_de_dados_nao_executa_sql():
+    from app.ai.agent import REGRAS_CRITICAS_TOPO, responder
+
+    assert "sobre o uso da plataforma" in REGRAS_CRITICAS_TOPO
+
+    sql_chamado = False
+
+    def executor_proibido(_sql: str):
+        nonlocal sql_chamado
+        sql_chamado = True
+        raise AssertionError("Não deveria executar SQL para pergunta sobre a plataforma!")
+
+    resposta = responder(
+        "O que é a aba Assistente V-Energy?",
+        executar_sql_fn=executor_proibido,
+    )
+    assert sql_chamado is False
+    assert resposta["status"] == "nao_sei"
+    assert resposta["sql"] is None
+    assert "plataforma" in resposta["resposta"].lower()

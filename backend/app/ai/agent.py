@@ -46,7 +46,7 @@ from app.ai.resposta import (
     substituir_marcadores_pt_br,
     validar_fidelidade_saida,
 )
-from app.ai.roteador import ModoSchema, montar_contexto_schema
+from app.ai.roteador import ModoSchema, e_pergunta_da_plataforma, montar_contexto_schema
 from app.ai.telemetria import construir_telemetria, montar_detalhes_tecnicos
 from app.db.gold_contract import COLUMNS
 
@@ -86,6 +86,7 @@ REGRAS_CRITICAS_TOPO = """
    - No campo `texto`, referencie os números retornados pelo banco usando marcadores `{v1}`, `{v2}` e preencha o dicionário `marcadores` com os valores exatos das células retornadas (ex.: `{"v1": 169680000.0, "v2": -2.09}`).
    - Não escreva números soltos fora dos marcadores que não estejam nos dados da consulta.
    - Se a consulta retornar vazio, se o período for fora de jul/2022 a jun/2026 ou se a pergunta for fora do escopo da V-Energy, devolva `status="nao_sei"` explicando o motivo.
+   - Se uma dúvida sobre o uso da interface, telas, abas ou navegação da plataforma escapar do roteador e cair aqui no agente de dados, NÃO execute `consultar_gold` (não gere SQL) e devolva `status="nao_sei"` indicando que a dúvida é sobre o uso da plataforma.
 4. CORREÇÃO DE PREMISSA FALSA (GENAI-10.4):
    - Se a pergunta contiver uma premissa contrária aos dados (ex.: "Quanto a receita comercial cresceu em Jaboatão?", quando na verdade caiu 2,09% de P1 para P2), corrija a premissa de forma explícita no texto informando que houve queda/redução.
 5. CONTINUAÇÃO DE CONVERSA / FOLLOW-UP (GENAI-13):
@@ -430,6 +431,11 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
     @agente.tool
     def consultar_gold(ctx: RunContext[DepsAgente], sql: str) -> dict[str, Any]:
         """Executa uma consulta SQL SELECT somente leitura na camada Gold e devolve colunas e linhas."""
+        if e_pergunta_da_plataforma(ctx.deps.pergunta_original):
+            raise ModelRetry(
+                "Esta pergunta é sobre o uso da plataforma e não sobre os dados da Gold. "
+                "Não execute SQL; finalize com status='nao_sei' indicando que a dúvida é sobre a plataforma."
+            )
         ctx.deps.tentativas_sql += 1
         try:
             validar_regra_consumo_negativo_no_sql(sql, ctx.deps.consumo_negativo_solicitado)
@@ -683,6 +689,54 @@ def responder(
     """Função principal do agente do Théo: recebe a pergunta e devolve o dicionário compatível com RespostaIA."""
     inicio_total = time.perf_counter()
     etapas_ms: dict[str, int] = {}
+
+    # 0. Defesa de escopo (T4): se uma pergunta sobre o uso da plataforma escapar do roteador e cair
+    # direto no agente de dados, não executa SQL e devolve status="nao_sei" indicando que é sobre a plataforma.
+    if e_pergunta_da_plataforma(pergunta):
+        latencia_ms = int((time.perf_counter() - inicio_total) * 1000)
+        saida_plat = RespostaAgente(
+            pergunta_interpretada=pergunta,
+            plano=None,
+            sql=None,
+            texto=(
+                "Esta dúvida é sobre como usar a plataforma V-Energy Grid 360 (atendida pelo Guia da Plataforma) "
+                "e não requer consulta SQL aos dados da camada Gold."
+            ),
+            marcadores={},
+            premissas=["Pergunta identificada como dúvida de uso da plataforma; nenhuma consulta SQL foi executada."],
+            status="nao_sei",
+            confianca="alta",
+            justificativa="Regra 3 (T4): perguntas sobre a plataforma não executam SQL no agente de dados.",
+        )
+        deps_plat = DepsAgente(pergunta_original=pergunta)
+        telemetria_plat = construir_telemetria(
+            resultado_run=None,
+            deps=deps_plat,
+            saida=saida_plat,
+            modelo_nome=obter_nome_modelo("sql"),
+            provedor_nome=obter_provedor_configurado(),
+            latencia_total_ms=latencia_ms,
+            etapas_ms={"ss_ms": 0, "agente_ms": 0, "validacao_ms": 0},
+            numeros_conferidos=True,
+        )
+        payload_plat: dict[str, Any] = {
+            "resposta": saida_plat.texto,
+            "sql": None,
+            "tabelas": [],
+            "dados": {"colunas": [], "linhas": []},
+            "status": "nao_sei",
+            "gerado_em": datetime.now(timezone.utc),
+            "metadados": {
+                "dados_ficticios": False,
+                "gold_atualizada_em": gold_atualizada_em,
+                "observacoes": list(saida_plat.premissas),
+            },
+            "apresentacao": "texto",
+            "detalhes_tecnicos": montar_detalhes_tecnicos(saida_plat, telemetria_plat, n_linhas=0),
+        }
+        if conversa_id is not None:
+            payload_plat["conversa_id"] = conversa_id
+        return payload_plat
 
     tem_historico = bool(historico)
     if usar_cache is not None:
