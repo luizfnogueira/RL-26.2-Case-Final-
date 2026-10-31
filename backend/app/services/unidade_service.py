@@ -122,6 +122,28 @@ def _base_media(meses_media: int) -> str:
     return f'média dos {meses_media} meses anteriores com consumo'
 
 
+def estados_consumo(consumo: Decimal, conta_alta: bool | None, variacao: Decimal | None,
+                    media: float | None) -> tuple[str | None, str | None]:
+    """Consumo válido (> 0) do mês contra o ano anterior e contra a média: 'acima', 'abaixo' ou 'em linha'.
+
+    None quando falta a base. Fonte única do veredito e dos fatos do resumo por IA (V1c).
+    """
+    # Média com três estados e o mesmo limiar nos dois sentidos: acima, abaixo ou em linha.
+    estado_media = None
+    if media is not None:
+        fator = LIMIAR_MEDIA_PCT / 100
+        acima_media = float(consumo) > media * (1 + fator)
+        abaixo_media = float(consumo) < media * (1 - fator)
+        estado_media = 'acima' if acima_media else 'abaixo' if abaixo_media else 'em linha'
+    # Ano anterior também com três estados: acima (flag da Gold), abaixo (variacao_pct da Gold
+    # abaixo de −20%, estrito) ou em linha. Nenhum dos dois é recalculado aqui.
+    estado_ano = None
+    if conta_alta is not None:
+        caiu_no_ano = conta_alta is False and variacao is not None and variacao < -LIMIAR_MEDIA_PCT
+        estado_ano = 'acima' if conta_alta else 'abaixo' if caiu_no_ano else 'em linha'
+    return estado_ano, estado_media
+
+
 def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None, variacao: Decimal | None,
               media: float | None, meses_media: int) -> dict:
     """Veredito em três partes: título curto, detalhe com os números e orientação ao atendente."""
@@ -135,11 +157,9 @@ def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None, variac
                 'detalhe': f'{rotulo} não tem o mesmo mês do ano anterior nem meses anteriores com '
                            'consumo para comparar.',
                 'orientacao': None}
-    # Média com três estados e o mesmo limiar nos dois sentidos: acima, abaixo ou em linha.
-    fator = LIMIAR_MEDIA_PCT / 100
-    acima_media = media is not None and float(consumo) > media * (1 + fator)
-    abaixo_media = media is not None and float(consumo) < media * (1 - fator)
-    estado_media = 'acima' if acima_media else 'abaixo' if abaixo_media else 'em linha'
+    estado_ano, estado_media = estados_consumo(consumo, conta_alta, variacao, media)
+    # Sem média (só com ano anterior), o texto trata a média como em linha, como sempre tratou.
+    estado_media = estado_media or 'em linha'
     desvio_media = None if media is None else _percentual((float(consumo) / media - 1) * 100)
     base = _base_media(meses_media)
     contra_media = _contra(estado_media, desvio_media, f'da {base}', f'com a {base}')
@@ -148,10 +168,6 @@ def _veredito(mes: str, consumo: Decimal | None, conta_alta: bool | None, variac
         return {'titulo': titulo,
                 'detalhe': f'{rotulo} ficou {contra_media}; não há o mesmo mês do ano anterior para comparar.',
                 'orientacao': orientacao}
-    # Ano anterior também com três estados: acima (flag da Gold), abaixo (variacao_pct da Gold
-    # abaixo de −20%, estrito) ou em linha. Nenhum dos dois é recalculado aqui.
-    caiu_no_ano = conta_alta is False and variacao is not None and variacao < -LIMIAR_MEDIA_PCT
-    estado_ano = 'acima' if conta_alta else 'abaixo' if caiu_no_ano else 'em linha'
     ano_anterior = mes_texto(somar_meses(mes, -12))
     contra_ano = _contra(estado_ano, None if variacao is None else _percentual(variacao),
                          f'de {ano_anterior}', f'com {ano_anterior}')

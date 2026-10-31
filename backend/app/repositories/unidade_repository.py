@@ -90,6 +90,14 @@ class FaturaUC:
 
 
 @dataclass(frozen=True)
+class ContaMes:
+    """Valor da conta de um mês (valor_total: o que o cliente vê) e a bandeira (V1c)."""
+    mes: str
+    valor_total: Decimal
+    bandeira_tarifaria: str
+
+
+@dataclass(frozen=True)
 class LeituraUC:
     data: date
     leitura_kwh: Decimal
@@ -132,6 +140,7 @@ class UnidadeRepositoryInterface(Protocol):
     def ultima_leitura(self, id_uc: str) -> LeituraUC | None: ...
     def interrupcoes(self, id_uc: str, inicio: str, fim: str, limite: int) -> tuple[list[InterrupcaoUC], int]: ...
     def chamados(self, id_uc: str) -> list[ChamadoUC]: ...
+    def contas(self, id_uc: str, meses: list[str]) -> list[ContaMes]: ...
     def metadados(self) -> dict: ...
 
 
@@ -291,6 +300,15 @@ class SqlAlchemyUnidadeRepository:
             .order_by(a.data_abertura.desc(), a.protocolo)
         ).all()
         return [ChamadoUC(*linha) for linha in linhas]
+
+    def contas(self, id_uc: str, meses: list[str]) -> list[ContaMes]:
+        """Valor total e bandeira dos meses pedidos, pagos ou em aberto (V1c: mês analisado e ano anterior)."""
+        linhas = self.db.execute(
+            select(FatoUCMes.mes_referencia, FatoUCMes.valor_total, FatoUCMes.bandeira_tarifaria)
+            .where(FatoUCMes.id_uc == id_uc, FatoUCMes.mes_referencia.in_(meses))
+            .order_by(FatoUCMes.mes_referencia)
+        ).all()
+        return [ContaMes(*linha) for linha in linhas]
 
     def metadados(self) -> dict:
         return metadados_gold(self.db, 'dim_uc', '')
