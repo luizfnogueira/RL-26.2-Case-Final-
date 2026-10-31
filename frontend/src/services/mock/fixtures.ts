@@ -54,4 +54,7 @@ export const fixtures = {
   respostaInsight: () => carregar<RespostaInsight>(import('@/data/mocks/resposta_insight.json')),
   respostaInsightUnidade: () =>
     carregar<RespostaInsight>(import('@/data/mocks/resposta_insight_unidade.json')),
+  /** Formato do modo real (GOLD_SOURCE=real), fictício; o mock do insight segue o stub do seed. */
+  respostaInsightUnidadeReal: () =>
+    carregar<RespostaInsight>(import('@/data/mocks/resposta_insight_unidade_real.json')),
 }

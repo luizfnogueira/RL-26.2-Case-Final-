@@ -1,0 +1,64 @@
+{
+  "titulo": "Valor da conta subiu",
+  "texto": "O valor da conta de jun/2026 foi de R$ 486,00, 42% acima de jun/2025 (R$ 342,70). O consumo subiu 38%, de 298 kWh para 412 kWh. A unidade tem geração própria desde fev/2025, já presente no mesmo mês do ano anterior. Pontos a verificar: a leitura de jun/2026 foi estimada e há 1 fatura em aberto, de R$ 486,00.",
+  "numeros_utilizados": [
+    {
+      "nome": "valor_conta_mes",
+      "rotulo": "Valor da conta",
+      "valor": 486.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2026-06"
+    },
+    {
+      "nome": "variacao_valor_conta",
+      "rotulo": "Aumento do valor da conta",
+      "valor": 41.81,
+      "unidade": "%",
+      "periodo_referencia": "2026-06"
+    },
+    {
+      "nome": "valor_conta_ano_anterior",
+      "rotulo": "Valor da conta no mesmo mês do ano anterior",
+      "valor": 342.7,
+      "unidade": "BRL",
+      "periodo_referencia": "2025-06"
+    },
+    {
+      "nome": "variacao_consumo_ano_anterior",
+      "rotulo": "Aumento do consumo",
+      "valor": 38.26,
+      "unidade": "%",
+      "periodo_referencia": "2026-06"
+    },
+    {
+      "nome": "consumo_ano_anterior",
+      "rotulo": "Consumo no mesmo mês do ano anterior",
+      "valor": 298.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2025-06"
+    },
+    {
+      "nome": "consumo_mes",
+      "rotulo": "Consumo do mês",
+      "valor": 412.0,
+      "unidade": "kWh",
+      "periodo_referencia": "2026-06"
+    },
+    {
+      "nome": "faturas_em_aberto_valor",
+      "rotulo": "Faturas em aberto (valor somado)",
+      "valor": 486.0,
+      "unidade": "BRL",
+      "periodo_referencia": "2026-06"
+    }
+  ],
+  "gerado_em": "2026-10-21T09:20:00+00:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do exemplo do contrato; no modo real, vêm da carga da Gold.",
+      "Texto alternativo: resumo montado por regra sobre os números da Gold; o resumo por IA da unidade ainda não está ligado."
+    ]
+  }
+}

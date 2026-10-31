@@ -64,7 +64,7 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
 | 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
-| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` |
+| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` e no `POST /ia/insight` de unidade com `GOLD_SOURCE=real` |
 
 `AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
 
@@ -554,7 +554,9 @@ Para UC360:
 {"contexto":"unidade","id_uc":"UC-DEMO-001","filtros":{"periodo_atual":"2025-07/2026-06"},"indicadores":[]}
 ```
 
-**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
+O comportamento depende de `GOLD_SOURCE`, como no GET /unidades/{id}.
+
+**Com `GOLD_SOURCE=seed` (stub).** **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
 
 Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos nomes e valores de `diagnostico_conta` em GET /unidades/{id}:
 
@@ -566,6 +568,44 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 | variacao_percentual | Variação sobre o ano anterior | % | mês analisado |
 
 `indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
+
+**Com `GOLD_SOURCE=real` (V1c).** O resumo explica se o valor da conta do mês analisado está alto, normal ou baixo contra o mesmo mês do ano anterior, e por quê. Os números saem do mesmo diagnóstico e dos mesmos dados do GET /unidades/{id} (`backend/app/services/fatos_unidade.py`), mais o valor total e a bandeira das duas faturas (`fato_uc_mes`). O código decide os motivos (consumo, preço médio por kWh, os dois juntos ou GD conectada no período) e os avisos (leitura estimada, troca de medidor, faturas em aberto, preço por kWh fora do padrão); o texto só redige a partir deles (`backend/app/services/texto_unidade.py`): até 4 frases, números sem sinal e direção em palavras. Nome, CPF, endereço, coordenadas e identificadores nunca entram nos fatos.
+
+- `filtros.periodo_atual` é a janela da Visão 360 e precisa ter 12 meses (como no GET); `periodo_comparacao` e os filtros de região são ignorados. Fora de 12 meses: 422 `DADOS_INVALIDOS`.
+- `indicadores` é **ignorado**: a resposta não usa nada do navegador, então enviá-los não muda nada.
+- Até o modelo ser ligado, o texto é sempre o por regra e `metadados.observacoes` termina com `Texto alternativo: resumo montado por regra sobre os números da Gold; o resumo por IA da unidade ainda não está ligado.` O front usa o prefixo para mostrar o selo de texto alternativo, como na receita.
+- Erros iguais aos do GET /unidades/{id}: UC inexistente, 404 `UC_INEXISTENTE`; Gold não carregada, 503 `GOLD_NAO_CARREGADA`.
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade_real.json)** (fictício: UC-DEMO-001, com o valor de jun/2025 inventado; abaixo, um trecho)
+
+```json
+{
+  "titulo": "Valor da conta subiu",
+  "texto": "O valor da conta de jun/2026 foi de R$ 486,00, 42% acima de jun/2025 (R$ 342,70). O consumo subiu 38%, de 298 kWh para 412 kWh. A unidade tem geração própria desde fev/2025, já presente no mesmo mês do ano anterior. Pontos a verificar: a leitura de jun/2026 foi estimada e há 1 fatura em aberto, de R$ 486,00.",
+  "numeros_utilizados": [
+    {"nome": "valor_conta_mes", "rotulo": "Valor da conta", "valor": 486.0, "unidade": "BRL", "periodo_referencia": "2026-06"},
+    {"nome": "variacao_valor_conta", "rotulo": "Aumento do valor da conta", "valor": 41.81, "unidade": "%", "periodo_referencia": "2026-06"},
+    "…"
+  ]
+}
+```
+
+`numeros_utilizados` traz **só os números que aparecem no texto, na ordem do texto**, então a lista varia por caso. Todo valor vem sem sinal; a direção está no rótulo (ex.: "Aumento do valor da conta", "Queda do consumo", "Consumo abaixo da média"). Nomes possíveis:
+
+| nome | rótulo | unidade | período de referência |
+| --- | --- | --- | --- |
+| valor_conta_mes | Valor da conta | BRL | mês analisado |
+| variacao_valor_conta | Aumento / Queda do valor da conta | % | mês analisado |
+| valor_conta_ano_anterior | Valor da conta no mesmo mês do ano anterior | BRL | mesmo mês, ano anterior |
+| variacao_consumo_ano_anterior | Aumento / Queda do consumo | % | mês analisado |
+| consumo_ano_anterior | Consumo no mesmo mês do ano anterior | kWh | mesmo mês, ano anterior |
+| consumo_mes | Consumo do mês | kWh | mês analisado |
+| variacao_preco_kwh | Aumento / Queda do preço médio por kWh | % | mês analisado |
+| preco_kwh_ano_anterior | Preço médio por kWh no mesmo mês do ano anterior | BRL | mesmo mês, ano anterior |
+| preco_kwh_mes | Preço médio por kWh | BRL | mês analisado |
+| desvio_consumo_media | Consumo acima / abaixo da média | % | mês analisado |
+| media_consumo | Média de consumo | kWh | 12 meses anteriores ao mês analisado |
+| faturas_em_aberto_valor | Faturas em aberto (valor somado) | BRL | mês analisado (referência; as faturas podem ser de qualquer mês) |
 
 ## 10.1 GET /filtros — opções dos filtros de região
 

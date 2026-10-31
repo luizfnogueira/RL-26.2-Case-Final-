@@ -29,6 +29,7 @@ import respostaIaBloqueado from '@/data/mocks/resposta_ia_bloqueado.json'
 import respostaIaNaoSei from '@/data/mocks/resposta_ia_nao_sei.json'
 import respostaInsight from '@/data/mocks/resposta_insight.json'
 import respostaInsightUnidade from '@/data/mocks/resposta_insight_unidade.json'
+import respostaInsightUnidadeReal from '@/data/mocks/resposta_insight_unidade_real.json'
 import unidade from '@/data/mocks/unidade.json'
 import unidadeRecente from '@/data/mocks/unidade_recente.json'
 import unidades from '@/data/mocks/unidades.json'
@@ -80,6 +81,7 @@ export const fixturesConferidos = {
   respostaIaBloqueado: respostaIaBloqueado satisfies Largo<RespostaIA>,
   respostaInsight: respostaInsight satisfies Largo<RespostaInsight>,
   respostaInsightUnidade: respostaInsightUnidade satisfies Largo<RespostaInsight>,
+  respostaInsightUnidadeReal: respostaInsightUnidadeReal satisfies Largo<RespostaInsight>,
   perguntaIa: perguntaIa satisfies Largo<PerguntaIA>,
   pedidoInsight: pedidoInsight satisfies Largo<PedidoInsight>,
   pedidoInsightUnidade: pedidoInsightUnidade satisfies Largo<PedidoInsight>,
