@@ -57,6 +57,7 @@ class FilaPerdas(GoldBase):
     id_uc: Mapped[str] = mapped_column(String(8), primary_key=True)
     posicao_fila: Mapped[int | None] = mapped_column(Integer)
     status_triagem: Mapped[str] = mapped_column(String(20), index=True)
+    acao_recomendada: Mapped[str] = mapped_column(String(30))
     score: Mapped[Decimal] = mapped_column(Numeric(5, 2))
     kwh_estimado: Mapped[Decimal] = mapped_column(Energia)
     motivos_json: Mapped[str] = mapped_column(Text)

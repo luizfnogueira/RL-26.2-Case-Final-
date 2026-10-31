@@ -1,4 +1,7 @@
-"""GENAI-16.3: toda pergunta sugerida na Tela 7 está no golden set com status ok.
+"""GENAI-16.3: toda pergunta sugerida na Tela 7 está no golden set com status ok ou esclarecer.
+
+"Qual bairro mais perdeu volume residencial no último ano?" (pergunta do case) pede esclarecimento: o
+clique leva a dois botões, 2025 ou os últimos 12 meses, e cada um responde.
 
 Pulado enquanto o golden set (GENAI-26, ai-agent/avaliacao/perguntas.yaml) não existir.
 """
@@ -24,9 +27,9 @@ def test_sugestoes_sao_lidas_do_front():
 
 
 @pytest.mark.skipif(not GOLDEN_SET.exists(), reason="golden set (GENAI-26) ainda não existe")
-def test_toda_sugestao_esta_no_golden_set_com_status_ok():
+def test_toda_sugestao_esta_no_golden_set_com_status_ok_ou_esclarecer():
     dados = yaml.safe_load(GOLDEN_SET.read_text(encoding="utf-8"))
     itens = dados if isinstance(dados, list) else dados.get("perguntas", [])
     status = {" ".join(str(i["pergunta"]).split()): i.get("status_esperado") for i in itens}
-    faltando = [p for p in sugestoes() if status.get(p) != "ok"]
-    assert not faltando, f"Sugestões fora do golden set ou sem status ok: {faltando}"
+    faltando = [p for p in sugestoes() if status.get(p) not in ("ok", "esclarecer")]
+    assert not faltando, f"Sugestões fora do golden set ou sem status ok ou esclarecer: {faltando}"

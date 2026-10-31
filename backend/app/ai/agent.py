@@ -225,6 +225,13 @@ _SOMA_SIMPLES_DEC_FEC = re.compile(r"\bsum\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_d
 # Uma linha por alimentador: agrupar ou filtrar por alimentador mantém a soma dos meses de um alimentador só
 _POR_ALIMENTADOR = re.compile(
     r"\bgroup\s+by\b[^;]*\balimentador\b|\balimentador\s*(?:=|\bin\b)|^\s*select\s+(?:\w+\.)?alimentador\b")
+# Ponderação pelas UCs: SUM(dec * ucs_atendidas) dividido por SUM(ucs_atendidas), aceitando NULLIF e casts
+_INDICE = r"(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?(?:\s*::\s*\w+)?"
+_UCS = r"(?:\w+\.)?ucs_atendidas(?:\s*::\s*\w+)?"
+_NUMERADOR_PONDERADO = rf"\bsum\s*\(\s*(?:{_INDICE}\s*\*\s*{_UCS}|{_UCS}\s*\*\s*{_INDICE})\s*\)"
+_RAZAO_PONDERADA = re.compile(
+    rf"{_NUMERADOR_PONDERADO}[^/;]{{0,40}}/\s*(?:(?:nullif|cast)?\s*\(\s*)*sum\s*\(\s*{_UCS}\s*\)")
+_NUMERADOR_PONDERADO = re.compile(_NUMERADOR_PONDERADO)
 
 
 def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
@@ -241,14 +248,70 @@ def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
             "O DEC mensal já é uma média por UC. Para um grupo de alimentadores, pondere pelas UCs em cada mês "
             "(`SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)`) e depois some os meses."
         )
-    if ("agg_dec_fec_mensal" in sql_lower and _SOMA_SIMPLES_DEC_FEC.search(sql_lower)
-            and "ucs_atendidas" not in sql_lower and not _POR_ALIMENTADOR.search(sql_lower)):
+    if "agg_dec_fec_mensal" not in sql_lower:
+        return
+    razoes = len(_RAZAO_PONDERADA.findall(sql_lower))
+    # Basta a coluna aparecer não serve: SUM(dec) ao lado de SUM(ucs_atendidas), ou SUM(dec * ucs) / COUNT(*)
+    if len(_NUMERADOR_PONDERADO.findall(sql_lower)) > razoes:
+        raise ErroConsulta(
+            "Regra de negócio violada: a ponderação do DEC/FEC pelas UCs divide pela soma das UCs do mesmo mês: "
+            "`SUM(dec * ucs_atendidas) / NULLIF(SUM(ucs_atendidas), 0)`, agrupando por `mes_referencia`; "
+            "depois some os meses."
+        )
+    if _SOMA_SIMPLES_DEC_FEC.search(sql_lower) and not razoes and not _POR_ALIMENTADOR.search(sql_lower):
         raise ErroConsulta(
             "Regra de negócio violada: em `agg_dec_fec_mensal` cada linha é um alimentador, e `SUM(dec)` por "
             "município, bairro ou sem agrupar soma o DEC de alimentadores diferentes. Pondere pelas UCs em cada "
             "mês e depois some os meses: `SELECT municipio, SUM(dec_mes) FROM (SELECT municipio, mes_referencia, "
             "SUM(dec * ucs_atendidas) / SUM(ucs_atendidas) AS dec_mes FROM agg_dec_fec_mensal WHERE ... GROUP BY "
             "municipio, mes_referencia) m GROUP BY municipio`."
+        )
+
+
+_COL = r"(?:\w+\.)?"
+_FILTROS_INTERRUPCAO = {
+    "flag_sem_interrupcao = FALSE": re.compile(
+        rf"{_COL}flag_sem_interrupcao\s*(?:=\s*false|is\s+false|<>\s*true)|\bnot\s+{_COL}flag_sem_interrupcao\b"),
+    "flag_antes_ligacao = FALSE": re.compile(
+        rf"{_COL}flag_antes_ligacao\s*(?:=\s*false|is\s+false|<>\s*true)|\bnot\s+{_COL}flag_antes_ligacao\b"),
+}
+# Qualquer corte a partir de 3 min serve: "interrupções acima de 30 min" já deixa a oscilação de fora
+_CORTE_DURACAO = re.compile(rf"{_COL}duracao_efetiva_min\s*>=?\s*(\d+(?:\.\d+)?)")
+
+
+def _corta_oscilacao(sql_lower: str) -> bool:
+    return any(float(minutos) >= 3 for minutos in _CORTE_DURACAO.findall(sql_lower))
+_AGREGA = re.compile(r"\b(?:count|sum|avg)\s*\(")
+_DURACAO_BRUTA = re.compile(rf"\b(?:sum|avg)\s*\([^)]*\b{_COL}duracao_min\b")
+# Quem pergunta pelas oscilações ou por todas as ocorrências quer justamente o que o filtro tira
+PEDIDO_OSCILACAO = re.compile(
+    r"oscila|piscad|pisca|sem\s+interrup|antes\s+da\s+liga|todas\s+as\s+ocorr|ocorr[eê]ncias\s+brutas",
+    re.IGNORECASE)
+
+
+def validar_regra_interrupcoes_no_sql(sql: str, pergunta: str) -> None:
+    """Contar ou somar interrupções em `uc_interrupcoes` segue a regra do DEC (skill de continuidade, regra 5).
+
+    Oscilação (menos de 3 min), ocorrência sem interrupção e ocorrência antes da ligação da UC não são
+    interrupção; a duração é a efetiva, sem o tempo sobreposto. Sem os filtros, a contagem infla.
+    """
+    sql_lower = (sql or "").lower()
+    if "uc_interrupcoes" not in sql_lower or PEDIDO_OSCILACAO.search(pergunta or ""):
+        return
+    if _DURACAO_BRUTA.search(sql_lower):
+        raise ErroConsulta(
+            "Regra de negócio violada: em `uc_interrupcoes`, some a duração por `duracao_efetiva_min` "
+            "(sem o tempo sobreposto), nunca por `duracao_min`."
+        )
+    if not _AGREGA.search(sql_lower):
+        return
+    faltando = [nome for nome, padrao in _FILTROS_INTERRUPCAO.items() if not padrao.search(sql_lower)]
+    if not _corta_oscilacao(sql_lower):
+        faltando.append("duracao_efetiva_min >= 3")
+    if faltando:
+        raise ErroConsulta(
+            "Regra de negócio violada: ao contar ou somar interrupções em `uc_interrupcoes`, oscilação não é "
+            f"interrupção. Inclua no WHERE: {' AND '.join(faltando)}."
         )
 
 
@@ -371,6 +434,7 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
         try:
             validar_regra_consumo_negativo_no_sql(sql, ctx.deps.consumo_negativo_solicitado)
             validar_regra_dec_fec_no_sql(sql, ctx.deps.pergunta_original)
+            validar_regra_interrupcoes_no_sql(sql, ctx.deps.pergunta_original)
             validar_regra_periodo_no_sql(sql, ctx.deps.pergunta_original)
             if ctx.deps.executar_sql_fn is None:
                 raise ErroConsulta("Função de consulta ao banco não configurada.")

@@ -25,7 +25,7 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /dashboard/comparacao | Ambos os períodos e `nivel=municipio|bairro|classe` obrigatórios; `itens` repetido de 2 a 4 vezes; município e bairro como filtros pai |
 | GET /unidades | busca (ID ou titular, 3–100 caracteres); município, bairro, classe, alimentador; page, page_size |
 | GET /unidades/{id} | periodo_atual opcional, sempre de 12 meses; sem ele, os 12 meses até o último mês da Gold |
-| GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
+| GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; sem_ordem_ativa; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta |
@@ -174,32 +174,29 @@ No mock (`GOLD_SOURCE=seed`), duas UCs têm a visão detalhada e só a janela 20
 ## 6. GET /inspecoes/candidatos — Tela 4
 
 ```http
-GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=20
+GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=50
 ```
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/candidatos.json)**
 
-`resumo`, antes da paginação e com os mesmos filtros: UCs analisadas (UCs do cadastro, o universo da `tb_fila_perdas_auditoria`), UCs priorizadas (UCs na `tb_fila_perdas`, todas elegíveis), potencial de recuperação (Σ `kwh_estimado` das priorizadas) e ordens ativas (do schema `portal`). Cada candidato: ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa.
+O padrão retorna todas as UCs com `status_triagem=ELEGIVEL` em `tb_fila_perdas`, incluindo as duas ações recomendadas. `page_size` é 50 por padrão e aceita de 1 a 200; `page` começa em 1. O único filtro próprio da fila é `sem_ordem_ativa` (booleano, padrão `false`): quando `true`, oculta as UCs com ordem `ABERTA` ou `EM_CAMPO`. O total e os indicadores de UCs priorizadas, potencial de recuperação e ordens ativas são calculados depois desse filtro e antes da paginação; `ucs_analisadas` continua representando o universo da auditoria após os filtros geográficos.
 
-Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após filtros (na Gold, `posicao_fila`). Só UCs com `status_triagem = ELEGIVEL` entram. `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada; a tela deve deixar isso claro. Desabilitar seleção de UC com ordem ativa no front; POST também valida duplicidade. Estimativa futura não é o kWh já recuperado do histórico.
+Cada candidato inclui `acao_recomendada` (`INSPECAO_PRIORITARIA` ou `VALIDACAO_DOCUMENTAL`), além de ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa. Os filtros geográficos município, bairro, classe e alimentador são mantidos; não há filtros por motivo ou status nesta rota. Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após todos os filtros (na Gold, `posicao_fila`). `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada.
 
 ## 7. Ordens — Telas 4 e 5
 
-### Regra da fila com Gold real
+### Relação da fila com as ordens
 
-Com `GOLD_SOURCE=real`, `GET /inspecoes/candidatos` exige tanto
-`status_triagem=ELEGIVEL` quanto `acao_recomendada=INSPECAO_PRIORITARIA`.
-O total de candidatos, as UCs priorizadas e o potencial de recuperação do resumo
-consideram esse recorte, antes da paginação.
+As UCs com `INSPECAO_PRIORITARIA` podem ser selecionadas para gerar uma ordem de campo,
+desde que não tenham ordem ativa. UCs com `VALIDACAO_DOCUMENTAL` aparecem na fila com
+essa recomendação, mas a seleção para ordem de campo fica desabilitada. O `POST /inspecoes`
+também rejeita essas UCs com 422 `DADOS_INVALIDOS`, independentemente de a fonte ser `seed`
+ou `real`. Ordens ativas continuam visíveis por padrão, identificadas por `ordem_ativa` e
+`id_ordem_ativa`; `sem_ordem_ativa=true` as oculta da fila.
 
-Casos de `VALIDACAO_DOCUMENTAL` permanecem na Gold, mas não aparecem na fila de
-inspeção nem podem gerar ordem de campo pelo `POST /inspecoes`. O backend aplica
-esse bloqueio mesmo quando a chamada é feita diretamente, sem passar pela tela.
-Não há endpoint ou tela de tratamento documental definido nesta entrega.
-
-Esse comportamento foi alinhado com o responsável pela interface da fila em
-27/10/2026, sem incompatibilidade com o fluxo visual existente. O modo `seed`
-mantém o comportamento de desenvolvimento.
+Os filtros de região seguem disponíveis na fila; filtros por motivo e status de triagem
+não fazem parte do contrato dessa rota. Não há endpoint ou tela de tratamento documental
+definido nesta entrega.
 
 ### Ciclo das ordens
 
@@ -226,9 +223,9 @@ GET /inspecoes?page=1&page_size=20
 
 Obrigatórios: id_uc e equipe_responsavel. data_prevista opcional no modelo do Gabriel; a modal pode exigir antes do envio. Demais campos opcionais. Servidor gera ID, datas, status e histórico.
 
-Com `GOLD_SOURCE=real`, uma UC marcada como `VALIDACAO_DOCUMENTAL` em
-`gold.tb_fila_perdas` retorna **422 `DADOS_INVALIDOS`**, sem criar ordem nem
-histórico. A interface deve exibir a mensagem retornada pela API:
+Uma UC marcada como `VALIDACAO_DOCUMENTAL` em `gold.tb_fila_perdas` retorna
+**422 `DADOS_INVALIDOS`**, sem criar ordem nem histórico, tanto com `GOLD_SOURCE=seed`
+quanto com `GOLD_SOURCE=real`. A interface deve exibir a mensagem retornada pela API:
 
 ```json
 {
@@ -350,13 +347,18 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
 | `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
 | `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
+| `metadados.fonte` | `"dados"` (padrão) ou `"guia"` | De onde veio a resposta. Ausente vale como `"dados"`. |
+| `metadados.secoes_guia` | lista de `{id, titulo}` | Seções do guia da plataforma em que a resposta se apoiou; vazia em resposta de dados. |
 
-**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta dois casos:
+**Pergunta sobre a plataforma.** Perguntas sobre o uso do portal ("O que é a aba Assistente V-Energy?", "Como gero uma ordem de inspeção?") são respondidas pelo [guia da plataforma](../backend/app/ai/guia/plataforma.md), não pela Gold. A resposta vem com `metadados.fonte: "guia"`, `sql: null`, `tabelas` e `dados` vazios, sem gráfico, e `status` `ok` ou `nao_sei`. Com `ok`, `metadados.secoes_guia` lista as seções usadas, e o bloco "Como cheguei nisso" mostra essas seções no lugar do SQL. O agente do guia só recebe as seções de nível público. O que não estiver no guia volta `nao_sei`. [Exemplo](../backend/app/services/fixtures/resposta_ia_guia.json).
+
+**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta três casos:
 
 | Caso | Exemplo | Opções |
 | --- | --- | --- |
 | Bairro que existe em 2 municípios ou mais, sem nenhum município na pergunta. A troca anterior só resolve numa continuação ("E no Centro?") logo depois de uma pergunta com um município só | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 10) e "Todos os municípios juntos". Um município citado resolve, mesmo sem esse bairro: aí o agente responde que não há dados |
 | "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
+| "Último ano", "ano passado" sem ano nem P1/P2 | "Qual bairro mais perdeu volume residencial no último ano?" | "2025 (jan a dez)" e "Últimos 12 meses (jul/2025 a jun/2026)": a base tem 2025 inteiro, e 2026 só até junho |
 
 ```json
 {
@@ -424,6 +426,7 @@ Cenários demonstrativos:
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 | Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
 | Qual a receita do Centro? / Qual foi a receita deste ano? | esclarecer — exemplos acima (no mock, "Centro" é um bairro fictício de Recife, Olinda e Paulista) |
+| O que é a aba Assistente V-Energy? | [ok pelo guia](../backend/app/services/fixtures/resposta_ia_guia.json) — `metadados.fonte: "guia"`, sem SQL |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
@@ -625,4 +628,3 @@ A Gold não muda para atender o portal. Onde este contrato divergia dela, a API 
 | Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
 | Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json`; `confianca_evidencia` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao`, converte `motivos_json` em `motivos[]` e repassa `confianca_evidencia` |
 | Medidor | `dim_uc` traz só o medidor ativo: id, tipo, modelo e data de instalação | Seção 5: medidor com esses campos e a última leitura do `fato_uc_mes` |
-

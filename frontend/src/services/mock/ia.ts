@@ -10,6 +10,8 @@ import { compararPeriodos, invalido, periodo, regiao, texto } from './validacao'
 import { montarDashboard } from './dashboard'
 
 const PERGUNTA_OK = 'qual foi a receita no período?'
+/** Pergunta sobre a plataforma: respondida pelo guia, sem SQL (`metadados.fonte: "guia"`). */
+const PERGUNTA_GUIA = 'o que é a aba assistente v-energy?'
 const PERGUNTA_BLOQUEADA = 'drop table clientes'
 const DESTRUTIVA = /\b(drop|delete|truncate|apague|apagar|exclua|excluir|remova|remover)\b/i
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -57,7 +59,10 @@ function esclarecimentoPedido(pergunta: string): 'bairro' | 'ano' | null {
   const texto = normalizar(pergunta)
   if (/\bcentro\b/.test(texto) && !/\b(recife|olinda|paulista|todos os municipios)\b/.test(texto))
     return 'bairro'
-  if (/\b(n|d)?(este|esse) ano\b|\b(no|do) ano atual\b/.test(texto) && !/\b(20\d{2}|p[12])\b/.test(texto))
+  if (
+    /\b(n|d)?(este|esse) ano\b|\b(no|do) ano atual\b/.test(texto) &&
+    !/\b(20\d{2}|p[12])\b/.test(texto)
+  )
     return 'ano'
   return null
 }
@@ -164,13 +169,15 @@ export async function responderPergunta(corpo: Registro): Promise<RespostaIA> {
       ? await fixtures.respostaIaBloqueado()
       : pergunta === PERGUNTA_OK
         ? await fixtures.respostaIa()
-        : esclarecer
-          ? await (esclarecer === 'bairro'
-              ? fixtures.respostaIaEsclarecer()
-              : fixtures.respostaIaEsclarecerAno())
-          : grafico
-            ? await fixtures.respostaIaGrafico[grafico]()
-            : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
+        : pergunta === PERGUNTA_GUIA
+          ? await fixtures.respostaIaGuia()
+          : esclarecer
+            ? await (esclarecer === 'bairro'
+                ? fixtures.respostaIaEsclarecer()
+                : fixtures.respostaIaEsclarecerAno())
+            : grafico
+              ? await fixtures.respostaIaGrafico[grafico]()
+              : ((await respostaExtra(normalizar(bruta))) ?? (await fixtures.respostaIaNaoSei()))
   // Como a API: devolve o id recebido ou cria um na primeira pergunta.
   return {
     ...resposta,

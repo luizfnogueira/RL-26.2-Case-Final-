@@ -20,6 +20,7 @@ def _item(candidato: CandidatoFila, periodo: str) -> dict:
         "alimentador": candidato.alimentador,
         "posicao": candidato.posicao,
         "motivos": candidato.motivos,
+        "acao_recomendada": candidato.acao_recomendada,
         "energia_estimada": _indicador(
             round(float(candidato.kwh_estimado), 2), "kWh", periodo
         ),
@@ -55,6 +56,7 @@ class CandidatoService:
             bairro=filtros.bairro,
             classe=filtros.classe,
             alimentador=filtros.alimentador,
+            sem_ordem_ativa=filtros.sem_ordem_ativa,
             page=filtros.page,
             page_size=filtros.page_size,
         )
@@ -71,8 +73,8 @@ class CandidatoService:
                 "dados_ficticios": manifest is None,
                 "gold_atualizada_em": manifest['exportado_em_utc'] if manifest else None,
                 "observacoes": [
-                    ("Gold V10 real: somente INSPECAO_PRIORITARIA nesta rota; "
-                     "VALIDACAO_DOCUMENTAL preservada na Gold. Score nao e probabilidade de fraude; "
+                    ("Gold V10 real: a fila inclui INSPECAO_PRIORITARIA e VALIDACAO_DOCUMENTAL; "
+                     "casos documentais requerem revisao antes de ordem de campo. Score nao e probabilidade de fraude; "
                      "kWh estimado e heuristico. Janela fixa P2 da exportacao."
                      if manifest else "Fila ficticia do seed; ordens ativas do portal.")
                 ],

@@ -129,6 +129,21 @@ export interface DetalhesTecnicos {
   avaliacao: AvaliacaoIA | null
 }
 
+/** Seção do guia da plataforma em que a resposta se apoiou. */
+export interface SecaoGuiaIA {
+  id: string
+  titulo: string
+}
+
+/**
+ * `fonte`: de onde veio a resposta. `"guia"` = pergunta sobre o uso da plataforma, respondida pelo guia,
+ * sem SQL nem dados; `secoes_guia` lista as seções citadas. Opcionais: ausentes valem como `"dados"`.
+ */
+export interface MetadadosIA extends Metadados {
+  fonte?: 'dados' | 'guia'
+  secoes_guia?: SecaoGuiaIA[]
+}
+
 /** Os campos `sql`, `tabelas` e `dados` alimentam o bloco "Como cheguei nisso". */
 export interface RespostaIA {
   resposta: string
@@ -137,7 +152,7 @@ export interface RespostaIA {
   dados: DadosIA
   status: StatusIA
   gerado_em: string
-  metadados: Metadados
+  metadados: MetadadosIA
   /** Campos da sprint de GenAI: opcionais, ausentes em respostas antigas. */
   conversa_id?: string | null
   /** `tabela`: os `dados` aparecem como tabela no corpo da resposta; `grafico`: o `grafico` abaixo. */

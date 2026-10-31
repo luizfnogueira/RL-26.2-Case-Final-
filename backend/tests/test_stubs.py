@@ -136,6 +136,14 @@ class TestIA:
         assert response.status_code == 200 and response.json()['status'] == status
         assert response.json()['sql'] is None
 
+    def test_pergunta_sobre_a_plataforma_vem_do_guia_sem_sql(self):
+        response = client.post('/ia', json={'pergunta': 'O que é a aba Assistente V-Energy?'})
+        corpo = response.json()
+        assert {k: corpo[k] for k in exemplo('resposta_ia_guia')} == exemplo('resposta_ia_guia')
+        assert corpo['sql'] is None and corpo['dados'] == {'colunas': [], 'linhas': []}
+        assert corpo['metadados']['fonte'] == 'guia'
+        assert [s['id'] for s in corpo['metadados']['secoes_guia']] == ['assistente']
+
     def test_pergunta_vazia(self):
         erro(client.post('/ia', json={'pergunta': '  '}), 422, 'DADOS_INVALIDOS')
 

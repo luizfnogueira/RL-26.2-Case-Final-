@@ -61,6 +61,26 @@ AVISO_DEC_JULHO_2025 = (
     "no mês crítico de julho/2025."
 )
 
+AVISO_2026_INCOMPLETO = (
+    "Os dados de 2026 vão só até junho (6 de 12 meses): o ano de 2026 não está completo na base."
+)
+
+# 2026 como ano: '2026', '2026%', ano = 2026, EXTRACT(YEAR ...) = 2026 ou de '2026-01' em diante
+_ANO_2026_NO_SQL = re.compile(
+    r"'2026%?'|\bano\s*=\s*'?2026\b|year\s+from[^)]*\)\s*=\s*'?2026\b|(?:between|>=)\s*'2026-01'")
+_MES_ANTES = re.compile(
+    r"\b(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\.?\s*(?:/|de\s+)?\s*$", re.IGNORECASE)
+
+
+def menciona_ano_de_2026(pergunta: str, sql: str | None) -> bool:
+    """O ano de 2026 entra na resposta; um mês só ("junho de 2026", "jun/2026") ou o P2 não contam."""
+    if _ANO_2026_NO_SQL.search((sql or "").lower()):
+        return True
+    for achado in re.finditer(r"(?<![\d/-])2026(?![\d-])", pergunta or ""):
+        if not _MES_ANTES.search(pergunta[:achado.start()]):
+            return True
+    return False
+
 
 class ViolacaoFidelidadeSaida(ValueError):
     """Indica falha na validação da saída que exige ModelRetry ou fallback para nao_sei."""
@@ -388,7 +408,7 @@ def enriquecer_avisos_e_premissas(
     sql_executado: str | None,
     resultado: ResultadoConsulta | None,
 ) -> list[str]:
-    """Adiciona avisos de interpretação de domínio (GENAI-10.5) e aviso de truncamento de tabela (GENAI-14.3)."""
+    """Adiciona avisos de interpretação de domínio (GENAI-10.5), de 2026 incompleto e de truncamento de tabela (GENAI-14.3)."""
     observacoes = list(saida.premissas or [])
     sql_lower = (sql_executado or "").lower()
     texto_lower = (saida.texto or "").lower()
@@ -401,6 +421,9 @@ def enriquecer_avisos_e_premissas(
     ):
         if not any("58" in obs for obs in observacoes):
             observacoes.append(AVISO_DEC_JULHO_2025)
+
+    if menciona_ano_de_2026(saida.pergunta_interpretada, sql_executado) and AVISO_2026_INCOMPLETO not in observacoes:
+        observacoes.append(AVISO_2026_INCOMPLETO)
 
     if resultado and resultado.n_linhas > 50:
         aviso_trunc = f"Exibindo as primeiras 50 linhas de um total de {resultado.n_linhas} registros encontrados."

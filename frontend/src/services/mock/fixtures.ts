@@ -39,6 +39,7 @@ export const fixtures = {
   perguntaIa: () => carregar<PerguntaIA>(import('@/data/mocks/pergunta_ia.json')),
   respostaIa: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia.json')),
   respostaIaNaoSei: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_nao_sei.json')),
+  respostaIaGuia: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_guia.json')),
   respostaIaBloqueado: () =>
     carregar<RespostaIA>(import('@/data/mocks/resposta_ia_bloqueado.json')),
   respostaIaEsclarecer: () =>

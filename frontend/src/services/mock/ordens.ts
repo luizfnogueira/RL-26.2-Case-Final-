@@ -26,7 +26,16 @@ import {
   verificarCenario,
   type Registro,
 } from './util'
-import { compararPeriodos, invalido, paginacao, periodo, regiao, texto } from './validacao'
+import {
+  booleano,
+  compararPeriodos,
+  invalido,
+  paginacao,
+  paginacaoCandidatos,
+  periodo,
+  regiao,
+  texto,
+} from './validacao'
 
 const STATUS: StatusOrdem[] = ['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 
@@ -87,8 +96,9 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
   const atual = periodo(params, 'periodo_atual', true)
   const comparacao = periodo(params, 'periodo_comparacao', false)
   compararPeriodos(atual, comparacao)
-  const { page, pageSize } = paginacao(params)
+  const { page, pageSize } = paginacaoCandidatos(params)
   const filtros = regiao(params)
+  const semOrdemAtiva = booleano(params, 'sem_ordem_ativa')
   verificarCenario(atual, comparacao)
 
   const [base, cadastro, e] = await Promise.all([
@@ -104,17 +114,20 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
       (b.energia_estimada.valor ?? 0) - (a.energia_estimada.valor ?? 0) ||
       (a.id_uc < b.id_uc ? -1 : 1),
   )
-  candidatos.forEach((c: Candidato, i) => {
-    c.posicao = i + 1
+  candidatos.forEach((c: Candidato) => {
     c.ordem_ativa = ativas.has(c.id_uc)
     c.id_ordem_ativa = ativas.get(c.id_uc) ?? null
+  })
+  const fila = candidatos.filter((c) => !semOrdemAtiva || !c.ordem_ativa)
+  fila.forEach((c, i) => {
+    c.posicao = i + 1
   })
   // Como na Gold: analisadas = UCs do cadastro (universo da auditoria); priorizadas = UCs na fila
   // (todas elegíveis, sem corte de score); potencial = Σ kwh_estimado, um proxy, não energia comprovada.
   const analisadas = filtrarRegiao(cadastro.items, filtros)
-  const priorizados = candidatos
+  const priorizados = fila
   return {
-    ...paginar(candidatos, page, pageSize),
+    ...paginar(fila, page, pageSize),
     periodo_referencia: PERIODO_ATUAL,
     resumo: {
       ucs_analisadas: indicador(analisadas.length, 'UCs', PERIODO_ATUAL),
@@ -124,11 +137,7 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
         'kWh',
         PERIODO_ATUAL,
       ),
-      ordens_ativas: indicador(
-        candidatos.filter((c) => c.ordem_ativa).length,
-        'ordens',
-        PERIODO_ATUAL,
-      ),
+      ordens_ativas: indicador(fila.filter((c) => c.ordem_ativa).length, 'ordens', PERIODO_ATUAL),
     },
     metadados: base.metadados,
   }
@@ -208,6 +217,11 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
       'UC_INEXISTENTE',
       `Unidade Consumidora '${idUc}' não encontrada no cadastro.`,
     )
+  }
+  const candidatos = await fixtures.candidatos()
+  const candidato = candidatos.items.find((item) => item.id_uc === idUc)
+  if (candidato?.acao_recomendada === 'VALIDACAO_DOCUMENTAL') {
+    throw erroApi(422, 'DADOS_INVALIDOS', 'UC requer validação documental antes de gerar inspeção.')
   }
   const ativa = e.ordens.find((o) => o.id_uc === idUc && ehAtiva(o))
   if (ativa) {

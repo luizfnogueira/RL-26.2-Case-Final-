@@ -72,6 +72,7 @@ MOTIVOS_FILA = [
     "Consumo abaixo da média da classe",
 ]
 STATUS_TRIAGEM = {"ELEGIVEL": 0.90, "EM_ANALISE": 0.06, "DESCLASSIFICADO": 0.04}
+ACOES_FILA = {"INSPECAO_PRIORITARIA": 0.55, "VALIDACAO_DOCUMENTAL": 0.45}
 CONFIANCA_EVIDENCIA = {"ALTA": 0.35, "MEDIA": 0.40, "BAIXA": 0.20, "INDETERMINADA": 0.05}
 PERIODOS_PRECO_VOLUME = {"P1": ("2022-07", "2023-06"), "P2": ("2025-07", "2026-06")}   # dim_mes.periodo
 
@@ -161,10 +162,14 @@ def _gerar_fila_perdas(rng: random.Random, ucs: list[dict], dados: dict) -> None
 
     escolhidas = rng.sample(ucs, k=max(1, round(len(ucs) * 0.30)))
     for uc in escolhidas:
+        status_triagem = _escolher(rng, STATUS_TRIAGEM)
         dados[gold.FilaPerdas].append({
             "id_uc": uc["id_uc"],
             "posicao_fila": None,
-            "status_triagem": _escolher(rng, STATUS_TRIAGEM),
+            "status_triagem": status_triagem,
+            "acao_recomendada": (
+                _escolher(rng, ACOES_FILA) if status_triagem == "ELEGIVEL" else "NAO_APLICAVEL"
+            ),
             "score": _brl(rng.uniform(10, 99.9)),
             "kwh_estimado": _brl(rng.uniform(80, 2_500)),
             "motivos_json": json.dumps(rng.sample(MOTIVOS_FILA, k=rng.randint(1, 3)), ensure_ascii=False),

@@ -59,6 +59,42 @@ def test_soma_por_alimentador_ou_ponderada_passa(sql):
     validar_regra_dec_fec_no_sql(sql, "DEC por município em P2")
 
 
+@pytest.mark.parametrize("sql", [
+    # A coluna aparece, mas a conta continua somando o DEC de alimentadores diferentes
+    "SELECT municipio, SUM(dec) AS dec_horas, SUM(ucs_atendidas) AS ucs FROM agg_dec_fec_mensal "
+    "WHERE periodo = 'P2' GROUP BY municipio",
+    "SELECT SUM(dec) FROM agg_dec_fec_mensal WHERE municipio = 'RECIFE' AND ucs_atendidas > 0",
+])
+def test_citar_ucs_atendidas_sem_ponderar_e_barrado(sql):
+    with pytest.raises(ErroConsulta, match="cada linha é um alimentador"):
+        validar_regra_dec_fec_no_sql(sql, "DEC por município em P2")
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT municipio, SUM(dec * ucs_atendidas) / COUNT(*) FROM agg_dec_fec_mensal GROUP BY municipio",
+    "SELECT municipio, SUM(dec * ucs_atendidas) AS dec_ponderado FROM agg_dec_fec_mensal GROUP BY municipio",
+    "SELECT SUM(dec * ucs_atendidas) / SUM(ucs_atendidas), SUM(fec * ucs_atendidas) / SUM(interrupcoes) "
+    "FROM agg_dec_fec_mensal",
+])
+def test_ponderacao_sem_dividir_pela_soma_das_ucs_e_barrada(sql):
+    with pytest.raises(ErroConsulta, match="divide pela soma das UCs"):
+        validar_regra_dec_fec_no_sql(sql, "DEC por município em P2")
+
+
+@pytest.mark.parametrize("sql", [
+    # Exemplo 2 da skill de continuidade
+    "SELECT municipio, ROUND(SUM(dec_mes), 2) FROM (SELECT municipio, mes_referencia, "
+    "SUM(dec * ucs_atendidas) / NULLIF(SUM(ucs_atendidas), 0) AS dec_mes FROM agg_dec_fec_mensal "
+    "GROUP BY 1, 2) m GROUP BY municipio",
+    "SELECT SUM(dec) FROM (SELECT mes_referencia, SUM(a.ucs_atendidas * a.dec)::numeric / "
+    "SUM(a.ucs_atendidas) AS dec FROM agg_dec_fec_mensal a GROUP BY 1) m",
+    "SELECT ROUND(SUM(fec_sem_dia_critico * ucs_atendidas) / CAST(SUM(ucs_atendidas) AS numeric), 4) "
+    "FROM agg_dec_fec_mensal WHERE mes_referencia = '2025-07'",
+])
+def test_formula_ponderada_com_nullif_cast_ou_alias_passa(sql):
+    validar_regra_dec_fec_no_sql(sql, "DEC por município em P2")
+
+
 def test_agente_troca_a_media_pela_soma_antes_de_consultar_o_banco() -> None:
     sqls_no_banco: list[str] = []
 

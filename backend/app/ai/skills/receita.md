@@ -16,7 +16,7 @@
   - `faturas` (int — quantidade de faturas emitidas)
   - `tarifa_media` (numeric, BRL/kWh)
 
-### `agg_preco_volume` (preferencial para decomposição da variação de receita entre P1 e P2)
+### `agg_preco_volume` (preferencial para decomposição da variação de receita entre P1 e P2; outros períodos: Exemplo 6)
 - **Grão:** `municipio` × `bairro` × `classe`.
 - **Colunas:**
   - `municipio`, `bairro`, `classe`
@@ -63,7 +63,9 @@
 3. **Períodos Canônicos P1 e P2 (Regra 4.4):**
    - **P1 ( primeiro ano da base ):** `mes_referencia BETWEEN '2022-07' AND '2023-06'`.
    - **P2 ( últimos 12 meses da base ):** `mes_referencia BETWEEN '2025-07' AND '2026-06'`.
-   - **"Último ano":** quando a pergunta falar em *"perdeu/cresceu no último ano"*, explicite o período usado (comparação P2 vs P1 ou 12 meses de P2 vs 12 meses imediatamente anteriores `'2024-07'` a `'2025-06'`).
+   - **Ano civil:** a base tem 2023, 2024 e 2025 completos; 2022 começa em julho e 2026 termina em junho. "Em 2025 (janeiro a dezembro)" usa `'2025-01'` a `'2025-12'`; "perdeu/cresceu em 2025" compara com 2024 (`'2024-01'` a `'2024-12'`).
+   - **Últimos 12 meses:** são o P2; "perdeu/cresceu nos últimos 12 meses" compara com os 12 meses imediatamente anteriores (`'2024-07'` a `'2025-06'`), não com P1.
+   - "Último ano" e "ano passado" chegam já resolvidos pelo portal em uma dessas duas formas. Diga na resposta quais meses foram comparados.
 
 4. **Correção de Premissa Falsa:**
    - Se o usuário perguntar *"Quanto a receita comercial cresceu em Jaboatão?"*, corrija educadamente a premissa: de P1 para P2, a receita comercial em `'JABOATÃO DOS GUARARAPES'` **caiu 2,09%** (não cresceu).
@@ -99,7 +101,7 @@ LIMIT 10;
 ```
 
 ### Exemplo 2: Bairro que mais perdeu volume residencial entre P1 e P2
-**Pergunta:** Qual bairro mais perdeu volume residencial no último ano?
+**Pergunta:** Qual bairro mais perdeu volume residencial entre P1 e P2?
 ```sql
 SELECT
     municipio,
@@ -158,4 +160,40 @@ SELECT
     ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
 FROM agg_preco_volume
 LIMIT 1;
+```
+
+### Exemplo 6: Preço × volume fora de P1 e P2 (mesma fórmula da Gold)
+**Pergunta:** Quanto da variação da receita de energia de 2025 contra 2024 foi preço e quanto foi volume?
+`agg_preco_volume` só tem P1 × P2. Para outro par de períodos (anos civis, últimos 12 meses contra os 12 anteriores), calcule a decomposição em `agg_receita_mensal` por município × bairro × classe, como a Gold faz, e só depois some:
+- tarifa do segmento = `receita_energia / consumo_kwh` do período base (sem kWh no período base, use a do período comparado);
+- efeito-volume do segmento = `(kWh comparado − kWh base) × tarifa`, arredondado a 2 casas;
+- efeito-preço = variação da receita − efeito-volume (preço + volume fecham exatamente com a variação).
+Troque só os meses dos `FILTER`; para recortar por município, bairro ou classe, filtre no `WHERE` ou agrupe por eles no `SELECT` final.
+```sql
+WITH segmento AS (
+    SELECT
+        municipio, bairro, classe,
+        COALESCE(SUM(receita_energia) FILTER (WHERE mes_referencia BETWEEN '2024-01' AND '2024-12'), 0) AS receita_base,
+        COALESCE(SUM(consumo_kwh)     FILTER (WHERE mes_referencia BETWEEN '2024-01' AND '2024-12'), 0) AS kwh_base,
+        COALESCE(SUM(receita_energia) FILTER (WHERE mes_referencia BETWEEN '2025-01' AND '2025-12'), 0) AS receita_comparada,
+        COALESCE(SUM(consumo_kwh)     FILTER (WHERE mes_referencia BETWEEN '2025-01' AND '2025-12'), 0) AS kwh_comparado
+    FROM agg_receita_mensal
+    WHERE mes_referencia BETWEEN '2024-01' AND '2025-12'
+    GROUP BY municipio, bairro, classe
+),
+efeitos AS (
+    SELECT
+        receita_base, receita_comparada,
+        receita_comparada - receita_base AS variacao_receita,
+        ROUND((kwh_comparado - kwh_base)
+              * COALESCE(receita_base / NULLIF(kwh_base, 0), receita_comparada / NULLIF(kwh_comparado, 0)), 2) AS efeito_volume
+    FROM segmento
+)
+SELECT
+    ROUND(SUM(receita_base), 2) AS receita_energia_2024_brl,
+    ROUND(SUM(receita_comparada), 2) AS receita_energia_2025_brl,
+    ROUND(SUM(variacao_receita), 2) AS variacao_receita_brl,
+    ROUND(SUM(variacao_receita - efeito_volume), 2) AS efeito_preco_brl,
+    ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
+FROM efeitos;
 ```

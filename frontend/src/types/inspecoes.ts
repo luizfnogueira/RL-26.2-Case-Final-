@@ -11,9 +11,11 @@ export const STATUS_ATIVOS: readonly StatusOrdem[] = ['ABERTA', 'EM_CAMPO']
 export interface ParamsCandidatos extends FiltrosRegiao, ParamsPaginacao {
   periodo_atual: Periodo
   periodo_comparacao?: Periodo
+  sem_ordem_ativa?: boolean
 }
 
 export type ConfiancaEvidencia = 'ALTA' | 'MEDIA' | 'BAIXA' | 'INDETERMINADA'
+export type AcaoRecomendada = 'INSPECAO_PRIORITARIA' | 'VALIDACAO_DOCUMENTAL'
 
 export interface Candidato {
   id_uc: string
@@ -24,13 +26,14 @@ export interface Candidato {
   /** Posição global após filtros, antes da paginação. */
   posicao: number
   motivos: string[]
+  acao_recomendada: AcaoRecomendada
   /** Estimativa futura em kWh; não é o kWh já recuperado do histórico. */
   energia_estimada: Indicador
   /** De 0 a 100. */
   score: number
   /** Score não é probabilidade de fraude; a energia estimada não é energia comprovada. */
   confianca_evidencia: ConfiancaEvidencia
-  /** Desabilitar a seleção de UCs com ordem ativa. */
+  /** Somente INSPECAO_PRIORITARIA sem ordem ativa pode gerar ordem de campo. */
   ordem_ativa: boolean
   id_ordem_ativa: number | null
 }
