@@ -451,6 +451,8 @@ describe('ReceitaPage (com mocks)', () => {
     const comparar = screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement
     expect(comparar.disabled).toBe(true)
     expect(comparar.title).toMatch(/não aplica o filtro de classe/)
+    // O aviso também aparece como texto, para quem não consegue passar o mouse no botão
+    expect(screen.getByText('Comparar não aplica o filtro de classe')).toBeTruthy()
   })
 
   it('escolher um bairro tira o "ver" da URL: voltar pelo breadcrumb mostra os bairros', async () => {

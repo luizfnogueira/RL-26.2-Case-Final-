@@ -266,11 +266,18 @@ export default function DrillDownReceita({
               ))}
             </div>
           )}
+          {comparacaoIgnoraClasse && (
+            // Texto visível: botão desabilitado não recebe foco nem hover (celular), então o title não basta
+            <p id="aviso-comparar-classe" className="text-legenda text-ink-2">
+              Comparar não aplica o filtro de classe
+            </p>
+          )}
           <Button
             variante="secundario"
             tamanho="sm"
             disabled={!podeComparar}
             onClick={lidarComComparar}
+            aria-describedby={comparacaoIgnoraClasse ? 'aviso-comparar-classe' : undefined}
             title={
               comparacaoIgnoraClasse
                 ? 'A comparação não aplica o filtro de classe: limpe a classe para comparar'
