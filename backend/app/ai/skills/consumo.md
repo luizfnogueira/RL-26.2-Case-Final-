@@ -30,7 +30,7 @@
    - Variação % = `(consumo_p2 - consumo_p1) / consumo_p1 * 100`. "Queda acima de 30%" = variação `< -30`.
    - Considere só UCs com consumo nos dois períodos (`consumo_p1 > 0` e `consumo_p2` não nulo).
    - Diga na resposta qual comparação foi usada.
-   - Se a pergunta falar em "último ano" ou "últimos 12 meses", compare P2 com `'2024-07'` a `'2025-06'`.
+   - "No último ano" segue a convenção do agente (P2 contra P1). Compare P2 com `'2024-07'` a `'2025-06'` só quando a pergunta pedir os 12 meses anteriores. Registre a comparação usada em `premissas`.
    - Se pedir "em algum mês" ou "mês a mês", use `variacao_pct` de `uc_consumo_comparativo`.
 
 3. **Conta alta:** `flag_conta_alta = TRUE` em `uc_consumo_comparativo` (consumo mais de 20% acima do mesmo mês do ano anterior). Não existe conta alta antes de `'2023-07'`.

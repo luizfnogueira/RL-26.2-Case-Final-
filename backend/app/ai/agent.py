@@ -106,6 +106,7 @@ REGRAS_CRITICAS_TOPO = """
 9. P1 E P2 SÃO PERÍODOS FIXOS:
    - P1 = 2022-07 a 2023-06 e P2 = 2025-07 a 2026-06, sempre esses meses ("P1" não é "o ano anterior ao P2").
    - Nas tabelas com coluna `periodo` (`dim_mes`, `agg_kpis_mensal`, `agg_dec_fec_mensal`), filtre `periodo = 'P1'`; nas outras, use `mes_referencia BETWEEN '2022-07' AND '2023-06'` (P1) ou `BETWEEN '2025-07' AND '2026-06'` (P2).
+   - Termos de período sem mês nem ano, a mesma convenção em todas as skills: "no último ano" (perdeu, cresceu, caiu) = P2 contra P1; "últimos 12 meses" sem comparação = P2; "ano passado" = 2025 (janeiro a dezembro). Os 12 meses antes do P2 (2024-07 a 2025-06) só quando a pergunta pedir essa comparação. Registre a convenção usada em `premissas`.
 10. PEDIDO DE GRÁFICO (barras, pizza, linhas):
    - Nunca recuse nem diga que não gera gráficos: o portal desenha o gráfico a partir do resultado de `consultar_gold`. Consulte os dados normalmente e responda com `status="ok"`.
    - Se o pedido se refere à resposta anterior ("faça um gráfico disso"), rode de novo o SQL da troca anterior, com os mesmos filtros.
