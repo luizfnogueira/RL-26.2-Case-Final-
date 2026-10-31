@@ -99,7 +99,7 @@ relatório. Ele também responde dúvidas sobre como usar esta plataforma.
 - Se aparecer **"O assistente está indisponível no momento"**, a sua pergunta continua no campo. Espere alguns instantes e clique em **Enviar** de novo.
 
 ## Como o assistente chega à resposta {#assistente-como-funciona}
-<!-- nivel: publico | rota: /assistente | palavras: como funciona o assistente, como a ia funciona, de onde vem a resposta, confiar, auditar, como cheguei nisso, inventa -->
+<!-- nivel: publico | rota: /assistente | palavras: como funciona o assistente, como a ia funciona, como o agente funciona, inteligência artificial funciona, de onde vem a resposta, confiar, auditar, como cheguei nisso, inventa -->
 
 1. O assistente entende a sua pergunta e escreve a consulta aos dados oficiais da plataforma, os mesmos das outras telas.
 2. Ele só tem permissão para **ler** os dados: não altera, apaga nem cria nada.
