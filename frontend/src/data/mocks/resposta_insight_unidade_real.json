@@ -58,7 +58,7 @@
     "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
     "observacoes": [
       "Dados fictícios do exemplo do contrato; no modo real, vêm da carga da Gold.",
-      "Texto alternativo: resumo montado por regra sobre os números da Gold; o resumo por IA da unidade ainda não está ligado."
+      "Texto alternativo: IA_MODO=mock; resumo montado por regra sobre os números da Gold."
     ]
   }
 }

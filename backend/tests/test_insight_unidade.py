@@ -27,8 +27,9 @@ PEDIDO = {'contexto': 'unidade', 'id_uc': 'UC-1', 'filtros': {'periodo_atual': P
 
 @pytest.fixture
 def real(monkeypatch):
-    """GOLD_SOURCE=real e o repository da Visão 360 trocado por um falso (sem banco)."""
+    """GOLD_SOURCE=real, IA_MODO=mock e o repository da Visão 360 trocado por um falso (sem banco)."""
     monkeypatch.setattr(config, 'GOLD_SOURCE', 'real')
+    monkeypatch.setattr(config, 'IA_MODO', 'mock')
 
     def usar_repositorio(repo):
         monkeypatch.setattr(insight_unidade, 'repositorio', lambda db: repo)

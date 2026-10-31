@@ -573,10 +573,12 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 
 - `filtros.periodo_atual` é a janela da Visão 360 e precisa ter 12 meses (como no GET); `periodo_comparacao` e os filtros de região são ignorados. Fora de 12 meses: 422 `DADOS_INVALIDOS`.
 - `indicadores` é **ignorado**: a resposta não usa nada do navegador, então enviá-los não muda nada.
-- Até o modelo ser ligado, o texto é sempre o por regra e `metadados.observacoes` termina com `Texto alternativo: resumo montado por regra sobre os números da Gold; o resumo por IA da unidade ainda não está ligado.` O front usa o prefixo para mostrar o selo de texto alternativo, como na receita.
+- `IA_MODO=real`: o modelo redige pelo mesmo agente de insight da receita (`escrever_insight`, com as instruções da unidade em `backend/app/services/redacao_ia_unidade.py`), no prazo de `IA_TIMEOUT_S` − 5 s. Ele recebe o caso já decidido (situação, motivos, contexto e avisos, em palavras) e os valores como marcadores formatados; todo número do texto sai de marcador. O título é sempre o do código ("Valor da conta subiu", "… caiu", "… estável", "Sem base de comparação"). Depois, uma conferência de cobertura recusa o texto da IA se faltar o valor da conta ou o número-chave de algum motivo ou aviso, se passar de 4 frases, se tiver sinal ou hífen, identificador interno ou chave sobrando, "bandeira" sem bandeira no caso (ou o contrário: bandeira no caso sem a palavra "bandeira"), geração própria/solar/painel sem GD no caso, média e geração própria na mesma frase, ou "a conta" sem "o valor da". As instruções pedem os dois valores em reais (o do mês e o do mesmo mês do ano anterior) na primeira frase. Texto aceito: sem observação extra (selo "Gerado por IA"), e `numeros_utilizados` traz os números do caso que aparecem no texto da IA.
+- Qualquer falha vira o texto por regra, com uma observação começando por `Texto alternativo:` (o front usa o prefixo para o selo, como na receita): `o módulo de IA não respondeu; …` (prazo, erro do provedor, validador do agente insistindo no erro), `o texto da IA não passou na conferência; …` ou `sem valor da conta no mês para a IA redigir; …`. Nunca 503.
+- `IA_MODO=mock`: sempre o texto por regra, com `Texto alternativo: IA_MODO=mock; resumo montado por regra sobre os números da Gold.`
 - Erros iguais aos do GET /unidades/{id}: UC inexistente, 404 `UC_INEXISTENTE`; Gold não carregada, 503 `GOLD_NAO_CARREGADA`.
 
-**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade_real.json)** (fictício: UC-DEMO-001, com o valor de jun/2025 inventado; abaixo, um trecho)
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade_real.json)** (fictício: UC-DEMO-001, com o valor de jun/2025 inventado, em `IA_MODO=mock`, ou seja, o texto por regra; abaixo, um trecho)
 
 ```json
 {
