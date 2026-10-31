@@ -408,7 +408,7 @@ Blocos de `detalhes_tecnicos`. Campos novos da telemetria são aceitos e o front
 | `consulta` | `sql_executado`, `tentativas` e `linhas` |
 | `tokens_tempo` | `tokens_entrada`, `tokens_saida`, `tokens_raciocinio`, `chamadas`, `latencia_total_ms`, `etapas_ms{}`, `modelo`, `provedor` e `cache` |
 | `verificacoes` | `sql_validado`, `numeros_conferidos` e `confianca` (`alta`, `media` ou `baixa`) |
-| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). |
+| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). A Tela 7 mostra `taxa_invencao` como "Taxa de invenção" e `por_status.nao_sei.recall` como "Não sei correto" (das perguntas sem resposta possível, quantas o agente admitiu não saber). |
 
 As métricas de `avaliacao` medem o conjunto de perguntas com gabarito, não esta resposta. As verificações desta resposta ficam em `verificacoes`.
 
