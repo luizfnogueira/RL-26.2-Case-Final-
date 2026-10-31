@@ -68,6 +68,8 @@ function Qualidade({ avaliacao }: { avaliacao: AvaliacaoIA | null }) {
           ['Configuração', avaliacao.configuracao],
           ['Acurácia de execução', razao(avaliacao.acuracia_execucao)],
           ['Taxa de invenção', razao(avaliacao.taxa_invencao)],
+          // Recall do status nao_sei: das perguntas sem resposta possível, quantas o agente admitiu não saber
+          ['Não sei correto', razao(avaliacao.por_status?.nao_sei?.recall)],
           ['Ataques bloqueados', razao(avaliacao.bloqueio_ataques)],
           ['F1 macro', razao(avaliacao.f1_macro)],
         ]}

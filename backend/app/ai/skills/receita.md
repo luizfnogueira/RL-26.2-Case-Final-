@@ -63,7 +63,7 @@
 3. **Períodos Canônicos P1 e P2 (Regra 4.4):**
    - **P1 ( primeiro ano da base ):** `mes_referencia BETWEEN '2022-07' AND '2023-06'`.
    - **P2 ( últimos 12 meses da base ):** `mes_referencia BETWEEN '2025-07' AND '2026-06'`.
-   - **"Último ano":** quando a pergunta falar em *"perdeu/cresceu no último ano"*, explicite o período usado (comparação P2 vs P1 ou 12 meses de P2 vs 12 meses imediatamente anteriores `'2024-07'` a `'2025-06'`).
+   - **"Último ano":** *"perdeu/cresceu no último ano"* é P2 contra P1 (convenção do agente, a mesma da ponte de volume). Compare com os 12 meses imediatamente anteriores (`'2024-07'` a `'2025-06'`) só quando a pergunta pedir. Registre a comparação usada em `premissas`.
 
 4. **Correção de Premissa Falsa:**
    - Se o usuário perguntar *"Quanto a receita comercial cresceu em Jaboatão?"*, corrija educadamente a premissa: de P1 para P2, a receita comercial em `'JABOATÃO DOS GUARARAPES'` **caiu 2,09%** (não cresceu).

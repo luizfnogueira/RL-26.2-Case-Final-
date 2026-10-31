@@ -29,3 +29,17 @@ def test_periodo_com_meses_errados_e_barrado(sql, pergunta):
 ])
 def test_periodo_certo_ou_sem_p1_p2_na_pergunta_passa(sql, pergunta):
     validar_regra_periodo_no_sql(sql, pergunta)
+
+
+def test_ultimo_ano_tem_uma_convencao_so_no_prompt_e_nas_skills():
+    """Mesmo termo, mesmo período: "último ano" é P2 contra P1 no prompt e em todas as skills."""
+    from app.ai.agent import REGRAS_CRITICAS_TOPO, carregar_texto_skills
+    from app.ai.roteador import MAPA_GLOSSARIO_SKILLS
+
+    assert '"no último ano" (perdeu, cresceu, caiu) = P2 contra P1' in REGRAS_CRITICAS_TOPO
+    assert '"ano passado" = 2025 (janeiro a dezembro)' in REGRAS_CRITICAS_TOPO
+    for skill in MAPA_GLOSSARIO_SKILLS:
+        texto = carregar_texto_skills([skill])
+        for linha in texto.splitlines():
+            if "último ano" in linha and "2024-07" in linha:
+                assert "só quando" in linha, f"{skill}: {linha.strip()}"
