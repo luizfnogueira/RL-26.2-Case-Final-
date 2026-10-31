@@ -151,6 +151,8 @@ export default function ReceitaPage() {
           <DrillDownReceita
             drill={dados.drill_down}
             carregando={atualizando}
+            periodoAtual={periodoAtual}
+            periodoComparacao={periodoComparacao}
             aoSelecionar={(linha) =>
               definir({
                 municipio: linha.filtros.municipio ?? '',
