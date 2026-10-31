@@ -18,10 +18,10 @@ from app.repositories import interacao_repository
 from app.repositories.gold_metadata import metadados_gold
 from app.schemas.ia import GraficoIA, PerguntaIA, RespostaIA
 from app.repositories import vocabulario_gold
-from app.services import cache_respostas, esclarecimento_ia, grafico_ia, stub_ia
+from app.services import cache_respostas, grafico_ia, stub_ia
 from app.ai.consulta import descrever_tabela, valores_distintos
 from app.ai.entidades import resolver_entidades
-from app.ai.guardrails import resposta_da_triagem, triar
+from app.ai.intencao import classificar, resposta_sem_consulta
 
 logger = logging.getLogger(__name__)
 
@@ -180,19 +180,9 @@ class AgenteReal:
 
     def perguntar(self, dados: PerguntaIA) -> dict:
         try:
-            # Pré-filtro (GENAI-22): o óbvio é barrado ou respondido antes de tudo, sem gastar tokens
-            triagem = triar(dados.pergunta)
-            segue = triagem.acao == "seguir"
             responder = self.responder or _responder_do_agente()
             executar_sql = self.executar_sql or _executor_sql()
-            
-            extras = {}
-            if self.executar_sql is None:
-                from app.ai.consulta import descrever_tabela, valores_distintos
-                extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
-                if segue:
-                    extras["entidades_resolvidas"] = resolver_entidades(triagem.pergunta)
-            
+
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
                 # Conversa longa: as perguntas anteriores às 3 da memória, em lista curta (só para o agente)
@@ -201,16 +191,24 @@ class AgenteReal:
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
                 # Nomes da Gold (uma consulta por versão): esclarecimento e assinatura do cache
                 nomes = vocabulario_gold.nomes(db, gold["gold_atualizada_em"])
-                # Pergunta ambígua volta com opções antes de gastar tokens
-                esclarecer = segue and esclarecimento_ia.detectar(
-                    dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
-                sem_o_comeco = segue and not esclarecer and (
+                # Roteador de intenção: segurança, fora de escopo, esclarecimento e dados ausentes são
+                # respondidos antes de qualquer consulta, sem gastar tokens; só a rota consulta segue
+                intencao = classificar(dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
+                segue = intencao.rota == "consulta"
+                sem_o_comeco = segue and (
                     pede_o_comeco_da_conversa(dados.pergunta)
                     and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico) + len(resumo))
                 # Respostas pré-calculadas: pergunta igual ou parecida a uma já respondida, sem histórico
-                usa_cache = cache_ligado() and segue and not historico and not esclarecer and not sem_o_comeco
+                usa_cache = cache_ligado() and segue and not historico and not sem_o_comeco
                 reaproveitada = (cache_respostas.buscar(db, dados.pergunta, gold["gold_atualizada_em"], nomes)
                                  if usa_cache else None)
+
+            extras = {}
+            if self.executar_sql is None:
+                from app.ai.consulta import descrever_tabela, valores_distintos
+                extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
+                if segue:
+                    extras["entidades_resolvidas"] = resolver_entidades(intencao.pergunta)
             para_o_cache = None
             # Cada consulta do agente, completa: a resposta só leva 50 linhas e o gráfico precisa de todas
             resultados: list = []
@@ -220,20 +218,14 @@ class AgenteReal:
                 resultados.append(resultado)
                 return resultado
             if not segue:
-                resposta = resposta_da_triagem(
-                    triagem,
-                    conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
-                    gold_atualizada_em=gold["gold_atualizada_em"],
-                )
-            elif esclarecer:
-                resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
+                resposta = resposta_sem_consulta(intencao, gold["gold_atualizada_em"])
             elif sem_o_comeco:
                 resposta = resposta_sem_o_comeco_da_conversa(historico, resumo, gold["gold_atualizada_em"])
             elif reaproveitada is not None:
                 resposta = reaproveitada
             else:
                 resposta = executar_com_prazo(lambda: responder(
-                    triagem.pergunta,
+                    intencao.pergunta,
                     historico=historico,
                     resumo_conversa=resumo,
                     conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
