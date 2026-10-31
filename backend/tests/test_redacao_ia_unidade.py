@@ -2,6 +2,7 @@
 import json
 import re
 import time
+from datetime import date
 from functools import partial
 
 import pytest
@@ -19,10 +20,10 @@ from app.services.insight_service import PREFIXO_TEXTO_ALTERNATIVO, GeradorIA
 from app.services.insight_unidade import (
     OBSERVACAO_CONFERENCIA, OBSERVACAO_FALHA, OBSERVACAO_SEM_IA, OBSERVACAO_SEM_SITUACAO,
 )
-from app.services.redacao_ia_unidade import INSTRUCOES_UNIDADE, Caso, aparece
+from app.services.redacao_ia_unidade import INSTRUCOES_UNIDADE, Caso, aparece, frases
 from app.services.texto_unidade import texto_por_regra_unidade
-from tests.test_diagnostico_conta import historico
-from tests.test_fatos_unidade import ESTAVEL, RepositorioComContas, contas, por_preco
+from tests.test_diagnostico_conta import JANELA, _mes, historico
+from tests.test_fatos_unidade import ESTAVEL, MES, RepositorioComContas, contas, gd, por_preco
 from tests.test_insight import gold_falsa  # noqa: F401  (autouse: get_db sem banco)
 from tests.test_unidade_service import CADASTRO, MEDIDOR, METADADOS, _fatura
 
@@ -212,11 +213,75 @@ def test_geracao_propria_sem_gd_no_caso_reprova(ia, palavra):
 
 
 def test_geracao_propria_com_gd_no_caso_passa(ia):
-    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', ' A unidade tem geração própria desde {mes_conexao_gd}. '
-                                                    'Vale verificar').replace('Em {mes_analisado}, o', 'O')))
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', ' A unidade tem geração própria desde {mes_conexao_gd}, já '
+                                                    'presente no mesmo mês do ano anterior. Vale verificar')
+          .replace('Em {mes_analisado}, o', 'O')))
     corpo = pedir()
     assert alternativo(corpo) == []
     assert 'geração própria desde fev/2025' in corpo['texto']
+
+
+# ---------- GD de antes do período e valor do ano anterior ----------
+
+GD_SEM_ANO_ANTERIOR = ' A unidade tem geração própria desde {mes_conexao_gd}.'
+
+
+@pytest.mark.parametrize('frase_gd', [
+    ' A unidade tem geração própria desde {mes_conexao_gd}, já presente no mesmo mês do ano anterior.',
+    ' A unidade já tinha painel solar em {mes_ano_anterior}, desde {mes_conexao_gd}.',
+], ids=['ano-anterior-por-extenso', 'mes-do-ano-anterior'])
+def test_gd_de_antes_do_periodo_citando_o_ano_anterior_passa(ia, frase_gd):
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', frase_gd + ' Vale verificar').replace('Em {mes_analisado}, o', 'O')))
+    assert alternativo(pedir()) == []
+
+
+@pytest.mark.parametrize('frase_gd', [
+    GD_SEM_ANO_ANTERIOR,
+    ' A unidade possui painel solar desde {mes_conexao_gd}.',
+], ids=['geracao-propria', 'painel-solar'])
+def test_gd_de_antes_do_periodo_sem_citar_o_ano_anterior_reprova(ia, frase_gd):
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', frase_gd + ' Vale verificar').replace('Em {mes_analisado}, o', 'O')))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+
+
+def test_gd_conectada_no_periodo_sem_ser_motivo_nao_exige_o_ano_anterior(ia):
+    # Conectada em nov/2025 com o consumo subindo: contexto "passou a ter", a regra do ano anterior não vale
+    repo = repo_base(ficha=FichaUC(CADASTRO, MEDIDOR, gd(date(2025, 11, 20))))
+    caso = Caso(carregar_fatos_unidade(repo, 'UC-1'))
+    assert caso.com_gd and not caso.gd_antes_do_periodo
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', ' A unidade passou a ter geração própria em {mes_conexao_gd}.'
+                                                    ' Vale verificar').replace('Em {mes_analisado}, o', 'O')), repo=repo)
+    assert alternativo(pedir()) == []
+
+
+def test_o_caso_pede_o_ano_anterior_ao_citar_a_gd():
+    assert 'diga sempre que ela já existia no mesmo mês do ano anterior' in Caso(fatos_base()).instrucoes()
+
+
+def test_contexto_pede_frases_proprias_na_ordem_media_e_gd_com_o_molde_da_gd():
+    caso = Caso(carregar_fatos_unidade(repo_media_e_gd(), 'UC-1')).instrucoes()
+    bloco = caso.split('Contexto (', 1)[1].split('Avisos (', 1)[0]
+    assert 'cada item numa frase própria' in bloco and 'primeiro a média, depois a geração própria' in bloco
+    assert bloco.index('da {base_media}') < bloco.index('geração própria desde {mes_conexao_gd}')
+    assert ('Molde da frase: "A unidade tem geração própria desde {mes_conexao_gd}, já presente no mesmo mês do '
+            'ano anterior."') in bloco
+
+
+def test_valor_do_ano_anterior_omitido_reprova(ia):
+    ia(ok(texto=TEXTO_IA.replace(' ({valor_conta_ano_anterior})', '')))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+
+
+def test_sem_ano_anterior_o_valor_do_ano_anterior_nao_e_exigido(ia):
+    meses = [_mes(m, 200) for m in JANELA[6:-1]] + [_mes(MES, 300)]
+    repo = RepositorioComContas(conta=contas(valor_anterior=None), meses=meses, ficha=SEM_GD)
+    ia(ok(texto='O valor da conta de {mes_analisado} foi de {valor_conta_mes}; não há o mesmo mês do ano anterior '
+                'para comparar. Vale verificar a fatura em aberto de {faturas_em_aberto_valor}.'), repo=repo)
+    corpo = pedir()
+    assert alternativo(corpo) == []
+    assert corpo['titulo'] == 'Sem base de comparação'
 
 
 # Caso com média e GD de contexto: consumo estável no ano e 36% abaixo da média, valor 13% abaixo (estável),
@@ -225,8 +290,8 @@ ABAIXO_DA_MEDIA = {'ultimo': 52, 'ano_anterior': 60, 'base': 83}
 TEXTO_MEDIA_E_GD = ('O valor da conta de {mes_analisado} foi de {valor_conta_mes}, {variacao_valor_conta} abaixo de '
                     '{mes_ano_anterior} ({valor_conta_ano_anterior}), dentro do normal. O consumo de {mes_analisado} '
                     '({consumo_mes}) ficou {desvio_consumo_media} abaixo da {base_media} ({media_consumo}). A unidade '
-                    'tem geração própria desde {mes_conexao_gd}. Vale verificar a fatura em aberto de '
-                    '{faturas_em_aberto_valor}.')
+                    'tem geração própria desde {mes_conexao_gd}, já presente no mesmo mês do ano anterior. Vale '
+                    'verificar a fatura em aberto de {faturas_em_aberto_valor}.')
 # Caso com bandeira como detalhe do preço: consumo estável, preço +25% e bandeira de verde para vermelha patamar 2
 TEXTO_BANDEIRA = ('O valor da conta de {mes_analisado} foi de {valor_conta_mes}, {variacao_valor_conta} acima de '
                   '{mes_ano_anterior} ({valor_conta_ano_anterior}). O preço médio por kWh subiu {variacao_preco_kwh}, '
@@ -274,7 +339,6 @@ def test_bandeira_do_caso_sem_a_palavra_reprova(ia):
 
 
 def test_frases_nao_corta_no_ponto_do_milhar():
-    from app.services.redacao_ia_unidade import frases
     assert frases('O valor foi de R$ 2.357,68. Ficou estável.') == ['O valor foi de R$ 2.357,68', 'Ficou estável']
 
 
@@ -308,9 +372,12 @@ def test_busca_do_valor_respeita_o_limite_do_numero(valor, texto, esperado):
 
 
 def test_numeros_utilizados_so_os_que_aparecem_no_texto(ia):
-    ia(ok(texto=TEXTO_IA.replace(' ({valor_conta_ano_anterior})', '')))
-    nomes = [n['nome'] for n in pedir()['numeros_utilizados']]
-    assert 'valor_conta_ano_anterior' not in nomes and 'valor_conta_mes' in nomes
+    # O consumo do ano anterior não é número-chave: tirá-lo do texto passa e ele sai da lista
+    ia(ok(texto=TEXTO_IA.replace('de {consumo_ano_anterior} para {consumo_mes}', 'chegando a {consumo_mes}')))
+    corpo = pedir()
+    assert alternativo(corpo) == []
+    nomes = [n['nome'] for n in corpo['numeros_utilizados']]
+    assert 'consumo_ano_anterior' not in nomes and 'consumo_mes' in nomes
 
 
 # ---------- modos ----------

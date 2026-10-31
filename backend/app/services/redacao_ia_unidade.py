@@ -43,6 +43,7 @@ GD = re.compile(r'gera[cç][aã]o pr[oó]pria|gerar a pr[oó]pria|solar|painel|p
                 re.IGNORECASE)
 BANDEIRA = re.compile(r'bandeira', re.IGNORECASE)
 CONTA_SOZINHA = re.compile(r'(?<!\w)a conta\b', re.IGNORECASE)
+ANO_ANTERIOR = re.compile(r'ano anterior', re.IGNORECASE)
 FIM_DE_FRASE = re.compile(r'[.!?](?=\s|$)')
 
 
@@ -74,6 +75,8 @@ class Caso:
         motivos = ' '.join(frase for tipo, frase in self.frases if tipo == 'motivo')
         self.com_media = any('média' in frase for frase in contexto)
         self.gd_contexto = next((frase for frase in contexto if 'geração própria' in frase), None)
+        # GD conectada até o mês do ano anterior: estava nos dois meses, então não explica a mudança
+        self.gd_antes_do_periodo = self.gd_contexto is not None and 'já presente' in self.gd_contexto
         self.com_bandeira = 'bandeira' in motivos
         self.com_gd = self.gd_contexto is not None or 'gd_conectada' in fatos['motivos']
         self.marcadores = self._marcadores()
@@ -147,8 +150,11 @@ class Caso:
                          'da {base_media} ({media_consumo}).')
         if self.gd_contexto:
             itens.append('a unidade tem geração própria desde {mes_conexao_gd}, já presente no mesmo mês do ano '
-                         'anterior.' if 'já presente' in self.gd_contexto
-                         else 'a unidade passou a ter geração própria em {mes_conexao_gd}.')
+                         'anterior (se citar a geração própria, diga sempre que ela já existia no mesmo mês do '
+                         'ano anterior). Molde da frase: "A unidade tem geração própria desde {mes_conexao_gd}, '
+                         'já presente no mesmo mês do ano anterior."' if self.gd_antes_do_periodo
+                         else 'a unidade passou a ter geração própria em {mes_conexao_gd}. Molde da frase: '
+                              '"A unidade passou a ter geração própria em {mes_conexao_gd}."')
         return itens
 
     def avisos(self) -> list[str]:
@@ -175,15 +181,19 @@ class Caso:
         return (f'{INSTRUCOES_UNIDADE}\n\nCaso desta unidade (decidido pelo código; não acrescente nada):\n'
                 f'Situação: {self.situacao()}\n'
                 f'Motivos (use todos, um por frase):\n{lista(self.motivos())}\n'
-                f'Contexto (opcional, frase própria, sem palavra de causa):\n{lista(self.contexto())}\n'
+                'Contexto (opcional; cada item numa frase própria, nunca junto de outro item nem da frase de '
+                'um motivo, nesta ordem: primeiro a média, depois a geração própria; sem palavra de causa):\n'
+                f'{lista(self.contexto())}\n'
                 f'Avisos (pontos a verificar, numa frase curta no fim):\n{lista(self.avisos())}')
 
     # ---------- depois da IA ----------
 
     def numeros_chave(self) -> list[str]:
-        """Valores que precisam aparecer no texto: o valor da conta e um por motivo e por aviso."""
+        """Valores que precisam aparecer no texto: os dois valores da conta e um por motivo e por aviso."""
         f, m = self.f, self.marcadores
         chaves = [m['valor_conta_mes']]
+        if 'valor_conta_ano_anterior' in m:                # sem base de comparação, não há
+            chaves.append(m['valor_conta_ano_anterior'])
         for motivo in f['motivos']:
             if motivo in ('consumo_subiu', 'consumo_caiu'):
                 chaves.append(m['variacao_consumo_ano_anterior'])
@@ -221,6 +231,11 @@ class Caso:
         # O contexto da média e o da GD são frases próprias: juntos, soariam como causa um do outro
         if any('média' in frase and GD.search(frase) for frase in frases(texto)):
             problemas.append('média e geração própria na mesma frase')
+        # GD de antes do período citada sem o ano anterior sugeriria que o painel explica a mudança
+        if self.gd_antes_do_periodo and any(
+                GD.search(frase) and not ANO_ANTERIOR.search(frase) and self.marcadores['mes_ano_anterior'] not in frase
+                for frase in frases(texto)):
+            problemas.append('geração própria de antes do período sem citar o ano anterior')
         if GD.search(texto) and not self.com_gd:
             problemas.append('geração própria sem GD no caso')
         if CONTA_SOZINHA.search(texto):
