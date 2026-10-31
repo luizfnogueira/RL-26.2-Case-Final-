@@ -27,6 +27,8 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /unidades/{id} | periodo_atual opcional, sempre de 12 meses; sem ele, os 12 meses até o último mês da Gold |
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; sem_ordem_ativa; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
+| POST /inspecoes/lote | corpo `{"ordens": [...]}` com 1 a 200 itens no formato do POST /inspecoes |
+| GET /inspecoes/indicadores | periodo_conclusao opcional (data de conclusão); município, bairro, classe, alimentador |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta |
 | GET /filtros | sem parâmetros |
@@ -57,6 +59,7 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 404 | ORDEM_NAO_ENCONTRADA | ID de ordem inexistente |
 | 409 | ORDEM_ATIVA_EXISTENTE | UC já tem ordem ABERTA ou EM_CAMPO |
 | 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
+| 422 | LOTE_REJEITADO | Alguma UC do lote falhou na validação; nenhuma ordem foi criada. `detalhes.falhas` lista `{id_uc, codigo, mensagem}` de cada UC |
 | 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
 | 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
@@ -179,7 +182,7 @@ GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=50
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/candidatos.json)**
 
-O padrão retorna todas as UCs com `status_triagem=ELEGIVEL` em `tb_fila_perdas`, incluindo as duas ações recomendadas. `page_size` é 50 por padrão e aceita de 1 a 200; `page` começa em 1. O único filtro próprio da fila é `sem_ordem_ativa` (booleano, padrão `false`): quando `true`, oculta as UCs com ordem `ABERTA` ou `EM_CAMPO`. O total e os indicadores de UCs priorizadas, potencial de recuperação e ordens ativas são calculados depois desse filtro e antes da paginação; `ucs_analisadas` continua representando o universo da auditoria após os filtros geográficos.
+O padrão retorna todas as UCs com `status_triagem=ELEGIVEL` em `tb_fila_perdas`, incluindo as duas ações recomendadas. UCs com ordem `CONCLUIDA` nos últimos 6 meses (pela `data_conclusao` no portal) ficam fora da fila, com ou sem irregularidade encontrada; passada a janela, voltam se a Gold ainda as priorizar. `page_size` é 50 por padrão e aceita de 1 a 200; `page` começa em 1. O único filtro próprio da fila é `sem_ordem_ativa` (booleano, padrão `false`): quando `true`, oculta as UCs com ordem `ABERTA` ou `EM_CAMPO`. O total e os indicadores de UCs priorizadas, potencial de recuperação e ordens ativas são calculados depois desses filtros e antes da paginação; `ucs_analisadas` continua representando o universo da auditoria após os filtros geográficos.
 
 Cada candidato inclui `acao_recomendada` (`INSPECAO_PRIORITARIA` ou `VALIDACAO_DOCUMENTAL`), além de ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa. Os filtros geográficos município, bairro, classe e alimentador são mantidos; não há filtros por motivo ou status nesta rota. Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após todos os filtros (na Gold, `posicao_fila`). `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada.
 
@@ -205,7 +208,7 @@ Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadore
 - Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
 - `data_prevista` é campo, não status. Uma ordem ativa por UC.
 - Resposta usa id_ordem inteiro, id_uc, equipe_responsavel, datas, motivo, kwh_estimado, observacoes, resultado e historico[].
-- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado, observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
+- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado (**kWh por mês** da irregularidade, estimado em campo; 0 sem irregularidade), observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
 - Com irregularidade: tipo obrigatório e kWh não negativo. Sem irregularidade: tipo null e kWh zero. Não há `classificacao` ou `INCONCLUSIVA` neste contrato, para corresponder ao modelo existente.
 - `historico[]`: id_historico, id_ordem, status_anterior, status_novo, data_mudanca, usuario, justificativa_ou_motivo e detalhes.
 
@@ -253,6 +256,42 @@ Content-Type: application/json
 
 **201 — [JSON completo da resposta](../backend/app/services/fixtures/ordem_criada.json)**
 
+### POST /inspecoes/lote
+
+Cria de 1 a 200 ordens de uma vez (seleção múltipla da Tela 4), **tudo ou nada**. Cada UC passa pelas mesmas validações do `POST /inspecoes` antes de qualquer gravação: UC inexistente, UC com ordem ABERTA/EM_CAMPO, UC em `VALIDACAO_DOCUMENTAL` ou UC repetida no lote. Se uma falhar, nenhuma ordem é criada e a resposta lista todas as falhas:
+
+```json
+{
+  "codigo": "LOTE_REJEITADO",
+  "mensagem": "Nenhuma ordem do lote foi criada: corrija as UCs listadas em detalhes.falhas.",
+  "detalhes": {
+    "falhas": [
+      {"id_uc": "UC-DEMO-002", "codigo": "ORDEM_ATIVA_EXISTENTE", "mensagem": "A Unidade Consumidora 'UC-DEMO-002' já possui a ordem ativa #1 com status 'ABERTA'."}
+    ]
+  }
+}
+```
+
+Com todas válidas, as ordens e seus eventos de histórico são gravados num único commit. Se uma ordem ativa for criada em paralelo entre a validação e a gravação, o índice único barra, o lote inteiro é desfeito e a resposta é 409 `ORDEM_ATIVA_EXISTENTE`.
+
+[Corpo de exemplo](../backend/app/services/fixtures/criar_inspecoes_lote.json) · **201 — [resposta](../backend/app/services/fixtures/ordens_criadas_lote.json)**: `{"items": [Ordem, ...], "total": n}`, na ordem do pedido.
+
+### GET /inspecoes/indicadores
+
+Resultado das inspeções concluídas, para saber se a fila está acertando. Calculado só sobre ordens `CONCLUIDA`; os filtros de região seguem o cadastro da UC e `periodo_conclusao` filtra pela data de conclusão (sem ele, todas as concluídas).
+
+| Campo | Cálculo |
+| --- | --- |
+| `concluidas` | Ordens concluídas no recorte |
+| `com_irregularidade` | Concluídas com `irregularidade_detectada = true` |
+| `taxa_acerto_pct` | `com_irregularidade ÷ concluidas × 100`, uma casa; `null` sem concluídas |
+| `ordens_comparadas` | Concluídas com `kwh_estimado`; só elas entram nas duas somas de kWh abaixo |
+| `kwh_mes_campo` | Σ `resultado.kwh_recuperado` dessas ordens, em kWh/mês (informado em campo) |
+| `kwh_mes_fila` | Σ `kwh_estimado` dessas ordens ÷ 3, em kWh/mês. O `kwh_estimado` da `tb_fila_perdas` é `queda_kwh_mensal × meses_atuais`, uma janela de 3 meses |
+| `por_motivo` | Para cada motivo da suspeita: concluídas, com irregularidade e taxa. O motivo vem do campo `motivo` da ordem, com os motivos da fila separados por ` · `; uma ordem com dois motivos conta nos dois. Ordenado por concluídas e depois pela taxa |
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/indicadores_ordens.json)**
+
 ### PATCH /inspecoes/{id}
 
 ```http
@@ -298,7 +337,7 @@ Cancelamento (ordem 1 ou 2):
 
 Resposta completa da ordem com histórico acrescentado. Campos não enviados permanecem; não permite trocar UC, ID ou data de criação. A equipe pode mudar ao iniciar campo. Combinações de campos inválidas: 422; transição inválida: 400.
 
-Persistência: `GET`, `POST` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
+Persistência: `GET`, `POST`, `POST /lote` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
 
 ## 8. GET /operacao — Tela 6
 

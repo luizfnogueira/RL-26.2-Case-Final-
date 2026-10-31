@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../erro-api'
 import {
   atualizarInspecao,
@@ -6,12 +6,15 @@ import {
   buscarComparacao,
   buscarDashboard,
   buscarFiltros,
+  buscarIndicadoresOrdens,
   buscarOperacao,
   buscarUnidade,
   buscarUnidades,
   cancelarInspecao,
   concluirInspecao,
   criarInspecao,
+  criarInspecoesEmLote,
+  falhasDoLote,
   gerarInsight,
   iniciarCampo,
   listarInspecoes,
@@ -270,6 +273,25 @@ describe('GET /unidades', () => {
 })
 
 describe('GET /inspecoes/candidatos', () => {
+  // A UC-DEMO-003 tem ordem concluída em 25/09/2026: relógio fixo para a janela de 6 meses não depender do dia
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-30T12:00:00-03:00'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('tira da fila a UC com inspeção concluída nos últimos 6 meses', async () => {
+    const ids = (await buscarCandidatos({ periodo_atual: ATUAL, page_size: 200 })).items.map(
+      (i) => i.id_uc,
+    )
+    expect(ids).not.toContain('UC-DEMO-003')
+    vi.setSystemTime(new Date('2027-04-01T12:00:00-03:00'))
+    const depois = await buscarCandidatos({ periodo_atual: ATUAL, page_size: 200 })
+    expect(depois.items.map((i) => i.id_uc)).toContain('UC-DEMO-003')
+  })
+
   it('ordena por score, numera a posição e marca ordem ativa', async () => {
     const c = await buscarCandidatos({ periodo_atual: ATUAL })
     const scores = c.items.map((i) => i.score)
@@ -288,10 +310,10 @@ describe('GET /inspecoes/candidatos', () => {
       page_size: 200,
     })
     expect(c.page_size).toBe(200)
-    expect(c.total).toBe(6)
+    expect(c.total).toBe(5)
     expect(c.items.every((i) => !i.ordem_ativa)).toBe(true)
     expect(c.items.map((i) => i.posicao)).toEqual(c.items.map((_, i) => i + 1))
-    expect(c.resumo.ucs_priorizadas.valor).toBe(6)
+    expect(c.resumo.ucs_priorizadas.valor).toBe(5)
     expect(c.resumo.ordens_ativas.valor).toBe(0)
   })
 
@@ -323,7 +345,7 @@ describe('GET /inspecoes/candidatos', () => {
   it('pagina e filtra por região sem diferenciar caixa', async () => {
     const pagina = await buscarCandidatos({ periodo_atual: ATUAL, page: 2, page_size: 3 })
     expect(pagina.items).toHaveLength(3)
-    expect(pagina.total).toBe(8)
+    expect(pagina.total).toBe(7)
     const recife = await buscarCandidatos({ periodo_atual: ATUAL, municipio: 'Recife' })
     expect(recife.items.every((i) => i.municipio === 'Recife')).toBe(true)
     // O valor pode vir do GET /filtros da Gold real, em maiúsculas.
@@ -380,6 +402,66 @@ describe('ordens de inspeção', () => {
     expect((await erroDe(criarInspecao({ ...NOVA, data_prevista: '22/10/2026' }))).codigo).toBe(
       'DADOS_INVALIDOS',
     )
+  })
+
+  it('GET /inspecoes/indicadores calcula o acerto das concluídas e acompanha novas conclusões', async () => {
+    // Snapshot: uma concluída (UC-DEMO-003) com irregularidade: 310 kWh/mês em campo; a fila estimava
+    // 280 kWh em 3 meses, ou seja 93,33 kWh/mês
+    const antes = await buscarIndicadoresOrdens()
+    expect(antes).toMatchObject({
+      concluidas: 1,
+      com_irregularidade: 1,
+      taxa_acerto_pct: 100,
+      ordens_comparadas: 1,
+      kwh_mes_campo: 310,
+      kwh_mes_fila: 93.33,
+    })
+    expect(antes.por_motivo.map((m) => m.motivo)).toEqual(['Consumo abaixo da média do bairro.'])
+
+    // Conclui a ordem #2 (EM_CAMPO) sem irregularidade: a taxa cai para 50%
+    await concluirInspecao(2, {
+      irregularidade_detectada: false,
+      observacoes: 'Instalação regular.',
+    })
+    const depois = await buscarIndicadoresOrdens()
+    expect([depois.concluidas, depois.com_irregularidade, depois.taxa_acerto_pct]).toEqual([
+      2, 1, 50,
+    ])
+
+    const antigo = await buscarIndicadoresOrdens({ periodo_conclusao: '2022-07/2023-06' })
+    expect([antigo.concluidas, antigo.taxa_acerto_pct, antigo.por_motivo]).toEqual([0, null, []])
+  })
+
+  it('POST /inspecoes/lote cria todas as ordens, cada uma com histórico', async () => {
+    const criadas = await criarInspecoesEmLote([NOVA, { ...NOVA, id_uc: 'UC-DEMO-006' }])
+    expect(criadas.total).toBe(2)
+    expect(criadas.items.map((o) => [o.id_uc, o.status, o.historico.length])).toEqual([
+      ['UC-DEMO-001', 'ABERTA', 1],
+      ['UC-DEMO-006', 'ABERTA', 1],
+    ])
+    expect((await listarInspecoes()).total).toBe(6)
+  })
+
+  it('POST /inspecoes/lote recusa o lote inteiro e lista cada UC com problema', async () => {
+    const erro = await erroDe(
+      criarInspecoesEmLote([
+        NOVA,
+        { ...NOVA, id_uc: 'UC-DEMO-002' }, // já tem ordem ativa
+        { ...NOVA, id_uc: 'UC-DEMO-003' }, // validação documental
+        { ...NOVA, id_uc: 'UC-XXX' },
+        NOVA, // repetida no lote
+      ]),
+    )
+    expect([erro.status, erro.codigo]).toEqual([422, 'LOTE_REJEITADO'])
+    expect(falhasDoLote(erro).map((f) => [f.id_uc, f.codigo])).toEqual([
+      ['UC-DEMO-002', 'ORDEM_ATIVA_EXISTENTE'],
+      ['UC-DEMO-003', 'DADOS_INVALIDOS'],
+      ['UC-XXX', 'UC_INEXISTENTE'],
+      ['UC-DEMO-001', 'ORDEM_ATIVA_EXISTENTE'],
+    ])
+    expect((await listarInspecoes()).total).toBe(4) // nada gravado
+    const vazio = await erroDe(criarInspecoesEmLote([]))
+    expect([vazio.status, vazio.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
   })
 
   it('segue o fluxo ABERTA → EM_CAMPO → CONCLUIDA com resultado e histórico', async () => {

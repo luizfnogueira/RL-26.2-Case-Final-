@@ -19,7 +19,8 @@ from app.schemas.inspecao import (
     StatusOrdem,
 )
 from app.schemas.inspecoes import (
-    AtualizarInspecao, Candidatos, CriarInspecao, FiltrosCandidatos, FiltrosInspecoes, Ordem, Ordens,
+    AtualizarInspecao, Candidatos, CriarInspecao, CriarInspecoesLote, FiltrosCandidatos, FiltrosIndicadoresOrdens,
+    FiltrosInspecoes, IndicadoresOrdens, Ordem, Ordens, OrdensCriadas,
 )
 from app.services.candidato_service import CandidatoService
 from app.services.inspecao_service import OrdemInspecaoService
@@ -99,6 +100,25 @@ async def listar_inspecoes(
     }
 
 
+@router.get('/indicadores', response_model=IndicadoresOrdens, summary='Taxa de acerto das inspeções',
+            description=(
+                'Calculado sobre as ordens CONCLUIDA do portal: quantas encontraram irregularidade (taxa de acerto), '
+                'kWh/mês informado em campo contra a estimativa da fila por mês (kwh_estimado ÷ 3, a janela da '
+                'tb_fila_perdas), só com as ordens que têm estimativa (ordens_comparadas), e acerto por motivo da '
+                'suspeita (o campo '
+                'motivo, com os motivos da fila separados por " · "; uma ordem conta em cada motivo dela). '
+                'periodo_conclusao filtra pela data de conclusão; sem ele, todas as concluídas. '
+                'taxa_acerto_pct é null sem ordens concluídas.'
+            ),
+            responses=respostas('indicadores_ordens'))
+async def indicadores_das_ordens(
+    filtros: Annotated[FiltrosIndicadoresOrdens, Query()],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    return {**servico.indicadores(**filtros.model_dump()), 'metadados': metadados(db)}
+
+
 @router.post('', response_model=Ordem, status_code=201, summary='Criar ordem de inspeção',
              description=PERSISTENCIA + ' UC inexistente retorna 404; UC já com ordem ativa retorna 409. '
              'UC marcada como VALIDACAO_DOCUMENTAL em gold.tb_fila_perdas '
@@ -112,6 +132,22 @@ async def criar_inspecao(
 ):
     ordem = servico.criar_ordem(OrdemInspecaoCreate(**dados.model_dump()))
     return para_transporte(ordem)
+
+
+@router.post('/lote', response_model=OrdensCriadas, status_code=201, summary='Criar ordens de inspeção em lote',
+             description=PERSISTENCIA + ' Tudo ou nada, de 1 a 200 ordens: cada UC passa pelas mesmas validações do '
+             'POST /inspecoes antes de qualquer gravação. Se alguma falhar (UC inexistente, ordem ativa, '
+             'VALIDACAO_DOCUMENTAL ou UC repetida no lote), nenhuma ordem é criada e a resposta é 422 '
+             'LOTE_REJEITADO com detalhes.falhas: [{id_uc, codigo, mensagem}].',
+             responses=respostas('ordens_criadas_lote', status=201, erros=('LOTE_REJEITADO',)))
+async def criar_inspecoes_em_lote(
+    dados: Annotated[CriarInspecoesLote, Body(openapi_examples={
+        'lote': {'value': exemplo('criar_inspecoes_lote')},
+    })],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+):
+    ordens = servico.criar_ordens_em_lote([OrdemInspecaoCreate(**ordem.model_dump()) for ordem in dados.ordens])
+    return {'items': [para_transporte(ordem) for ordem in ordens], 'total': len(ordens)}
 
 
 @router.patch('/{id}', response_model=Ordem, summary='Avançar, concluir ou cancelar ordem',

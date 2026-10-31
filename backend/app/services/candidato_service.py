@@ -1,4 +1,5 @@
 from app.repositories.candidato_repository import (
+    MESES_SEM_REINSPECAO,
     CandidatoFila,
     CandidatoRepositoryInterface,
     ResumoFila,
@@ -76,7 +77,8 @@ class CandidatoService:
                     ("Gold V10 real: a fila inclui INSPECAO_PRIORITARIA e VALIDACAO_DOCUMENTAL; "
                      "casos documentais requerem revisao antes de ordem de campo. Score nao e probabilidade de fraude; "
                      "kWh estimado e heuristico. Janela fixa P2 da exportacao."
-                     if manifest else "Fila ficticia do seed; ordens ativas do portal.")
+                     if manifest else "Fila ficticia do seed; ordens ativas do portal."),
+                    f"UCs com inspeção concluída nos últimos {MESES_SEM_REINSPECAO} meses ficam fora da fila.",
                 ],
             },
         }

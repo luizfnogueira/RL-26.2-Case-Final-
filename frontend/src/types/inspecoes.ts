@@ -60,6 +60,36 @@ export interface ParamsInspecoes extends FiltrosRegiao, ParamsPaginacao {
   periodo_atual?: Periodo
 }
 
+/** Query de GET /inspecoes/indicadores. */
+export interface ParamsIndicadoresOrdens extends FiltrosRegiao {
+  /** Janela pela data de conclusão; sem ela, todas as ordens concluídas. */
+  periodo_conclusao?: Periodo
+}
+
+export interface AcertoPorMotivo {
+  motivo: string
+  concluidas: number
+  com_irregularidade: number
+  taxa_acerto_pct: number
+}
+
+/** GET /inspecoes/indicadores: se a fila está acertando, calculado sobre as ordens CONCLUIDA. */
+export interface IndicadoresOrdens {
+  concluidas: number
+  com_irregularidade: number
+  /** null sem ordens concluídas. */
+  taxa_acerto_pct: number | null
+  /** Concluídas com estimativa da fila: só elas entram nas duas somas de kWh. */
+  ordens_comparadas: number
+  /** kWh/mês da irregularidade informado em campo (resultado.kwh_recuperado). */
+  kwh_mes_campo: number
+  /** Estimativa da fila por mês: kwh_estimado (janela de 3 meses) ÷ 3. */
+  kwh_mes_fila: number
+  /** Uma ordem com vários motivos conta em cada um deles. */
+  por_motivo: AcertoPorMotivo[]
+  metadados: Metadados
+}
+
 /** Resultado de campo, como a API devolve. */
 export interface Resultado {
   irregularidade_detectada: boolean
@@ -130,6 +160,23 @@ export interface CriarInspecao {
   motivo?: string | null
   kwh_estimado?: number | null
   observacoes?: string | null
+}
+
+/** Corpo de POST /inspecoes/lote: de 1 a 200 ordens, criadas todas ou nenhuma. */
+export interface CriarInspecoesLote {
+  ordens: CriarInspecao[]
+}
+
+export interface OrdensCriadas {
+  items: Ordem[]
+  total: number
+}
+
+/** Uma UC recusada no lote (`detalhes.falhas` do 422 LOTE_REJEITADO). */
+export interface FalhaLote {
+  id_uc: string
+  codigo: string
+  mensagem: string
 }
 
 export interface IniciarCampo {
