@@ -191,6 +191,8 @@ describe('GET /dashboard/comparacao', () => {
 
   it.each([
     { nivel: 'municipio', itens: ['RECIFE'] },
+    // Como a API: vírgula não separa itens, então "RECIFE,OLINDA" é um item só
+    { nivel: 'municipio', itens: 'RECIFE,OLINDA' },
     { nivel: 'municipio', itens: ['A', 'B', 'C', 'D', 'E'] },
     { nivel: 'municipio', itens: ['RECIFE', 'RECIFE'] },
     { nivel: 'municipio', itens: ['RECIFE', 'OLINDA'], municipio: 'RECIFE' },

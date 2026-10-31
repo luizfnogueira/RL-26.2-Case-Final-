@@ -17,9 +17,9 @@ describe('construirQuery', () => {
     expect(construirQuery({ nivel: 'municipio', itens: ['RECIFE', 'OLINDA'] })).toBe(
       '?nivel=municipio&itens=RECIFE&itens=OLINDA',
     )
-    expect(
-      construirQuery({ itens: ['A', '', undefined, 'B'] as unknown as string[] }),
-    ).toBe('?itens=A&itens=B')
+    expect(construirQuery({ itens: ['A', '', undefined, 'B'] as unknown as string[] })).toBe(
+      '?itens=A&itens=B',
+    )
   })
 })
 

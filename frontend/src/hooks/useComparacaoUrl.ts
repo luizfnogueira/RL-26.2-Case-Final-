@@ -1,11 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import type { NivelDrill, ParamsComparacao } from '@/types/dashboard'
-import {
-  PERIODO_ATUAL_PADRAO,
-  PERIODO_COMPARACAO_PADRAO,
-  periodoValido,
-} from '@/utils/periodos'
+import { PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO, periodoValido } from '@/utils/periodos'
 
 export interface EstadoComparacaoUrl {
   aba?: string
@@ -180,4 +176,3 @@ export function useComparacaoUrl(padroes?: Partial<EstadoComparacaoUrl>): Result
 
   return { filtros, definir, limpar, estaAtiva }
 }
-

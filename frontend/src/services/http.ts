@@ -25,12 +25,7 @@ export interface OpcoesRequisicao {
 }
 
 type ValorQuery =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | readonly (string | number | boolean)[]
+  string | number | boolean | null | undefined | readonly (string | number | boolean)[]
 
 export function construirQuery(params?: object): string {
   const busca = new URLSearchParams()

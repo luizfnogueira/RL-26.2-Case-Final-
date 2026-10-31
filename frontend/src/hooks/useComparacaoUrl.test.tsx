@@ -2,11 +2,7 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  construirUrlComparacao,
-  extrairItens,
-  useComparacaoUrl,
-} from './useComparacaoUrl'
+import { construirUrlComparacao, extrairItens, useComparacaoUrl } from './useComparacaoUrl'
 
 afterEach(cleanup)
 
@@ -102,7 +98,9 @@ describe('useComparacaoUrl', () => {
   })
 
   it('limpar remove parâmetros de comparação da URL', () => {
-    const { result } = usarComparacao('/painel?aba=comparar&nivel=municipio&itens=RECIFE&itens=OLINDA')
+    const { result } = usarComparacao(
+      '/painel?aba=comparar&nivel=municipio&itens=RECIFE&itens=OLINDA',
+    )
     act(() => {
       result.current.limpar()
     })
@@ -110,4 +108,3 @@ describe('useComparacaoUrl', () => {
     expect(result.current.estaAtiva).toBe(false)
   })
 })
-

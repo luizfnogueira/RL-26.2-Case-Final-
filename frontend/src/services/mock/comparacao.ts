@@ -19,20 +19,8 @@ function validar(params: Registro) {
   if (!nivel || !NIVEIS.includes(nivel))
     throw invalido('nivel deve ser municipio, bairro ou classe.')
   const bruto = params.itens
-  const itens: string[] = []
-  if (Array.isArray(bruto)) {
-    for (const b of bruto) {
-      if (typeof b === 'string' && b.includes(',')) {
-        itens.push(...b.split(',').map((s) => s.trim()).filter(Boolean))
-      } else if (b !== undefined && b !== null && String(b).trim()) {
-        itens.push(String(b).trim())
-      }
-    }
-  } else if (typeof bruto === 'string') {
-    itens.push(...bruto.split(',').map((s) => s.trim()).filter(Boolean))
-  } else if (bruto) {
-    itens.push(String(bruto).trim())
-  }
+  // Como a API: cada item é um parâmetro repetido; "A,B" é um item só
+  const itens = (Array.isArray(bruto) ? bruto : bruto ? [bruto] : []).map((i) => String(i).trim())
   if (itens.length < 2 || itens.length > 4) throw invalido('Informe de 2 a 4 itens.')
   if (new Set(itens).size !== itens.length) throw invalido('itens repetidos.')
   const { municipio, bairro, classe, alimentador } = regiao(params)

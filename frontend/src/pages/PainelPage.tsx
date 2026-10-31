@@ -19,7 +19,12 @@ import { construirQuery } from '@/services/http'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
 import { cx } from '@/utils/cx'
 import { formatarAtualizacao } from '@/utils/datas'
-import { formatarNome } from '@/utils/formatacao'
+import {
+  formatarEnergia,
+  formatarNome,
+  formatarPercentual,
+  formatarReais,
+} from '@/utils/formatacao'
 import {
   duracaoEmMeses,
   formatarPeriodo,
@@ -32,6 +37,11 @@ const PADROES: FiltrosUrl = {
   periodo_atual: PERIODO_ATUAL_PADRAO,
   periodo_comparacao: PERIODO_COMPARACAO_PADRAO,
 }
+
+const ROTULO_NIVEL = { municipio: 'Município', bairro: 'Bairro', classe: 'Classe' } as const
+
+/** DEC, FEC e contagens: até duas casas, no formato pt-BR ("3,74", "17.995"). */
+const decimal = (valor: number) => valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
 export default function PainelPage() {
   const opcoesFiltros = useOpcoesFiltros()
@@ -218,7 +228,10 @@ export default function PainelPage() {
               )}
               <p className="text-legenda leading-5 text-ink-2">
                 {dados.metadados.gold_atualizada_em && (
-                  <>Atualização da fonte: {formatarAtualizacao(dados.metadados.gold_atualizada_em)}. </>
+                  <>
+                    Atualização da fonte: {formatarAtualizacao(dados.metadados.gold_atualizada_em)}
+                    .{' '}
+                  </>
                 )}
                 {dados.metadados.observacoes[0]}
               </p>
@@ -226,11 +239,7 @@ export default function PainelPage() {
           ) : null}
         </>
       ) : (
-        <section
-          role="tabpanel"
-          aria-label="Aba de comparação"
-          className="flex flex-col gap-4"
-        >
+        <section role="tabpanel" aria-label="Aba de comparação" className="flex flex-col gap-4">
           {comparacaoUrl.filtros.itens.length < 2 ? (
             <EmptyState
               titulo="Selecione de 2 a 4 itens para comparar"
@@ -267,7 +276,7 @@ export default function PainelPage() {
                       consultaComparacao.dados.filtros.periodo_comparacao ??
                         comparacaoUrl.filtros.periodo_comparacao,
                     )}
-                    {' · '}Nível: {formatarNome(consultaComparacao.dados.filtros.nivel)}
+                    {' · '}Nível: {ROTULO_NIVEL[consultaComparacao.dados.filtros.nivel]}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -284,16 +293,18 @@ export default function PainelPage() {
                     key={item.nome}
                     className="rounded-card border border-borda bg-surface-card p-4 shadow-card"
                   >
-                    <h3 className="text-titulo-sm font-medium text-ink">{formatarNome(item.nome)}</h3>
+                    <h3 className="text-titulo-sm font-medium text-ink">
+                      {formatarNome(item.nome)}
+                    </h3>
                     <p className="mt-1 text-legenda text-ink-2">
-                      {item.ucs_ativas.atual.valor ?? 0} UCs ativas
+                      {decimal(item.ucs_ativas.atual.valor ?? 0)} UCs ativas
                     </p>
                     <div className="mt-3 flex flex-col gap-2 text-corpo">
                       <div className="flex justify-between">
                         <span className="text-ink-2">Receita/UC:</span>
                         <span className="font-medium text-ink">
                           {item.receita_media_uc.atual.valor !== null
-                            ? `R$ ${item.receita_media_uc.atual.valor.toFixed(2)}`
+                            ? formatarReais(item.receita_media_uc.atual.valor)
                             : '—'}
                         </span>
                       </div>
@@ -301,7 +312,7 @@ export default function PainelPage() {
                         <span className="text-ink-2">Consumo/UC:</span>
                         <span className="font-medium text-ink">
                           {item.consumo_medio_uc.atual.valor !== null
-                            ? `${item.consumo_medio_uc.atual.valor} kWh`
+                            ? formatarEnergia(item.consumo_medio_uc.atual.valor)
                             : '—'}
                         </span>
                       </div>
@@ -309,20 +320,24 @@ export default function PainelPage() {
                         <span className="text-ink-2">Em aberto:</span>
                         <span className="font-medium text-ink">
                           {item.valor_em_aberto_pct.atual.valor !== null
-                            ? `${item.valor_em_aberto_pct.atual.valor}%`
+                            ? formatarPercentual(item.valor_em_aberto_pct.atual.valor)
                             : '—'}
                         </span>
                       </div>
                       {item.dec.atual.valor !== null && (
                         <div className="flex justify-between">
                           <span className="text-ink-2">DEC:</span>
-                          <span className="font-medium text-ink">{item.dec.atual.valor} h</span>
+                          <span className="font-medium text-ink">
+                            {decimal(item.dec.atual.valor)} h
+                          </span>
                         </div>
                       )}
                       {item.fec.atual.valor !== null && (
                         <div className="flex justify-between">
                           <span className="text-ink-2">FEC:</span>
-                          <span className="font-medium text-ink">{item.fec.atual.valor}</span>
+                          <span className="font-medium text-ink">
+                            {decimal(item.fec.atual.valor)}
+                          </span>
                         </div>
                       )}
                     </div>
