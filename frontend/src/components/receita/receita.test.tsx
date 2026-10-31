@@ -419,6 +419,38 @@ describe('ReceitaPage (com mocks)', () => {
     expect(busca()).toBe('')
   })
 
+  it('"Ver por: Classes" lista as classes sem escolher bairro; clicar numa classe filtra por ela', async () => {
+    const { busca } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Classes' }))
+    expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
+    expect(busca()).toBe('?ver=classe')
+    expect(screen.getByRole('button', { name: 'Classes' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+
+    const primeira = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0]
+    fireEvent.click(primeira)
+    expect(await screen.findByRole('columnheader', { name: 'Município' })).toBeTruthy()
+    expect(busca()).toMatch(/^\?classe=[^&]+$/)
+  })
+
+  it('destaca em barras as maiores perdas de receita por volume', async () => {
+    abrir()
+    const titulo = await screen.findByRole('heading', {
+      name: 'Maiores perdas de receita por volume',
+    })
+    const barras = within(titulo.closest('section') as HTMLElement).getAllByRole('listitem')
+    expect(barras.length).toBeGreaterThan(0)
+    expect(barras.length).toBeLessThanOrEqual(5)
+    expect(screen.getByText('Ordenado pela perda de receita por volume')).toBeTruthy()
+  })
+
+  it('com bairro escolhido, o seletor "Ver por" some: já é o ranking de classes do bairro', async () => {
+    abrir('/receita?municipio=OLINDA&bairro=RIO+DOCE')
+    expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Ver por' })).toBeNull()
+  })
+
   it('abre já filtrada quando a URL traz município e bairro (recarregar mantém)', async () => {
     // O filtro usa o valor da Gold (maiúsculas); o texto do insight vem formatado, como na API.
     abrir('/receita?municipio=OLINDA&bairro=RIO+DOCE')

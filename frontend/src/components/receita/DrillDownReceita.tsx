@@ -34,6 +34,54 @@ type Props = {
   periodoAtual?: string
   periodoComparacao?: string
   aoComparar?: (itens: string[]) => void
+  /** Ranking por região (município ou bairro) ou por classe; com `aoMudarVisao`, a tela mostra o seletor. */
+  visao?: Visao
+  aoMudarVisao?: (visao: Visao) => void
+  /** Se a linha leva a outro recorte. Padrão: todo nível menos classe. */
+  podeDescer?: boolean
+}
+
+export type Visao = 'regiao' | 'classe'
+
+/** Quantas das maiores perdas por volume aparecem em barras acima da tabela. */
+const MAIORES_PERDAS = 5
+
+/** As maiores perdas de receita por volume do ranking (já ordenado pelo efeito-volume), em barras. */
+function MaioresPerdas({ linhas }: { linhas: LinhaDrill[] }) {
+  const perdas = linhas.filter((l) => (l.efeito_volume.valor ?? 0) < 0).slice(0, MAIORES_PERDAS)
+  if (perdas.length === 0) return null
+  const maior = Math.abs(perdas[0].efeito_volume.valor as number)
+  return (
+    <section aria-labelledby="maiores-perdas" className="mb-5">
+      <h3 id="maiores-perdas" className="mb-2 text-legenda text-ink-2">
+        Maiores perdas de receita por volume
+      </h3>
+      <ul className="flex flex-col gap-2">
+        {perdas.map((l) => {
+          const valor = l.efeito_volume.valor as number
+          return (
+            <li
+              key={l.nome}
+              className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-corpo"
+            >
+              <span className="truncate text-ink" title={formatarNome(l.nome)}>
+                {formatarNome(l.nome)}
+              </span>
+              <span className="h-2 rounded-full bg-surface-alt" aria-hidden="true">
+                <span
+                  className="block h-full rounded-full bg-perigo-escuro/70"
+                  style={{ width: `${(Math.abs(valor) / maior) * 100}%` }}
+                />
+              </span>
+              <span className="whitespace-nowrap text-perigo-escuro tabular-nums">
+                {formatarReais(valor, { sinal: true })}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
 }
 
 /** Cor do número pelo sinal; o sinal escrito (+/−) garante que a cor não é a única pista. */
@@ -62,8 +110,10 @@ export default function DrillDownReceita({
   periodoAtual,
   periodoComparacao,
   aoComparar,
+  visao = 'regiao',
+  aoMudarVisao,
+  podeDescer = drill.nivel !== 'classe',
 }: Props) {
-  const podeDescer = drill.nivel !== 'classe'
   const navigate = useNavigate()
 
   // Leva os itens visíveis (de 2 a 4) para a aba de comparação
@@ -171,7 +221,36 @@ export default function DrillDownReceita({
       titulo="Onde o volume caiu?"
       acoes={
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-legenda text-ink-2">Ordenado por maior queda de volume</p>
+          <p className="text-legenda text-ink-2">Ordenado pela perda de receita por volume</p>
+          {aoMudarVisao && (
+            <div
+              role="group"
+              aria-label="Ver por"
+              className="flex gap-1 rounded-full bg-surface-alt p-1"
+            >
+              {(
+                [
+                  ['regiao', 'Região'],
+                  ['classe', 'Classes'],
+                ] as const
+              ).map(([valor, rotulo]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  aria-pressed={visao === valor}
+                  onClick={() => aoMudarVisao(valor)}
+                  className={cx(
+                    'cursor-pointer rounded-full px-3 py-1 text-legenda transition-colors',
+                    visao === valor
+                      ? 'bg-surface-card font-medium text-teal-profundo shadow-sm'
+                      : 'text-ink-2 hover:text-ink',
+                  )}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
+          )}
           <Button
             variante="secundario"
             tamanho="sm"
@@ -214,6 +293,8 @@ export default function DrillDownReceita({
           })}
         </ol>
       </nav>
+
+      {drill.page === 1 && <MaioresPerdas linhas={drill.items} />}
 
       <Tabela
         legenda={`Variação de volume e efeitos por ${ROTULO_NIVEL[drill.nivel].toLowerCase()}`}

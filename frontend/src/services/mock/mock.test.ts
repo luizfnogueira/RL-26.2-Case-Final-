@@ -67,10 +67,10 @@ describe('GET /dashboard', () => {
     expect(d.metadados.dados_ficticios).toBe(true)
   })
 
-  it('ordena o drill-down pela maior queda de volume', async () => {
+  it('ordena o drill-down pela maior perda de receita por volume (efeito-volume)', async () => {
     const d = await buscarDashboard(DASH)
-    const quedas = d.drill_down.items.map((l) => l.queda_kwh.valor ?? 0)
-    expect(quedas).toEqual([...quedas].sort((a, b) => b - a))
+    const efeitos = d.drill_down.items.map((l) => l.efeito_volume.valor ?? 0)
+    expect(efeitos).toEqual([...efeitos].sort((a, b) => a - b))
     expect(d.drill_down.nivel).toBe('municipio')
     expect(d.drill_down.breadcrumb.map((b) => b.nivel)).toEqual(['consolidado'])
   })
@@ -112,12 +112,21 @@ describe('GET /dashboard', () => {
     ).toBe('CENARIO_STUB_INDISPONIVEL')
     const mesmo = await erroDe(buscarDashboard({ ...DASH, periodo_comparacao: ATUAL }))
     expect([mesmo.status, mesmo.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
-    expect(
-      (await erroDe(buscarDashboard({ ...DASH, nivel: 'classe', municipio: 'Recife' }))).status,
-    ).toBe(422)
+    expect((await erroDe(buscarDashboard({ ...DASH, nivel: 'bairro' }))).status).toBe(422)
     expect((await erroDe(buscarDashboard({ ...DASH, page_size: 500 }))).codigo).toBe(
       'DADOS_INVALIDOS',
     )
+  })
+
+  it('lista as classes de toda a área ou de um município, sem escolher bairro', async () => {
+    const area = await buscarDashboard({ ...DASH, nivel: 'classe' })
+    expect(area.drill_down.nivel).toBe('classe')
+    expect(area.drill_down.breadcrumb.map((b) => b.nivel)).toEqual(['consolidado'])
+    const ponte = (await buscarDashboard(DASH)).ponte_receita
+    const soma = area.drill_down.items.reduce((s, l) => s + (l.efeito_volume.valor ?? 0), 0)
+    expect(soma).toBeCloseTo(ponte.efeito_volume.valor ?? 0, 1)
+    const recife = await buscarDashboard({ ...DASH, nivel: 'classe', municipio: 'Recife' })
+    expect(recife.drill_down.breadcrumb.map((b) => b.nivel)).toEqual(['consolidado', 'municipio'])
   })
 
   it('devolve cópias independentes: alterar o resultado não afeta a próxima chamada', async () => {

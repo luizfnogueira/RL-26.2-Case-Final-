@@ -82,7 +82,7 @@ def montar_indicadores(db: Session, filtros: FiltrosDashboard) -> dict:
 
     return {
         "receita_faturada": kpi(
-            "Receita faturada",
+            "Receita faturada (com tributos)",
             receita_atual,
             receita_comparacao,
             "BRL",
@@ -202,7 +202,8 @@ def montar_ponte(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
 
 
 def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dict:
-    """Uma linha por item do nível pedido, ordenada pela maior queda de kWh (depois nome), paginada."""
+    """Uma linha por item do nível pedido, ordenada pelo efeito-volume em R$ (a maior perda de receita
+    por volume primeiro; depois nome), paginada."""
     nivel = filtros.nivel
     grupos: dict[str, list[AggPrecoVolume]] = {}
     for linha in linhas:
@@ -230,14 +231,15 @@ def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
             "efeito_volume": indicador(sum(linha.efeito_volume for linha in grupo), "BRL", filtros.periodo_atual),
             "filtros": linha_filtros,
         })
-    itens.sort(key=lambda item: (-item["queda_kwh"]["valor"], item["nome"]))
+    itens.sort(key=lambda item: (item["efeito_volume"]["valor"], item["nome"]))
 
     vazio = {"municipio": None, "bairro": None, "classe": None}
     breadcrumb = [{"nivel": "consolidado", "rotulo": "Todos os municípios", "filtros": vazio}]
-    if nivel in ("bairro", "classe"):
+    # Classe pode vir direto do consolidado ou do município: só entram no caminho os pais escolhidos
+    if nivel in ("bairro", "classe") and filtros.municipio:
         breadcrumb.append({"nivel": "municipio", "rotulo": filtros.municipio,
                            "filtros": {**vazio, "municipio": filtros.municipio}})
-    if nivel == "classe":
+    if nivel == "classe" and filtros.bairro:
         breadcrumb.append({"nivel": "bairro", "rotulo": filtros.bairro,
                            "filtros": {**vazio, "municipio": filtros.municipio, "bairro": filtros.bairro}})
     return {"nivel": nivel, "breadcrumb": breadcrumb, **paginar(itens, filtros)}
