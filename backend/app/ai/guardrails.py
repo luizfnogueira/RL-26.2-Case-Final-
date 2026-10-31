@@ -39,6 +39,8 @@ TEXTO_BLOQUEIO = {
     'dados_pessoais': 'Não tenho acesso a CPF, nome do titular, endereço ou contato dos clientes. '
                       'Posso responder por município, bairro, classe ou código da UC.',
     'acesso': 'Só consulto as tabelas de dados da V-Energy liberadas para o assistente.',
+    'interno': 'Isso é da parte interna da plataforma e eu não compartilho. '
+               'Posso explicar como usar as telas ou responder perguntas sobre os dados.',
 }
 
 # Cada regra é (nome, padrão sobre o texto normalizado). A primeira que casar decide.
@@ -46,14 +48,17 @@ REGRAS_BLOQUEIO = [
     ('escrita', r'\b(drop|truncate|alter|grant|revoke)\s+\w+'
                 r'|\bdelete\s+from\b|\binsert\s+into\b|\bupdate\s+\w+\s+set\b'
                 r'|\bcreate\s+(table|role|user|schema|function|view|index)\b'
-                # Apagar no imperativo nunca é pergunta sobre dados ("apagão" não casa)
-                r'|\b(apague|apagar|apaga|deletar|destrua|destruir)\b'
+                # Só a ordem no imperativo: "o assistente pode apagar dados?" é pergunta de ajuda e segue
+                # para o guia; "apagão" não casa. Quem segura de verdade é o banco, que só deixa ler.
+                r'|\b(apague|apaguem|destrua|destruam)\b'
                 # Mudar só com o objeto: "quando foi atualizada a base?" tem que passar
-                r'|\b(limpe|limpar|altere|alterar|modifique|modificar|atualize|atualizar|edite|editar)\s+'
+                r'|\b(limpe|altere|modifique|atualize|edite)\s+'
                 r'(a |o |as |os |toda |todo |todas |todos )*'
                 r'(tabela|tabelas|banco|base|registros?|dados|cadastro|faturas?|clientes?)\b'),
-    ('injecao', r'\b(ignor|desconsider|esquec)\w*\s+(a |as |o |os |todas |todos |suas |seus |tudo |essas |estas )*'
-                r'(instruc|orientac|comando|diretriz|prompt|regras anteriores|regras do sistema)'
+    # "esqueça" sim, "esqueci" não: "esqueci como gera a ordem" é pedido de ajuda, não ataque
+    ('injecao', r'\b(ignor\w*|desconsider\w*|esqueca|esquecam|esquecer|esquece)\s+'
+                r'(a |as |o |os |todas |todos |suas |seus |tudo |essas |estas )*'
+                r'(instruc|orientac|comando|diretriz|prompt|guia|regras anteriores|regras do sistema)'
                 r'|\bignore (all |any |the )*(previous |prior |above )*instructions\b'
                 r'|\b(a partir de agora|agora) (voce|vc) (e|sera|vai ser)\b'
                 r'|\b(finja|fingir|pretend|act as|aja como|se comporte como)\b'
@@ -72,16 +77,32 @@ REGRAS_BLOQUEIO = [
     # Tabela de outro schema citada na pergunta (portal.ordens_inspecao, ia.interacao, gold.dim_uc):
     # o agente só enxerga o schema agente, então isso só aparece em tentativa de ataque
     ('acesso', r'\b(portal|ia|gold|silver|bronze|public|pg_catalog|information_schema)\.\w+'),
+    # Parte interna da plataforma (guia, seção 4): segredos, banco, servidores, código, as regras de
+    # bloqueio e como contornar as proteções. "Como uso os filtros?" e "por que minha pergunta foi
+    # bloqueada?" seguem para o guia.
+    ('interno', r'\b(senhas?|password|tokens? (de acesso|da api|de autenticacao)|jwt|bearer)\b'
+                r'|\b(qual|quais|que) (e |sao )?(o |a |os |as )?(banco de dados|servidor|servidores|host|ip|porta'
+                r'|endpoint|url (da|do) (api|backend|servidor))\b'
+                r'|\b(postgres|postgresql|sqlalchemy|railway|docker|kubernetes|aws|azure)\b'
+                r'|\b(schemas?|esquemas? do banco|nome do banco|usuarios? do banco|estrutura do banco)\b'
+                r'|\b(codigo fonte|repositorio|github|arquivos? do (codigo|sistema))\b'
+                r'|\b(contorn|burl|dribl|engan|desativ|deslig|fur|escap)\w*\s+(o |a |os |as |seu |sua |seus |suas |esse |essa )?'
+                r'(bloqueios?|protecao|protecoes|seguranca|guardrails?|validacao|restricao|restricoes)\b'
+                r'|\b(regras|lista|palavras|termos|perguntas|assuntos) (de bloqueio|(que )?(sao |estao )?(bloquead|proibid|barrad))'
+                r'|\bo que (voce|vc) (bloqueia|recusa|nao pode responder)\b'
+                # Pedido de nível maior no texto: o nível vem do login, nunca da pergunta
+                r'|\b(secoes|partes|conteudos?|informacoes|paginas) (restritas|internas|ocultas|secretas|escondidas'
+                r'|de gestor|de administrador|de admin)\b'
+                r'|\b(modo|nivel|perfil|permissao|acesso) (de )?(admin|administrador|gestor|superusuario|root)\b'),
 ]
 
 # Só quando a mensagem INTEIRA é isso; "oi, qual a receita?" segue para o agente.
+# "Ajuda", "como funciona" e "o que você faz" não têm mais texto fixo: seguem para o guia da plataforma.
 SAUDACAO = re.compile(r'^(oi+|ola|opa|bom dia|boa tarde|boa noite|e ai|hello|hi|tudo bem|obrigad[oa]|valeu)'
                       r'[\s,!.?]*(tudo bem)?[\s!.?]*$')
-AJUDA = re.compile(r'^(ajuda|help|o que (voce|vc) (faz|sabe fazer|pode fazer)|como (funciona|te uso|usar)'
-                   r'|quem e (voce|vc))[\s!.?]*$')
 TEXTO_APRESENTACAO = ('Olá! Respondo perguntas sobre os dados da V-Energy (jul/2022 a jun/2026): receita, consumo, '
-                      'continuidade (DEC/FEC), perdas, atendimento e geração distribuída. '
-                      'Exemplo: "Qual bairro mais perdeu volume residencial no último ano?"')
+                      'continuidade (DEC/FEC), perdas, atendimento e geração distribuída. Também explico como usar '
+                      'as telas da plataforma. Exemplo: "Qual foi a receita de Olinda em P2?"')
 
 # Assuntos claramente fora da V-Energy. Lista curta de propósito: na dúvida, segue para o agente.
 FORA_DO_ESCOPO = re.compile(r'\b(receita de (bolo|torta|pao|comida)|piada|poema|poesia|letra da musica|horoscopo'
@@ -91,7 +112,8 @@ TEXTO_FORA_DO_ESCOPO = ('Essa pergunta está fora do que eu sei responder. Pergu
                         'continuidade, perdas, atendimento ou geração distribuída da V-Energy.')
 
 # Só as regras de escrita, injeção e prompt: um valor pode citar "endereço" ou "gold.x" sem ser ataque.
-REGRAS_DE_INSTRUCAO = [padrao for regra, padrao in REGRAS_BLOQUEIO if regra not in ('dados_pessoais', 'acesso')]
+REGRAS_DE_INSTRUCAO = [padrao for regra, padrao in REGRAS_BLOQUEIO
+                       if regra not in ('dados_pessoais', 'acesso', 'interno')]
 
 def parece_instrucao(texto: str) -> bool:
     normalizado = normalizar(limpar(texto))
@@ -104,7 +126,7 @@ def triar(pergunta: str) -> Triagem:
     for regra, padrao in REGRAS_BLOQUEIO:
         if re.search(padrao, texto):
             return Triagem('bloquear', limpa, regra, TEXTO_BLOQUEIO[regra])
-    if SAUDACAO.match(texto) or AJUDA.match(texto):
+    if SAUDACAO.match(texto):
         return Triagem('responder', limpa, 'saudacao', TEXTO_APRESENTACAO)
     if FORA_DO_ESCOPO.search(texto):
         return Triagem('responder', limpa, 'fora_do_escopo', TEXTO_FORA_DO_ESCOPO)
