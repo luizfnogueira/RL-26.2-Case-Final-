@@ -1,0 +1,12 @@
+{
+  "ordens": [
+    {
+      "id_uc": "UC-DEMO-001",
+      "equipe_responsavel": "Equipe Norte 02",
+      "data_prevista": "2026-10-22",
+      "motivo": "Verificar variação de consumo.",
+      "kwh_estimado": 120.0,
+      "observacoes": null
+    }
+  ]
+}

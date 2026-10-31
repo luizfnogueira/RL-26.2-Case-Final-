@@ -8,10 +8,12 @@ import type {
   Historico,
   Ordem,
   Ordens,
+  OrdensCriadas,
   Resultado,
   StatusOrdem,
 } from '@/types/inspecoes'
 import { STATUS_ATIVOS } from '@/types/inspecoes'
+import { ApiError } from '../erro-api'
 import { mesNoPeriodo } from '@/utils/periodos'
 import { fixtures } from './fixtures'
 import {
@@ -69,6 +71,15 @@ export function reiniciarOrdens(): void {
 
 const ehAtiva = (ordem: Ordem) => STATUS_ATIVOS.includes(ordem.status)
 
+/** Como a API: UC com inspeção concluída nos últimos 6 meses sai da fila. */
+const MESES_SEM_REINSPECAO = 6
+function inspecionadaRecentemente(ordem: Ordem): boolean {
+  if (ordem.status !== 'CONCLUIDA' || !ordem.data_conclusao) return false
+  const limite = new Date()
+  limite.setMonth(limite.getMonth() - MESES_SEM_REINSPECAO)
+  return new Date(ordem.data_conclusao) >= limite
+}
+
 function novoHistorico(
   e: Estado,
   ordem: Ordem,
@@ -108,7 +119,11 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
   ])
   const ativas = new Map(e.ordens.filter(ehAtiva).map((o) => [o.id_uc, o.id_ordem]))
   // Mesma ordem de gold.tb_fila_perdas: score, kWh estimado e id_uc (contrato Gold, regra 4.10).
-  const candidatos = filtrarRegiao(base.items, filtros).sort(
+  const inspecionadas = new Set(e.ordens.filter(inspecionadaRecentemente).map((o) => o.id_uc))
+  const candidatos = filtrarRegiao(
+    base.items.filter((c) => !inspecionadas.has(c.id_uc)),
+    filtros,
+  ).sort(
     (a, b) =>
       b.score - a.score ||
       (b.energia_estimada.valor ?? 0) - (a.energia_estimada.valor ?? 0) ||
@@ -195,7 +210,10 @@ function dataOpcional(corpo: Registro, campo: string): string | null {
   return valor
 }
 
-export async function criarOrdem(corpo: Registro): Promise<Ordem> {
+const MAX_ORDENS_LOTE = 200
+
+/** As validações do POST /inspecoes, sem gravar: devolve os campos já limpos ou lança o erro da API. */
+async function validarCriacao(corpo: Registro, e: Estado) {
   const idUc = typeof corpo.id_uc === 'string' ? corpo.id_uc.trim() : ''
   const equipe = typeof corpo.equipe_responsavel === 'string' ? corpo.equipe_responsavel.trim() : ''
   if (!idUc) throw invalido('id_uc é obrigatório.')
@@ -210,7 +228,6 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
       throw invalido('kwh_estimado deve ser maior ou igual a zero.')
   }
 
-  const e = await obterEstado()
   if (!(idUc in e.cadastro)) {
     throw erroApi(
       404,
@@ -231,7 +248,11 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
       `A Unidade Consumidora '${idUc}' já possui a ordem ativa #${ativa.id_ordem} com status '${ativa.status}'.`,
     )
   }
+  return { idUc, equipe, dataPrevista, motivo, observacoes, kwh }
+}
 
+function gravarOrdem(e: Estado, campos: Awaited<ReturnType<typeof validarCriacao>>): Ordem {
+  const { idUc, equipe, dataPrevista, motivo, observacoes, kwh } = campos
   const ordem: Ordem = {
     id_ordem: e.proximoIdOrdem++,
     id_uc: idUc,
@@ -256,6 +277,47 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
   })
   e.ordens.push(ordem)
   return clonar(ordem)
+}
+
+export async function criarOrdem(corpo: Registro): Promise<Ordem> {
+  const e = await obterEstado()
+  return gravarOrdem(e, await validarCriacao(corpo, e))
+}
+
+/** Como o POST /inspecoes/lote: valida todas antes de gravar; uma falha rejeita o lote inteiro. */
+export async function criarOrdensEmLote(corpo: Registro): Promise<OrdensCriadas> {
+  const lista = corpo.ordens
+  if (!Array.isArray(lista) || lista.length < 1 || lista.length > MAX_ORDENS_LOTE)
+    throw invalido(`ordens deve ter de 1 a ${MAX_ORDENS_LOTE} itens.`)
+  const e = await obterEstado()
+  const validas: Awaited<ReturnType<typeof validarCriacao>>[] = []
+  const falhas: { id_uc: string; codigo: string; mensagem: string }[] = []
+  const vistas = new Set<string>()
+  for (const item of lista as Registro[]) {
+    const idUc = typeof item.id_uc === 'string' ? item.id_uc.trim() : ''
+    try {
+      if (vistas.has(idUc))
+        throw erroApi(
+          409,
+          'ORDEM_ATIVA_EXISTENTE',
+          `A Unidade Consumidora '${idUc}' aparece mais de uma vez no lote.`,
+        )
+      vistas.add(idUc)
+      validas.push(await validarCriacao(item, e))
+    } catch (erro) {
+      if (!(erro instanceof ApiError)) throw erro
+      falhas.push({ id_uc: idUc, codigo: erro.codigo, mensagem: erro.mensagem })
+    }
+  }
+  if (falhas.length > 0)
+    throw erroApi(
+      422,
+      'LOTE_REJEITADO',
+      'Nenhuma ordem do lote foi criada: corrija as UCs listadas em detalhes.falhas.',
+      { falhas },
+    )
+  const items = validas.map((campos) => gravarOrdem(e, campos))
+  return { items, total: items.length }
 }
 
 // ---------- Atualização ----------

@@ -123,6 +123,18 @@ class CriarInspecao(Schema):
     observacoes: TextoLongo | None = None
 
 
+MAX_ORDENS_LOTE = 200
+
+
+class CriarInspecoesLote(Schema):
+    ordens: list[CriarInspecao] = Field(min_length=1, max_length=MAX_ORDENS_LOTE)
+
+
+class OrdensCriadas(Schema):
+    items: list[Ordem]
+    total: int
+
+
 class AtualizarInspecao(Schema):
     status: StatusOrdem
     equipe_responsavel: Texto | None = None

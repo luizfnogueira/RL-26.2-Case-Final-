@@ -2,12 +2,15 @@ import type {
   AtualizarInspecao,
   Candidatos,
   CriarInspecao,
+  FalhaLote,
   Ordem,
+  OrdensCriadas,
   Ordens,
   ParamsCandidatos,
   ParamsInspecoes,
   ResultadoEnvio,
 } from '@/types/inspecoes'
+import { ehErroApi } from './erro-api'
 import { requisitar } from './http'
 
 /** GET /inspecoes/candidatos: fila priorizada de UCs suspeitas (Tela 4). */
@@ -32,6 +35,21 @@ export function listarInspecoes(
  */
 export function criarInspecao(corpo: CriarInspecao): Promise<Ordem> {
   return requisitar<Ordem>('POST', '/inspecoes', { corpo })
+}
+
+/**
+ * POST /inspecoes/lote: cria todas as ordens ou nenhuma.
+ * Erros: 422 LOTE_REJEITADO (UCs em `detalhes.falhas`, ver `falhasDoLote`), 422 DADOS_INVALIDOS.
+ */
+export function criarInspecoesEmLote(ordens: CriarInspecao[]): Promise<OrdensCriadas> {
+  return requisitar<OrdensCriadas>('POST', '/inspecoes/lote', { corpo: { ordens } })
+}
+
+/** UCs recusadas num 422 LOTE_REJEITADO; lista vazia para qualquer outro erro. */
+export function falhasDoLote(erro: unknown): FalhaLote[] {
+  if (!ehErroApi(erro) || erro.codigo !== 'LOTE_REJEITADO') return []
+  const falhas = erro.detalhes?.falhas
+  return Array.isArray(falhas) ? (falhas as FalhaLote[]) : []
 }
 
 /**

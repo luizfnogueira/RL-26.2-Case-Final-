@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from app.core.exceptions import (
     AppException,
     JustificativaObrigatoriaException,
+    LoteRejeitadoException,
     OrdemAtivaExistenteException,
     OrdemNaoEncontradaException,
     ResultadoIncompletoException,
@@ -41,6 +42,39 @@ class OrdemInspecaoService:
         dados: Union[OrdemInspecaoCreate, dict[str, Any]],
         usuario: Optional[str] = None,
     ) -> OrdemInspecaoResponse:
+        nova_ordem, evento_historico = self._preparar_ordem(dados, usuario)
+        return self.repository.salvar(nova_ordem, evento_historico=evento_historico)
+
+    def criar_ordens_em_lote(
+        self,
+        lista: list[OrdemInspecaoCreate],
+        usuario: Optional[str] = None,
+    ) -> list[OrdemInspecaoResponse]:
+        """Tudo ou nada: valida todas as UCs antes de gravar; uma falha rejeita o lote inteiro."""
+        preparadas = []
+        falhas = []
+        vistas: set[str] = set()
+        for dados in lista:
+            id_uc = dados.id_uc.strip()
+            try:
+                if id_uc in vistas:
+                    raise OrdemAtivaExistenteException(
+                        f"A Unidade Consumidora '{id_uc}' aparece mais de uma vez no lote."
+                    )
+                vistas.add(id_uc)
+                preparadas.append(self._preparar_ordem(dados, usuario))
+            except AppException as exc:
+                falhas.append({"id_uc": id_uc, "codigo": exc.codigo, "mensagem": exc.mensagem})
+        if falhas:
+            raise LoteRejeitadoException(detalhes={"falhas": falhas})
+        return self.repository.salvar_varias(preparadas)
+
+    def _preparar_ordem(
+        self,
+        dados: Union[OrdemInspecaoCreate, dict[str, Any]],
+        usuario: Optional[str],
+    ) -> tuple[OrdemInspecaoResponse, HistoricoOrdem]:
+        """Valida a UC e monta a ordem ABERTA com o primeiro evento do histórico, sem gravar."""
         if isinstance(dados, dict):
             try:
                 dados = OrdemInspecaoCreate(**dados)
@@ -93,8 +127,7 @@ class OrdemInspecaoService:
             justificativa_ou_motivo=dados.motivo or "Criação da ordem de inspeção",
             detalhes={"equipe": dados.equipe_responsavel, "data_prevista": str(dados.data_prevista)},
         )
-
-        return self.repository.salvar(nova_ordem, evento_historico=evento_historico)
+        return nova_ordem, evento_historico
 
     def avancar_para_campo(
         self,

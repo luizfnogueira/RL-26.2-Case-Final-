@@ -9,6 +9,8 @@ export {
   cancelarInspecao,
   concluirInspecao,
   criarInspecao,
+  criarInspecoesEmLote,
+  falhasDoLote,
   iniciarCampo,
   listarInspecoes,
 } from './inspecoes'

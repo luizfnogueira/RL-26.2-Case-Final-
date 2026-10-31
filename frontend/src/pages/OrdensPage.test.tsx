@@ -285,11 +285,27 @@ describe('OrdensPage', () => {
     expect(await screen.findByRole('dialog')).toBeTruthy()
     expect(screen.getByText(/Registrar resultado em campo · Ordem #2/i)).toBeTruthy()
 
-    // Preenche observações (obrigatório)
-    const inputObs = screen.getByLabelText(/Observações e laudo técnico/i)
-    fireEvent.change(inputObs, { target: { value: 'Fraude confirmada e eliminada' } })
-
+    // Abre sem resposta marcada: nada de tipo nem kWh antes da escolha, e o botão bloqueado
     const botaoConfirmar = screen.getByRole('button', { name: /Concluir vistoria/i })
+    expect((botaoConfirmar as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByLabelText(/Tipo de irregularidade/i)).toBeNull()
+    expect(
+      screen
+        .getByRole('button', { name: /Irregularidade confirmada/i })
+        .getAttribute('aria-pressed'),
+    ).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: /Irregularidade confirmada/i }))
+    expect((screen.getByLabelText(/Tipo de irregularidade/i) as HTMLSelectElement).value).toBe('')
+    expect((screen.getByLabelText(/Energia recuperada/i) as HTMLInputElement).value).toBe('')
+    fireEvent.change(screen.getByLabelText(/Tipo de irregularidade/i), {
+      target: { value: 'BY-PASS' },
+    })
+    fireEvent.change(screen.getByLabelText(/Energia recuperada/i), { target: { value: '150' } })
+    fireEvent.change(screen.getByLabelText(/Observações e laudo técnico/i), {
+      target: { value: 'Fraude confirmada e eliminada' },
+    })
+
     await act(async () => {
       fireEvent.click(botaoConfirmar)
     })
@@ -298,7 +314,42 @@ describe('OrdensPage', () => {
       2,
       expect.objectContaining({
         irregularidade_detectada: true,
+        tipo_irregularidade: 'BY-PASS',
+        kwh_recuperado: 150,
         observacoes: 'Fraude confirmada e eliminada',
+      }),
+    )
+  })
+
+  it('conclui sem irregularidade com 0 kWh', async () => {
+    const fixture = inspecoesFixture as unknown as Ordens
+    vi.mocked(listarInspecoes).mockResolvedValue(fixture)
+    vi.mocked(concluirInspecao).mockResolvedValue({ ...fixture.items[1], status: 'CONCLUIDA' })
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/ordens']}>
+        <OrdensPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('UC-DEMO-005')
+    fireEvent.click(screen.getByRole('button', { name: 'Ações da ordem #2' }))
+    fireEvent.click(screen.getByRole('button', { name: /Registrar resultado/i }))
+    await screen.findByRole('dialog')
+
+    fireEvent.click(screen.getByRole('button', { name: /Sem irregularidade/i }))
+    fireEvent.change(screen.getByLabelText(/Observações e laudo técnico/i), {
+      target: { value: 'Instalação regular' },
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Concluir vistoria/i }))
+    })
+
+    expect(concluirInspecao).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({
+        irregularidade_detectada: false,
+        tipo_irregularidade: null,
+        kwh_recuperado: 0,
       }),
     )
   })

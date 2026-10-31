@@ -45,7 +45,9 @@ export function construirQuery(params?: object): string {
   return texto ? `?${texto}` : ''
 }
 
-function ehCorpoDeErro(valor: unknown): valor is { codigo: string; mensagem: string } {
+function ehCorpoDeErro(
+  valor: unknown,
+): valor is { codigo: string; mensagem: string; detalhes?: Record<string, unknown> } {
   return (
     typeof valor === 'object' &&
     valor !== null &&
@@ -106,7 +108,8 @@ export async function requisitar<T>(
   if (!resposta.ok) {
     // Gancho único do 401: sessão inválida. O erro continua sendo lançado para a tela que pediu.
     if (resposta.status === 401 && !semSessao) tratarNaoAutorizado()
-    if (ehCorpoDeErro(corpo)) throw new ApiError(resposta.status, corpo.codigo, corpo.mensagem)
+    if (ehCorpoDeErro(corpo))
+      throw new ApiError(resposta.status, corpo.codigo, corpo.mensagem, corpo.detalhes)
     throw new ApiError(
       resposta.status,
       resposta.status >= 500 ? 'ERRO_INTERNO' : 'RESPOSTA_INVALIDA',

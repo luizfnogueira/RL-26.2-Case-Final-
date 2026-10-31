@@ -7,11 +7,13 @@
  */
 import ordemAtualizada from '@/data/mocks/ordem_atualizada.json'
 import ordemCriada from '@/data/mocks/ordem_criada.json'
+import ordensCriadasLote from '@/data/mocks/ordens_criadas_lote.json'
 import candidatos from '@/data/mocks/candidatos.json'
 import cancelarInspecao from '@/data/mocks/cancelar_inspecao.json'
 import comparacao from '@/data/mocks/comparacao.json'
 import concluirInspecao from '@/data/mocks/concluir_inspecao.json'
 import criarInspecao from '@/data/mocks/criar_inspecao.json'
+import criarInspecoesLote from '@/data/mocks/criar_inspecoes_lote.json'
 import dashboard from '@/data/mocks/dashboard.json'
 import erro from '@/data/mocks/erro.json'
 import filtros from '@/data/mocks/filtros.json'
@@ -38,9 +40,11 @@ import type {
   Candidatos,
   ConcluirInspecao,
   CriarInspecao,
+  CriarInspecoesLote,
   IniciarCampo,
   Ordem,
   Ordens,
+  OrdensCriadas,
 } from './inspecoes'
 import type { Operacao } from './operacao'
 import type { Unidade360, Unidades } from './unidades'
@@ -65,6 +69,7 @@ export const fixturesConferidos = {
   candidatos: candidatos satisfies Largo<Candidatos>,
   inspecoes: inspecoes satisfies Largo<Ordens>,
   ordemCriada: ordemCriada satisfies Largo<Ordem>,
+  ordensCriadasLote: ordensCriadasLote satisfies Largo<OrdensCriadas>,
   ordemAtualizada: ordemAtualizada satisfies Largo<Ordem>,
   operacao: operacao satisfies Largo<Operacao>,
   respostaIa: respostaIa satisfies Largo<RespostaIA>,
@@ -76,6 +81,7 @@ export const fixturesConferidos = {
   pedidoInsight: pedidoInsight satisfies Largo<PedidoInsight>,
   pedidoInsightUnidade: pedidoInsightUnidade satisfies Largo<PedidoInsight>,
   criarInspecao: criarInspecao satisfies Largo<CriarInspecao>,
+  criarInspecoesLote: criarInspecoesLote satisfies Largo<CriarInspecoesLote>,
   iniciarInspecao: iniciarInspecao satisfies Largo<IniciarCampo>,
   concluirInspecao: concluirInspecao satisfies Largo<ConcluirInspecao>,
   cancelarInspecao: cancelarInspecao satisfies Largo<CancelarInspecao>,

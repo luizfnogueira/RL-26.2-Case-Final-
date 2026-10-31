@@ -57,6 +57,13 @@ class OrdemInspecaoRepositoryInterface(Protocol):
     ) -> OrdemInspecaoResponse:
         ...
 
+    def salvar_varias(
+        self,
+        ordens: list[tuple[OrdemInspecaoResponse, Optional[HistoricoOrdem]]],
+    ) -> list[OrdemInspecaoResponse]:
+        """Grava todas ou nenhuma."""
+        ...
+
     def existe_uc(self, id_uc: str) -> bool:
         ...
 
@@ -268,39 +275,50 @@ class SqlAlchemyOrdemInspecaoRepository:
         ordem: OrdemInspecaoResponse,
         evento_historico: Optional[HistoricoOrdem] = None,
     ) -> OrdemInspecaoResponse:
-        modelo = self.db.get(OrdemInspecao, ordem.id_ordem) if ordem.id_ordem > 0 else None
-        if modelo is None:
-            modelo = OrdemInspecao()
-            self.db.add(modelo)
-        _preencher_modelo(modelo, ordem)
+        return self.salvar_varias([(ordem, evento_historico)])[0]
 
+    def salvar_varias(
+        self,
+        ordens: list[tuple[OrdemInspecaoResponse, Optional[HistoricoOrdem]]],
+    ) -> list[OrdemInspecaoResponse]:
+        """Um commit para todas: se uma falhar (ex.: ordem ativa criada em paralelo), nenhuma fica gravada."""
+        modelos = []
+        id_uc = None
         try:
-            self.db.flush()
-            if evento_historico is not None:
-                modelo.historico.append(
-                    OrdemHistorico(
-                        status_anterior=(
-                            evento_historico.status_anterior.value
-                            if evento_historico.status_anterior is not None
-                            else None
-                        ),
-                        status_novo=evento_historico.status_novo.value,
-                        data_mudanca=evento_historico.data_mudanca,
-                        usuario=evento_historico.usuario,
-                        justificativa_ou_motivo=evento_historico.justificativa_ou_motivo,
-                        detalhes=evento_historico.detalhes,
+            for ordem, evento_historico in ordens:
+                id_uc = ordem.id_uc
+                modelo = self.db.get(OrdemInspecao, ordem.id_ordem) if ordem.id_ordem > 0 else None
+                if modelo is None:
+                    modelo = OrdemInspecao()
+                    self.db.add(modelo)
+                _preencher_modelo(modelo, ordem)
+                self.db.flush()
+                if evento_historico is not None:
+                    modelo.historico.append(
+                        OrdemHistorico(
+                            status_anterior=(
+                                evento_historico.status_anterior.value
+                                if evento_historico.status_anterior is not None
+                                else None
+                            ),
+                            status_novo=evento_historico.status_novo.value,
+                            data_mudanca=evento_historico.data_mudanca,
+                            usuario=evento_historico.usuario,
+                            justificativa_ou_motivo=evento_historico.justificativa_ou_motivo,
+                            detalhes=evento_historico.detalhes,
+                        )
                     )
-                )
+                modelos.append(modelo)
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
             if _violou_indice_ordem_ativa(exc):
                 raise OrdemAtivaExistenteException(
-                    f"A Unidade Consumidora '{ordem.id_uc}' já possui uma ordem de inspeção ativa."
+                    f"A Unidade Consumidora '{id_uc}' já possui uma ordem de inspeção ativa."
                 ) from exc
             raise
 
-        return self.obter_por_id(modelo.id_ordem)
+        return [self.obter_por_id(modelo.id_ordem) for modelo in modelos]
 
 
 class MemoriaOrdemInspecaoRepository:
@@ -401,3 +419,9 @@ class MemoriaOrdemInspecaoRepository:
 
         self._ordens[ordem_salva.id_ordem] = deepcopy(ordem_salva)
         return deepcopy(ordem_salva)
+
+    def salvar_varias(
+        self,
+        ordens: list[tuple[OrdemInspecaoResponse, Optional[HistoricoOrdem]]],
+    ) -> list[OrdemInspecaoResponse]:
+        return [self.salvar(ordem, evento_historico) for ordem, evento_historico in ordens]

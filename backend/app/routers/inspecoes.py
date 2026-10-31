@@ -19,7 +19,8 @@ from app.schemas.inspecao import (
     StatusOrdem,
 )
 from app.schemas.inspecoes import (
-    AtualizarInspecao, Candidatos, CriarInspecao, FiltrosCandidatos, FiltrosInspecoes, Ordem, Ordens,
+    AtualizarInspecao, Candidatos, CriarInspecao, CriarInspecoesLote, FiltrosCandidatos, FiltrosInspecoes, Ordem,
+    Ordens, OrdensCriadas,
 )
 from app.services.candidato_service import CandidatoService
 from app.services.inspecao_service import OrdemInspecaoService
@@ -112,6 +113,22 @@ async def criar_inspecao(
 ):
     ordem = servico.criar_ordem(OrdemInspecaoCreate(**dados.model_dump()))
     return para_transporte(ordem)
+
+
+@router.post('/lote', response_model=OrdensCriadas, status_code=201, summary='Criar ordens de inspeção em lote',
+             description=PERSISTENCIA + ' Tudo ou nada, de 1 a 200 ordens: cada UC passa pelas mesmas validações do '
+             'POST /inspecoes antes de qualquer gravação. Se alguma falhar (UC inexistente, ordem ativa, '
+             'VALIDACAO_DOCUMENTAL ou UC repetida no lote), nenhuma ordem é criada e a resposta é 422 '
+             'LOTE_REJEITADO com detalhes.falhas: [{id_uc, codigo, mensagem}].',
+             responses=respostas('ordens_criadas_lote', status=201, erros=('LOTE_REJEITADO',)))
+async def criar_inspecoes_em_lote(
+    dados: Annotated[CriarInspecoesLote, Body(openapi_examples={
+        'lote': {'value': exemplo('criar_inspecoes_lote')},
+    })],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+):
+    ordens = servico.criar_ordens_em_lote([OrdemInspecaoCreate(**ordem.model_dump()) for ordem in dados.ordens])
+    return {'items': [para_transporte(ordem) for ordem in ordens], 'total': len(ordens)}
 
 
 @router.patch('/{id}', response_model=Ordem, summary='Avançar, concluir ou cancelar ordem',

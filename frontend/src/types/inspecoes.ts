@@ -132,6 +132,23 @@ export interface CriarInspecao {
   observacoes?: string | null
 }
 
+/** Corpo de POST /inspecoes/lote: de 1 a 200 ordens, criadas todas ou nenhuma. */
+export interface CriarInspecoesLote {
+  ordens: CriarInspecao[]
+}
+
+export interface OrdensCriadas {
+  items: Ordem[]
+  total: number
+}
+
+/** Uma UC recusada no lote (`detalhes.falhas` do 422 LOTE_REJEITADO). */
+export interface FalhaLote {
+  id_uc: string
+  codigo: string
+  mensagem: string
+}
+
 export interface IniciarCampo {
   status: 'EM_CAMPO'
   /** A equipe pode mudar ao iniciar o campo. */

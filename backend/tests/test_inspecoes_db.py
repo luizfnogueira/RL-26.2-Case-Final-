@@ -12,7 +12,7 @@ from app.core.exceptions import OrdemAtivaExistenteException
 from app.db import seed
 from app.db.session import get_db
 from app.main import app
-from app.models.gold import UnidadeConsumidora
+from app.models.gold import FilaPerdas, UnidadeConsumidora
 from app.models.portal import OrdemHistorico, OrdemInspecao
 from app.repositories.inspecao_repository import SqlAlchemyOrdemInspecaoRepository
 from app.schemas.inspecao import HistoricoOrdem, OrdemInspecaoResponse, StatusOrdem
@@ -248,3 +248,83 @@ def test_duas_criacoes_simultaneas_pela_api_para_a_mesma_uc(client, engine):
     with Session(engine) as db:
         assert db.scalar(select(func.count()).select_from(OrdemInspecao)) == 1
         assert db.scalar(select(func.count()).select_from(OrdemHistorico)) == 1
+
+
+def ucs_sem_restricao(engine, quantidade: int) -> list[str]:
+    """UCs do seed que aceitam ordem de campo (fora da VALIDACAO_DOCUMENTAL)."""
+    documentais = select(FilaPerdas.id_uc).where(FilaPerdas.acao_recomendada == "VALIDACAO_DOCUMENTAL")
+    with engine.connect() as conn:
+        return list(conn.execute(
+            select(UnidadeConsumidora.id_uc)
+            .where(UnidadeConsumidora.id_uc.not_in(documentais))
+            .order_by(UnidadeConsumidora.id_uc)
+            .limit(quantidade)
+        ).scalars())
+
+
+def contar_ordens(engine) -> int:
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT count(*) FROM portal.ordens_inspecao")).scalar_one()
+
+
+def test_lote_cria_todas_as_ordens_com_historico(client, engine):
+    ucs = ucs_sem_restricao(engine, 3)
+    response = client.post("/inspecoes/lote", json={"ordens": [corpo(uc) for uc in ucs]})
+    assert response.status_code == 201, response.text
+    dados = response.json()
+    assert dados["total"] == 3
+    assert [ordem["id_uc"] for ordem in dados["items"]] == ucs
+    assert all(ordem["status"] == "ABERTA" and len(ordem["historico"]) == 1 for ordem in dados["items"])
+    assert contar_ordens(engine) == 3
+
+
+@pytest.mark.parametrize("problema, codigo", [
+    ("inexistente", "UC_INEXISTENTE"),
+    ("ativa", "ORDEM_ATIVA_EXISTENTE"),
+    ("repetida", "ORDEM_ATIVA_EXISTENTE"),
+])
+def test_lote_com_uma_uc_invalida_nao_cria_nenhuma(client, engine, problema, codigo):
+    ucs = ucs_sem_restricao(engine, 3)
+    if problema == "ativa":
+        assert client.post("/inspecoes", json=corpo(ucs[2])).status_code == 201
+    ruim = {"inexistente": "UC999999", "ativa": ucs[2], "repetida": ucs[0]}[problema]
+    antes = contar_ordens(engine)
+
+    response = client.post("/inspecoes/lote", json={"ordens": [corpo(ucs[0]), corpo(ucs[1]), corpo(ruim)]})
+
+    assert response.status_code == 422, response.text
+    erro = response.json()
+    assert erro["codigo"] == "LOTE_REJEITADO"
+    assert [(f["id_uc"], f["codigo"]) for f in erro["detalhes"]["falhas"]] == [(ruim, codigo)]
+    assert contar_ordens(engine) == antes
+
+
+def test_lote_lista_todas_as_falhas_de_uma_vez(client):
+    response = client.post(
+        "/inspecoes/lote", json={"ordens": [corpo("UC999998"), corpo("UC999999")]}
+    )
+    assert response.status_code == 422
+    assert [f["id_uc"] for f in response.json()["detalhes"]["falhas"]] == ["UC999998", "UC999999"]
+
+
+@pytest.mark.parametrize("quantidade", [0, 201])
+def test_lote_aceita_de_1_a_200_ordens(client, quantidade):
+    response = client.post("/inspecoes/lote", json={"ordens": [corpo()] * quantidade})
+    assert response.status_code == 422
+    assert response.json()["codigo"] == "DADOS_INVALIDOS"
+
+
+def test_salvar_varias_desfaz_o_lote_se_o_indice_barrar_uma_ordem(client, engine):
+    # Ordem ativa criada entre a validação e a gravação: o índice único barra e nada do lote fica
+    livre, ocupada = ucs_sem_restricao(engine, 2)
+    assert client.post("/inspecoes", json=corpo(ocupada)).status_code == 201
+
+    with Session(bind=engine, expire_on_commit=False) as db:
+        repositorio = SqlAlchemyOrdemInspecaoRepository(db)
+        with pytest.raises(OrdemAtivaExistenteException, match=ocupada):
+            repositorio.salvar_varias([_ordem_em_memoria(livre), _ordem_em_memoria(ocupada)])
+
+    with engine.connect() as conn:
+        assert conn.execute(
+            select(func.count()).select_from(OrdemInspecao).where(OrdemInspecao.id_uc == livre)
+        ).scalar_one() == 0

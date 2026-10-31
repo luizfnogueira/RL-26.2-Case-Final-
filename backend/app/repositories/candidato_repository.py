@@ -9,9 +9,12 @@ from sqlalchemy.orm import Session
 from app.models.gold_source import FilaPerdas, FilaPerdasAuditoria, UnidadeConsumidora
 from app.core.config import GOLD_SOURCE
 from app.models.portal import OrdemInspecao
-from app.schemas.inspecao import STATUS_ATIVOS
+from app.schemas.inspecao import STATUS_ATIVOS, StatusOrdem
 
 STATUS_ELEGIVEL = "ELEGIVEL"
+# UC com inspeção concluída há menos que isso sai da fila: o resultado já está no portal e a Gold só
+# reflete a visita na próxima carga. Passada a janela, ela volta se a Gold ainda a priorizar.
+MESES_SEM_REINSPECAO = 6
 
 
 @dataclass(frozen=True)
@@ -107,6 +110,16 @@ def _subconsulta_ordens_ativas():
     )
 
 
+def _subconsulta_inspecionadas_recentes():
+    return (
+        select(OrdemInspecao.id_uc)
+        .where(
+            OrdemInspecao.status == StatusOrdem.CONCLUIDA.value,
+            OrdemInspecao.data_conclusao >= func.now() - func.make_interval(0, MESES_SEM_REINSPECAO),
+        )
+    )
+
+
 class SqlAlchemyCandidatoRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -132,7 +145,7 @@ class SqlAlchemyCandidatoRepository:
         regiao = _condicoes_regiao(municipio, bairro, classe, alimentador)
         elegivel = FilaPerdas.status_triagem == STATUS_ELEGIVEL
         ativas = _subconsulta_ordens_ativas()
-        condicoes_fila = [elegivel, *regiao]
+        condicoes_fila = [elegivel, *regiao, FilaPerdas.id_uc.not_in(_subconsulta_inspecionadas_recentes())]
         if sem_ordem_ativa:
             condicoes_fila.append(ativas.c.id_uc.is_(None))
 

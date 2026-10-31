@@ -24,13 +24,7 @@ const TIPOS_IRREGULARIDADE = [
 export default function ModalConcluirOrdem({ ordem, aberto, aoFechar, aoSucesso }: Props) {
   if (!aberto || !ordem) return null
 
-  return (
-    <ModalConcluirOrdemForm
-      ordem={ordem}
-      aoFechar={aoFechar}
-      aoSucesso={aoSucesso}
-    />
-  )
+  return <ModalConcluirOrdemForm ordem={ordem} aoFechar={aoFechar} aoSucesso={aoSucesso} />
 }
 
 function ModalConcluirOrdemForm({
@@ -46,10 +40,11 @@ function ModalConcluirOrdemForm({
   const tzOffset = agora.getTimezoneOffset() * 60000
   const localIso = new Date(agora.getTime() - tzOffset).toISOString().slice(0, 16)
 
-  const [irregularidade, setIrregularidade] = useState<boolean>(true)
-  const [tipo, setTipo] = useState('BY-PASS')
+  // Sem resposta marcada: o inspetor registra o que viu, sem ser puxado pela suspeita da fila
+  const [irregularidade, setIrregularidade] = useState<boolean | null>(null)
+  const [tipo, setTipo] = useState('')
   const [outroTipo, setOutroTipo] = useState('')
-  const [kwh, setKwh] = useState<string>(ordem.kwh_estimado ? String(ordem.kwh_estimado) : '0')
+  const [kwh, setKwh] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [dataHora, setDataHora] = useState(localIso)
   const [inspetor, setInspetor] = useState('')
@@ -57,6 +52,10 @@ function ModalConcluirOrdemForm({
   const [erro, setErro] = useState<string | null>(null)
 
   const handleConfirmar = async () => {
+    if (irregularidade === null) {
+      setErro('Informe se a inspeção encontrou irregularidade.')
+      return
+    }
     if (!observacoes.trim()) {
       setErro('Observações da vistoria são obrigatórias.')
       return
@@ -69,7 +68,7 @@ function ModalConcluirOrdemForm({
     }
 
     const valorKwh = irregularidade ? Number(kwh) : 0
-    if (irregularidade && (!Number.isFinite(valorKwh) || valorKwh < 0)) {
+    if (irregularidade && (!kwh.trim() || !Number.isFinite(valorKwh) || valorKwh < 0)) {
       setErro('O volume recuperado (kWh) deve ser maior ou igual a zero.')
       return
     }
@@ -121,6 +120,7 @@ function ModalConcluirOrdemForm({
           <Button
             onClick={handleConfirmar}
             carregando={salvando}
+            disabled={irregularidade === null}
             icone={<CheckCircle2 size={16} aria-hidden="true" />}
           >
             Concluir vistoria
@@ -138,36 +138,47 @@ function ModalConcluirOrdemForm({
             <button
               type="button"
               onClick={() => setIrregularidade(true)}
+              aria-pressed={irregularidade === true}
               className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-all ${
-                irregularidade
+                irregularidade === true
                   ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-sm'
                   : 'border-[#cfd9e0] bg-white text-[#59656d] hover:bg-[#f6f9fa]'
               }`}
             >
-              <AlertTriangle size={18} className={irregularidade ? 'text-amber-600' : 'text-[#7d858d]'} />
+              <AlertTriangle
+                size={18}
+                className={irregularidade === true ? 'text-amber-600' : 'text-[#7d858d]'}
+              />
               Irregularidade confirmada
             </button>
             <button
               type="button"
               onClick={() => setIrregularidade(false)}
+              aria-pressed={irregularidade === false}
               className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-all ${
-                !irregularidade
+                irregularidade === false
                   ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm'
                   : 'border-[#cfd9e0] bg-white text-[#59656d] hover:bg-[#f6f9fa]'
               }`}
             >
-              <CheckCircle2 size={18} className={!irregularidade ? 'text-emerald-600' : 'text-[#7d858d]'} />
+              <CheckCircle2
+                size={18}
+                className={irregularidade === false ? 'text-emerald-600' : 'text-[#7d858d]'}
+              />
               Sem irregularidade (normal)
             </button>
           </div>
         </div>
 
         {/* Campos condicionais de irregularidade */}
-        {irregularidade ? (
+        {irregularidade === true && (
           <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label htmlFor="tipo-irregularidade" className="text-xs font-semibold text-[#2d425a]">
+                <label
+                  htmlFor="tipo-irregularidade"
+                  className="text-xs font-semibold text-[#2d425a]"
+                >
                   Tipo de irregularidade *
                 </label>
                 <select
@@ -177,6 +188,9 @@ function ModalConcluirOrdemForm({
                   disabled={salvando}
                   className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
                 >
+                  <option value="" disabled>
+                    Selecione o tipo
+                  </option>
                   {TIPOS_IRREGULARIDADE.map((t) => (
                     <option key={t} value={t}>
                       {t}
@@ -209,15 +223,18 @@ function ModalConcluirOrdemForm({
                   className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
                 />
                 <span className="text-[11px] text-[#7d858d]">
-                  Volume estimado recuperado pela correção da fraude.
+                  Volume medido em campo.
+                  {ordem.kwh_estimado !== null &&
+                    ` A fila estimava ${ordem.kwh_estimado.toLocaleString('pt-BR')} kWh.`}
                 </span>
               </div>
             </div>
           </div>
-        ) : (
+        )}
+        {irregularidade === false && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-800">
-            A instalação do consumidor foi avaliada e nenhuma anomalia ou desvio foi detectado.
-            O volume recuperado será automaticamente registrado como 0 kWh.
+            A instalação do consumidor foi avaliada e nenhuma anomalia ou desvio foi detectado. O
+            volume recuperado será automaticamente registrado como 0 kWh.
           </div>
         )}
 
@@ -282,4 +299,3 @@ function ModalConcluirOrdemForm({
     </Modal>
   )
 }
-
