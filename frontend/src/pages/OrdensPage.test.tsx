@@ -1,22 +1,25 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import indicadoresFixture from '@/data/mocks/indicadores_ordens.json'
 import inspecoesFixture from '@/data/mocks/inspecoes.json'
 import unidadesFixture from '@/data/mocks/unidades.json'
 import {
   buscarFiltros,
+  buscarIndicadoresOrdens,
   cancelarInspecao,
   concluirInspecao,
   iniciarCampo,
   listarInspecoes,
 } from '@/services'
 import type { OpcoesFiltrosApi } from '@/types/filtros'
-import type { Ordens, ParamsInspecoes } from '@/types/inspecoes'
+import type { IndicadoresOrdens, Ordens, ParamsInspecoes } from '@/types/inspecoes'
 import OrdensPage from './OrdensPage'
 
 const mocks = vi.hoisted(() => ({
   buscarFiltros: vi.fn(),
   listarInspecoes: vi.fn(),
+  buscarIndicadoresOrdens: vi.fn(),
   iniciarCampo: vi.fn(),
   concluirInspecao: vi.fn(),
   cancelarInspecao: vi.fn(),
@@ -56,6 +59,7 @@ function opcoesDoCadastro(): OpcoesFiltrosApi {
 
 beforeEach(() => {
   vi.mocked(buscarFiltros).mockResolvedValue(opcoesDoCadastro())
+  vi.mocked(buscarIndicadoresOrdens).mockResolvedValue(indicadoresFixture as IndicadoresOrdens)
 })
 
 afterEach(() => {
@@ -64,6 +68,48 @@ afterEach(() => {
 })
 
 describe('OrdensPage', () => {
+  it('mostra a taxa de acerto, a energia recuperada e o acerto por motivo', async () => {
+    vi.mocked(listarInspecoes).mockResolvedValue(inspecoesFixture as unknown as Ordens)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/ordens?municipio=Recife']}>
+        <OrdensPage />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Resultado das inspeções')).toBeTruthy()
+    expect(await screen.findByText('75,0%')).toBeTruthy()
+    expect(screen.getByText('3 de 4 encontraram irregularidade')).toBeTruthy()
+    expect(screen.getByText('1,5 MWh')).toBeTruthy()
+    expect(screen.getByText('a fila estimava 1,8 MWh')).toBeTruthy()
+    expect(screen.getByText('Histórico de religação')).toBeTruthy()
+    expect(buscarIndicadoresOrdens).toHaveBeenCalledWith(
+      expect.objectContaining({ municipio: 'Recife' }),
+      expect.anything(),
+    )
+  })
+
+  it('sem inspeções concluídas, explica que a taxa ainda não existe', async () => {
+    vi.mocked(listarInspecoes).mockResolvedValue(inspecoesFixture as unknown as Ordens)
+    vi.mocked(buscarIndicadoresOrdens).mockResolvedValue({
+      ...(indicadoresFixture as IndicadoresOrdens),
+      concluidas: 0,
+      com_irregularidade: 0,
+      taxa_acerto_pct: null,
+      kwh_recuperado: 0,
+      kwh_estimado: 0,
+      por_motivo: [],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/ordens']}>
+        <OrdensPage />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Nenhuma inspeção concluída')).toBeTruthy()
+  })
+
   it('renderiza a lista de ordens e os contadores de status', async () => {
     const fixture = inspecoesFixture as unknown as Ordens
     vi.mocked(listarInspecoes).mockResolvedValue(fixture)

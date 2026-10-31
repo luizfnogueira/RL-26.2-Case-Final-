@@ -60,6 +60,32 @@ export interface ParamsInspecoes extends FiltrosRegiao, ParamsPaginacao {
   periodo_atual?: Periodo
 }
 
+/** Query de GET /inspecoes/indicadores. */
+export interface ParamsIndicadoresOrdens extends FiltrosRegiao {
+  /** Janela pela data de conclusão; sem ela, todas as ordens concluídas. */
+  periodo_conclusao?: Periodo
+}
+
+export interface AcertoPorMotivo {
+  motivo: string
+  concluidas: number
+  com_irregularidade: number
+  taxa_acerto_pct: number
+}
+
+/** GET /inspecoes/indicadores: se a fila está acertando, calculado sobre as ordens CONCLUIDA. */
+export interface IndicadoresOrdens {
+  concluidas: number
+  com_irregularidade: number
+  /** null sem ordens concluídas. */
+  taxa_acerto_pct: number | null
+  kwh_recuperado: number
+  kwh_estimado: number
+  /** Uma ordem com vários motivos conta em cada um deles. */
+  por_motivo: AcertoPorMotivo[]
+  metadados: Metadados
+}
+
 /** Resultado de campo, como a API devolve. */
 export interface Resultado {
   irregularidade_detectada: boolean

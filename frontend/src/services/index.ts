@@ -6,6 +6,7 @@ export { buscarUnidade, buscarUnidades } from './unidades'
 export {
   atualizarInspecao,
   buscarCandidatos,
+  buscarIndicadoresOrdens,
   cancelarInspecao,
   concluirInspecao,
   criarInspecao,

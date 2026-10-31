@@ -16,6 +16,7 @@ import criarInspecao from '@/data/mocks/criar_inspecao.json'
 import criarInspecoesLote from '@/data/mocks/criar_inspecoes_lote.json'
 import dashboard from '@/data/mocks/dashboard.json'
 import erro from '@/data/mocks/erro.json'
+import indicadoresOrdens from '@/data/mocks/indicadores_ordens.json'
 import filtros from '@/data/mocks/filtros.json'
 import iniciarInspecao from '@/data/mocks/iniciar_inspecao.json'
 import inspecoes from '@/data/mocks/inspecoes.json'
@@ -41,6 +42,7 @@ import type {
   ConcluirInspecao,
   CriarInspecao,
   CriarInspecoesLote,
+  IndicadoresOrdens,
   IniciarCampo,
   Ordem,
   Ordens,
@@ -70,6 +72,7 @@ export const fixturesConferidos = {
   inspecoes: inspecoes satisfies Largo<Ordens>,
   ordemCriada: ordemCriada satisfies Largo<Ordem>,
   ordensCriadasLote: ordensCriadasLote satisfies Largo<OrdensCriadas>,
+  indicadoresOrdens: indicadoresOrdens satisfies Largo<IndicadoresOrdens>,
   ordemAtualizada: ordemAtualizada satisfies Largo<Ordem>,
   operacao: operacao satisfies Largo<Operacao>,
   respostaIa: respostaIa satisfies Largo<RespostaIA>,

@@ -6,6 +6,7 @@ import {
   buscarComparacao,
   buscarDashboard,
   buscarFiltros,
+  buscarIndicadoresOrdens,
   buscarOperacao,
   buscarUnidade,
   buscarUnidades,
@@ -401,6 +402,32 @@ describe('ordens de inspeção', () => {
     expect((await erroDe(criarInspecao({ ...NOVA, data_prevista: '22/10/2026' }))).codigo).toBe(
       'DADOS_INVALIDOS',
     )
+  })
+
+  it('GET /inspecoes/indicadores calcula o acerto das concluídas e acompanha novas conclusões', async () => {
+    // Snapshot: uma concluída (UC-DEMO-003) com irregularidade, 310 kWh recuperados de 280 estimados
+    const antes = await buscarIndicadoresOrdens()
+    expect(antes).toMatchObject({
+      concluidas: 1,
+      com_irregularidade: 1,
+      taxa_acerto_pct: 100,
+      kwh_recuperado: 310,
+      kwh_estimado: 280,
+    })
+    expect(antes.por_motivo.map((m) => m.motivo)).toEqual(['Consumo abaixo da média do bairro.'])
+
+    // Conclui a ordem #2 (EM_CAMPO) sem irregularidade: a taxa cai para 50%
+    await concluirInspecao(2, {
+      irregularidade_detectada: false,
+      observacoes: 'Instalação regular.',
+    })
+    const depois = await buscarIndicadoresOrdens()
+    expect([depois.concluidas, depois.com_irregularidade, depois.taxa_acerto_pct]).toEqual([
+      2, 1, 50,
+    ])
+
+    const antigo = await buscarIndicadoresOrdens({ periodo_conclusao: '2022-07/2023-06' })
+    expect([antigo.concluidas, antigo.taxa_acerto_pct, antigo.por_motivo]).toEqual([0, null, []])
   })
 
   it('POST /inspecoes/lote cria todas as ordens, cada uma com histórico', async () => {

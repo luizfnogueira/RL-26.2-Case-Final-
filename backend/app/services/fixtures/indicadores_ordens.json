@@ -1,0 +1,34 @@
+{
+  "concluidas": 4,
+  "com_irregularidade": 3,
+  "taxa_acerto_pct": 75.0,
+  "kwh_recuperado": 1450.0,
+  "kwh_estimado": 1820.0,
+  "por_motivo": [
+    {
+      "motivo": "Queda de 42% no consumo sem geração distribuída",
+      "concluidas": 2,
+      "com_irregularidade": 2,
+      "taxa_acerto_pct": 100.0
+    },
+    {
+      "motivo": "Histórico de religação",
+      "concluidas": 2,
+      "com_irregularidade": 1,
+      "taxa_acerto_pct": 50.0
+    },
+    {
+      "motivo": "Consumo abaixo da média do bairro",
+      "concluidas": 1,
+      "com_irregularidade": 0,
+      "taxa_acerto_pct": 0.0
+    }
+  ],
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Dados fictícios do stub P1; não representam a Gold nem o diagnóstico real."
+    ]
+  }
+}

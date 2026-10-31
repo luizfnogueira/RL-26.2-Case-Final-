@@ -58,6 +58,28 @@ class FiltrosInspecoes(FiltrosRegiao, Paginacao):
     periodo_atual: Periodo | None = None
 
 
+class FiltrosIndicadoresOrdens(FiltrosRegiao):
+    # Janela pela data de conclusão; sem ela, todas as ordens concluídas
+    periodo_conclusao: Periodo | None = None
+
+
+class AcertoPorMotivo(Schema):
+    motivo: str
+    concluidas: int
+    com_irregularidade: int
+    taxa_acerto_pct: float
+
+
+class IndicadoresOrdens(Schema):
+    concluidas: int
+    com_irregularidade: int
+    taxa_acerto_pct: float | None
+    kwh_recuperado: float
+    kwh_estimado: float
+    por_motivo: list[AcertoPorMotivo]
+    metadados: Metadados
+
+
 class Resultado(Schema):
     irregularidade_detectada: bool
     tipo_irregularidade: Texto | None = None

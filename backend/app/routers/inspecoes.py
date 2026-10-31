@@ -19,8 +19,8 @@ from app.schemas.inspecao import (
     StatusOrdem,
 )
 from app.schemas.inspecoes import (
-    AtualizarInspecao, Candidatos, CriarInspecao, CriarInspecoesLote, FiltrosCandidatos, FiltrosInspecoes, Ordem,
-    Ordens, OrdensCriadas,
+    AtualizarInspecao, Candidatos, CriarInspecao, CriarInspecoesLote, FiltrosCandidatos, FiltrosIndicadoresOrdens,
+    FiltrosInspecoes, IndicadoresOrdens, Ordem, Ordens, OrdensCriadas,
 )
 from app.services.candidato_service import CandidatoService
 from app.services.inspecao_service import OrdemInspecaoService
@@ -98,6 +98,23 @@ async def listar_inspecoes(
         'contagem_status': contagem,
         'metadados': metadados(db),
     }
+
+
+@router.get('/indicadores', response_model=IndicadoresOrdens, summary='Taxa de acerto das inspeções',
+            description=(
+                'Calculado sobre as ordens CONCLUIDA do portal: quantas encontraram irregularidade (taxa de acerto), '
+                'kWh recuperado em campo contra o kWh estimado pela fila e acerto por motivo da suspeita (o campo '
+                'motivo, com os motivos da fila separados por " · "; uma ordem conta em cada motivo dela). '
+                'periodo_conclusao filtra pela data de conclusão; sem ele, todas as concluídas. '
+                'taxa_acerto_pct é null sem ordens concluídas.'
+            ),
+            responses=respostas('indicadores_ordens'))
+async def indicadores_das_ordens(
+    filtros: Annotated[FiltrosIndicadoresOrdens, Query()],
+    servico: Annotated[OrdemInspecaoService, Depends(get_service)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    return {**servico.indicadores(**filtros.model_dump()), 'metadados': metadados(db)}
 
 
 @router.post('', response_model=Ordem, status_code=201, summary='Criar ordem de inspeção',

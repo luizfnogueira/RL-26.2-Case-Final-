@@ -328,3 +328,50 @@ def test_salvar_varias_desfaz_o_lote_se_o_indice_barrar_uma_ordem(client, engine
         assert conn.execute(
             select(func.count()).select_from(OrdemInspecao).where(OrdemInspecao.id_uc == livre)
         ).scalar_one() == 0
+
+
+def concluir(client, id_ordem: int, irregularidade: bool, kwh: float = 0.0) -> None:
+    assert client.patch(f"/inspecoes/{id_ordem}", json={"status": "EM_CAMPO"}).status_code == 200
+    resultado = {
+        "irregularidade_detectada": irregularidade,
+        "kwh_recuperado": kwh,
+        "observacoes": "Vistoria de teste.",
+        "inspetor": "Inspetor de teste",
+    }
+    if irregularidade:
+        resultado["tipo_irregularidade"] = "BY-PASS"
+    response = client.patch(f"/inspecoes/{id_ordem}", json={"status": "CONCLUIDA", "resultado": resultado})
+    assert response.status_code == 200, response.text
+
+
+def test_indicadores_contam_so_as_concluidas_e_respeitam_os_filtros(client, engine):
+    certa, errada, aberta = ucs_sem_restricao(engine, 3)
+    ids = {}
+    for uc, motivo in ((certa, "Religação · Queda de consumo"), (errada, "Queda de consumo"), (aberta, "Religação")):
+        criada = client.post("/inspecoes", json={**corpo(uc), "motivo": motivo, "kwh_estimado": 100.0})
+        ids[uc] = criada.json()["id_ordem"]
+    concluir(client, ids[certa], True, 80.0)
+    concluir(client, ids[errada], False)
+
+    dados = client.get("/inspecoes/indicadores").json()
+    assert (dados["concluidas"], dados["com_irregularidade"], dados["taxa_acerto_pct"]) == (2, 1, 50.0)
+    assert (dados["kwh_recuperado"], dados["kwh_estimado"]) == (80.0, 200.0)
+    assert [(m["motivo"], m["concluidas"], m["taxa_acerto_pct"]) for m in dados["por_motivo"]] == [
+        ("Queda de consumo", 2, 50.0), ("Religação", 1, 100.0),
+    ]
+    assert "metadados" in dados
+
+    # Período pela data de conclusão: as ordens de hoje ficam fora de uma janela antiga
+    antigo = client.get("/inspecoes/indicadores", params={"periodo_conclusao": "2022-07/2023-06"}).json()
+    assert (antigo["concluidas"], antigo["taxa_acerto_pct"], antigo["por_motivo"]) == (0, None, [])
+
+    with engine.connect() as conn:
+        municipio = conn.execute(
+            select(UnidadeConsumidora.municipio).where(UnidadeConsumidora.id_uc == certa)
+        ).scalar_one()
+        no_municipio = conn.execute(
+            select(func.count()).select_from(UnidadeConsumidora)
+            .where(UnidadeConsumidora.municipio == municipio, UnidadeConsumidora.id_uc.in_([certa, errada]))
+        ).scalar_one()
+    filtrado = client.get("/inspecoes/indicadores", params={"municipio": municipio}).json()
+    assert filtrado["concluidas"] == no_municipio

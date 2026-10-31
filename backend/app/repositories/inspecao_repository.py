@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Protocol
@@ -19,6 +20,15 @@ from app.schemas.inspecao import (
     ResultadoInspecao,
     StatusOrdem,
 )
+
+
+@dataclass(frozen=True)
+class OrdemConcluida:
+    """O que os indicadores de acerto precisam de uma ordem CONCLUIDA."""
+    motivo: Optional[str]
+    kwh_estimado: Optional[float]
+    irregularidade: bool
+    kwh_recuperado: float
 
 
 class OrdemInspecaoRepositoryInterface(Protocol):
@@ -67,6 +77,17 @@ class OrdemInspecaoRepositoryInterface(Protocol):
     def existe_uc(self, id_uc: str) -> bool:
         ...
 
+    def listar_concluidas(
+        self,
+        *,
+        periodo_conclusao: Optional[str] = None,
+        municipio: Optional[str] = None,
+        bairro: Optional[str] = None,
+        classe: Optional[str] = None,
+        alimentador: Optional[str] = None,
+    ) -> list[OrdemConcluida]:
+        ...
+
 
 def _valor_status(status: StatusOrdem | str) -> str:
     return status.value if isinstance(status, StatusOrdem) else status
@@ -87,6 +108,22 @@ def _mes_seguinte(referencia: str) -> datetime:
 def _intervalo_periodo(periodo: str) -> tuple[datetime, datetime]:
     inicio, fim = limites(periodo)
     return _inicio_mes(inicio), _mes_seguinte(fim)
+
+
+def _condicoes_regiao(
+    municipio: Optional[str],
+    bairro: Optional[str],
+    classe: Optional[str],
+    alimentador: Optional[str],
+) -> list:
+    """Filtros de região pelo cadastro da UC (exigem o join com dim_uc)."""
+    pares = (
+        (UnidadeConsumidora.municipio, municipio),
+        (UnidadeConsumidora.bairro, bairro),
+        (UnidadeConsumidora.classe, classe),
+        (UnidadeConsumidora.alimentador, alimentador),
+    )
+    return [coluna == valor.strip() for coluna, valor in pares if valor]
 
 
 def _flutuante(valor: Decimal | float | None) -> float | None:
@@ -224,15 +261,9 @@ class SqlAlchemyOrdemInspecaoRepository:
             inicio, fim = _intervalo_periodo(periodo_atual)
             condicoes.append(OrdemInspecao.data_criacao >= inicio)
             condicoes.append(OrdemInspecao.data_criacao < fim)
-        if municipio:
-            condicoes.append(UnidadeConsumidora.municipio == municipio.strip())
-        if bairro:
-            condicoes.append(UnidadeConsumidora.bairro == bairro.strip())
-        if classe:
-            condicoes.append(UnidadeConsumidora.classe == classe.strip())
-        if alimentador:
-            condicoes.append(UnidadeConsumidora.alimentador == alimentador.strip())
-        join_uc = any((municipio, bairro, classe, alimentador))
+        regiao = _condicoes_regiao(municipio, bairro, classe, alimentador)
+        condicoes.extend(regiao)
+        join_uc = bool(regiao)
 
         contagem = {status.value: 0 for status in StatusOrdem}
         consulta_contagem = select(
@@ -259,6 +290,36 @@ class SqlAlchemyOrdemInspecaoRepository:
         )
         ordens = [_para_response(modelo) for modelo in self.db.scalars(consulta)]
         return ordens, total, contagem
+
+    def listar_concluidas(
+        self,
+        *,
+        periodo_conclusao: Optional[str] = None,
+        municipio: Optional[str] = None,
+        bairro: Optional[str] = None,
+        classe: Optional[str] = None,
+        alimentador: Optional[str] = None,
+    ) -> list[OrdemConcluida]:
+        regiao = _condicoes_regiao(municipio, bairro, classe, alimentador)
+        condicoes = [OrdemInspecao.status == StatusOrdem.CONCLUIDA.value, *regiao]
+        if periodo_conclusao:
+            inicio, fim = _intervalo_periodo(periodo_conclusao)
+            condicoes.append(OrdemInspecao.data_conclusao >= inicio)
+            condicoes.append(OrdemInspecao.data_conclusao < fim)
+        consulta = self._aplicar_filtros(
+            select(OrdemInspecao.motivo, OrdemInspecao.kwh_estimado, OrdemInspecao.resultado),
+            condicoes,
+            bool(regiao),
+        )
+        return [
+            OrdemConcluida(
+                motivo=motivo,
+                kwh_estimado=_flutuante(kwh_estimado),
+                irregularidade=bool((resultado or {}).get("irregularidade_detectada")),
+                kwh_recuperado=float((resultado or {}).get("kwh_recuperado") or 0),
+            )
+            for motivo, kwh_estimado, resultado in self.db.execute(consulta)
+        ]
 
     @staticmethod
     def _aplicar_filtros(consulta, condicoes, join_uc: bool):
@@ -425,3 +486,26 @@ class MemoriaOrdemInspecaoRepository:
         ordens: list[tuple[OrdemInspecaoResponse, Optional[HistoricoOrdem]]],
     ) -> list[OrdemInspecaoResponse]:
         return [self.salvar(ordem, evento_historico) for ordem, evento_historico in ordens]
+
+    def listar_concluidas(
+        self,
+        *,
+        periodo_conclusao: Optional[str] = None,
+        municipio: Optional[str] = None,
+        bairro: Optional[str] = None,
+        classe: Optional[str] = None,
+        alimentador: Optional[str] = None,
+    ) -> list[OrdemConcluida]:
+        """Sem cadastro em memória: os filtros de região não se aplicam aqui."""
+        inicio, fim = _intervalo_periodo(periodo_conclusao) if periodo_conclusao else (None, None)
+        return [
+            OrdemConcluida(
+                motivo=ordem.motivo,
+                kwh_estimado=ordem.kwh_estimado,
+                irregularidade=ordem.resultado.irregularidade_detectada,
+                kwh_recuperado=ordem.resultado.kwh_recuperado,
+            )
+            for ordem in self._ordens.values()
+            if ordem.status == StatusOrdem.CONCLUIDA and ordem.resultado is not None
+            and (inicio is None or (ordem.data_conclusao and inicio <= ordem.data_conclusao < fim))
+        ]

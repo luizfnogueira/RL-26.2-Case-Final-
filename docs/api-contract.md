@@ -28,6 +28,7 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; sem_ordem_ativa; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
 | POST /inspecoes/lote | corpo `{"ordens": [...]}` com 1 a 200 itens no formato do POST /inspecoes |
+| GET /inspecoes/indicadores | periodo_conclusao opcional (data de conclusão); município, bairro, classe, alimentador |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta |
 | GET /filtros | sem parâmetros |
@@ -274,6 +275,21 @@ Cria de 1 a 200 ordens de uma vez (seleção múltipla da Tela 4), **tudo ou nad
 Com todas válidas, as ordens e seus eventos de histórico são gravados num único commit. Se uma ordem ativa for criada em paralelo entre a validação e a gravação, o índice único barra, o lote inteiro é desfeito e a resposta é 409 `ORDEM_ATIVA_EXISTENTE`.
 
 [Corpo de exemplo](../backend/app/services/fixtures/criar_inspecoes_lote.json) · **201 — [resposta](../backend/app/services/fixtures/ordens_criadas_lote.json)**: `{"items": [Ordem, ...], "total": n}`, na ordem do pedido.
+
+### GET /inspecoes/indicadores
+
+Resultado das inspeções concluídas, para saber se a fila está acertando. Calculado só sobre ordens `CONCLUIDA`; os filtros de região seguem o cadastro da UC e `periodo_conclusao` filtra pela data de conclusão (sem ele, todas as concluídas).
+
+| Campo | Cálculo |
+| --- | --- |
+| `concluidas` | Ordens concluídas no recorte |
+| `com_irregularidade` | Concluídas com `irregularidade_detectada = true` |
+| `taxa_acerto_pct` | `com_irregularidade ÷ concluidas × 100`, uma casa; `null` sem concluídas |
+| `kwh_recuperado` | Σ `kwh_recuperado` dos resultados |
+| `kwh_estimado` | Σ `kwh_estimado` das mesmas ordens (o que a fila previa) |
+| `por_motivo` | Para cada motivo da suspeita: concluídas, com irregularidade e taxa. O motivo vem do campo `motivo` da ordem, com os motivos da fila separados por ` · `; uma ordem com dois motivos conta nos dois. Ordenado por concluídas e depois pela taxa |
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/indicadores_ordens.json)**
 
 ### PATCH /inspecoes/{id}
 

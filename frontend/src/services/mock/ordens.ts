@@ -6,6 +6,7 @@ import type {
   Candidato,
   Candidatos,
   Historico,
+  IndicadoresOrdens,
   Ordem,
   Ordens,
   OrdensCriadas,
@@ -154,6 +155,65 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
       ),
       ordens_ativas: indicador(fila.filter((c) => c.ordem_ativa).length, 'ordens', PERIODO_ATUAL),
     },
+    metadados: base.metadados,
+  }
+}
+
+// ---------- Indicadores ----------
+
+/** Como a API: os motivos da fila vêm no campo motivo da ordem, unidos por " · ". */
+const SEPARADOR_MOTIVOS = ' · '
+const pct = (parte: number, todo: number) => (todo ? Math.round((1000 * parte) / todo) / 10 : null)
+
+export async function indicadoresDasOrdens(params: Registro): Promise<IndicadoresOrdens> {
+  const janela = periodo(params, 'periodo_conclusao', false)
+  const filtros = regiao(params)
+  const e = await obterEstado()
+  const base = await fixtures.inspecoes()
+  const concluidas = filtrarRegiao(e.ordens, filtros, e.cadastro).filter(
+    (o) =>
+      o.status === 'CONCLUIDA' &&
+      o.resultado !== null &&
+      (!janela ||
+        (o.data_conclusao !== null && mesNoPeriodo(o.data_conclusao.slice(0, 7), janela))),
+  )
+  const certas = concluidas.filter((o) => o.resultado?.irregularidade_detectada)
+  const motivos = new Map<string, { concluidas: number; certas: number }>()
+  for (const ordem of concluidas) {
+    const daOrdem = new Set(
+      (ordem.motivo ?? '')
+        .split(SEPARADOR_MOTIVOS)
+        .map((m) => m.trim())
+        .filter(Boolean),
+    )
+    for (const motivo of daOrdem) {
+      const contagem = motivos.get(motivo) ?? { concluidas: 0, certas: 0 }
+      contagem.concluidas += 1
+      if (ordem.resultado?.irregularidade_detectada) contagem.certas += 1
+      motivos.set(motivo, contagem)
+    }
+  }
+  const porMotivo = [...motivos].map(([motivo, c]) => ({
+    motivo,
+    concluidas: c.concluidas,
+    com_irregularidade: c.certas,
+    taxa_acerto_pct: pct(c.certas, c.concluidas) as number,
+  }))
+  porMotivo.sort(
+    (a, b) =>
+      b.concluidas - a.concluidas ||
+      b.taxa_acerto_pct - a.taxa_acerto_pct ||
+      a.motivo.localeCompare(b.motivo),
+  )
+  return {
+    concluidas: concluidas.length,
+    com_irregularidade: certas.length,
+    taxa_acerto_pct: pct(certas.length, concluidas.length),
+    kwh_recuperado: arredondar(
+      concluidas.reduce((s, o) => s + (o.resultado?.kwh_recuperado ?? 0), 0),
+    ),
+    kwh_estimado: arredondar(concluidas.reduce((s, o) => s + (o.kwh_estimado ?? 0), 0)),
+    por_motivo: porMotivo,
     metadados: base.metadados,
   }
 }

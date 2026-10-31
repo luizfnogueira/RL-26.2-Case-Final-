@@ -9,6 +9,7 @@ import {
   atualizarOrdem,
   criarOrdem,
   criarOrdensEmLote,
+  indicadoresDasOrdens,
   listarCandidatos,
   listarOrdens,
 } from './ordens'
@@ -61,6 +62,10 @@ export async function atenderMock(
       if (segundo === 'candidatos') {
         exigirMetodo(metodo, 'GET')
         return listarCandidatos(consulta)
+      }
+      if (segundo === 'indicadores') {
+        exigirMetodo(metodo, 'GET')
+        return indicadoresDasOrdens(consulta)
       }
       if (segundo === 'lote') {
         exigirMetodo(metodo, 'POST')

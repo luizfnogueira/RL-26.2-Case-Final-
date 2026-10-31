@@ -14,6 +14,7 @@ from app.core.exceptions import (
 )
 from app.repositories.inspecao_repository import (
     MemoriaOrdemInspecaoRepository,
+    OrdemConcluida,
     OrdemInspecaoRepositoryInterface,
 )
 from app.schemas.inspecao import (
@@ -26,6 +27,45 @@ from app.schemas.inspecao import (
     ResultadoInspecao,
     StatusOrdem,
 )
+
+# A Fila grava os motivos da suspeita no campo motivo da ordem, unidos por este separador
+SEPARADOR_MOTIVOS = " · "
+
+
+def _pct(parte: int, todo: int) -> float | None:
+    return round(100 * parte / todo, 1) if todo else None
+
+
+def calcular_indicadores(concluidas: list[OrdemConcluida]) -> dict[str, Any]:
+    """Taxa de acerto, kWh recuperado × estimado e acerto por motivo da suspeita.
+
+    Uma ordem com vários motivos conta em cada um deles; o motivo vazio fica de fora do ranking.
+    """
+    acertos = sum(ordem.irregularidade for ordem in concluidas)
+    motivos: dict[str, list[int]] = {}
+    for ordem in concluidas:
+        for motivo in {m.strip() for m in (ordem.motivo or "").split(SEPARADOR_MOTIVOS) if m.strip()}:
+            contagem = motivos.setdefault(motivo, [0, 0])
+            contagem[0] += 1
+            contagem[1] += ordem.irregularidade
+    por_motivo = [
+        {
+            "motivo": motivo,
+            "concluidas": total,
+            "com_irregularidade": certas,
+            "taxa_acerto_pct": _pct(certas, total),
+        }
+        for motivo, (total, certas) in motivos.items()
+    ]
+    por_motivo.sort(key=lambda m: (-m["concluidas"], -m["taxa_acerto_pct"], m["motivo"]))
+    return {
+        "concluidas": len(concluidas),
+        "com_irregularidade": acertos,
+        "taxa_acerto_pct": _pct(acertos, len(concluidas)),
+        "kwh_recuperado": round(sum(ordem.kwh_recuperado for ordem in concluidas), 2),
+        "kwh_estimado": round(sum(ordem.kwh_estimado or 0 for ordem in concluidas), 2),
+        "por_motivo": por_motivo,
+    }
 
 
 class OrdemInspecaoService:
@@ -346,6 +386,9 @@ class OrdemInspecaoService:
             page=page,
             page_size=page_size,
         )
+
+    def indicadores(self, **filtros: Optional[str]) -> dict[str, Any]:
+        return calcular_indicadores(self.repository.listar_concluidas(**filtros))
 
     def obter_ordem_ativa(self, id_uc: str) -> Optional[OrdemInspecaoResponse]:
         return self.repository.obter_ativa_por_uc(id_uc)

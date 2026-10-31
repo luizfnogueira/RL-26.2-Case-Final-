@@ -3,10 +3,12 @@ import type {
   Candidatos,
   CriarInspecao,
   FalhaLote,
+  IndicadoresOrdens,
   Ordem,
   OrdensCriadas,
   Ordens,
   ParamsCandidatos,
+  ParamsIndicadoresOrdens,
   ParamsInspecoes,
   ResultadoEnvio,
 } from '@/types/inspecoes'
@@ -27,6 +29,14 @@ export function listarInspecoes(
   sinal?: AbortSignal,
 ): Promise<Ordens> {
   return requisitar<Ordens>('GET', '/inspecoes', { params, sinal })
+}
+
+/** GET /inspecoes/indicadores: taxa de acerto, kWh recuperado e acerto por motivo (Tela 5). */
+export function buscarIndicadoresOrdens(
+  params: ParamsIndicadoresOrdens = {},
+  sinal?: AbortSignal,
+): Promise<IndicadoresOrdens> {
+  return requisitar<IndicadoresOrdens>('GET', '/inspecoes/indicadores', { params, sinal })
 }
 
 /**
