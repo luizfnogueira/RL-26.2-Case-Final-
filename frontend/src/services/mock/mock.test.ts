@@ -507,6 +507,15 @@ describe('POST /ia', () => {
     )
   })
 
+  it('responde a pergunta sobre a plataforma pelo guia, sem sql nem dados', async () => {
+    const r = await perguntarIA('O que é a aba Assistente V-Energy?')
+    expect(r.status).toBe('ok')
+    expect(r.sql).toBeNull()
+    expect(r.dados).toEqual({ colunas: [], linhas: [] })
+    expect(r.metadados.fonte).toBe('guia')
+    expect(r.metadados.secoes_guia?.map((s) => s.id)).toEqual(['assistente'])
+  })
+
   it('recusa campo além da pergunta e do conversa_id, como a API', async () => {
     const extra = atenderMock('POST', '/ia', { corpo: { pergunta: 'Oi', contexto: {} } })
     expect((await erroDe(extra)).codigo).toBe('DADOS_INVALIDOS')

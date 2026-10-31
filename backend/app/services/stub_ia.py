@@ -10,6 +10,8 @@ from app.services.stub_dashboard import montar_dashboard
 from app.services.stubs import CAMPOS_REGIAO, exemplo, verificar_cenario
 
 PERGUNTA_OK = 'qual foi a receita no período?'
+# Pergunta sobre a plataforma: respondida pelo guia, sem SQL (metadados.fonte "guia")
+PERGUNTA_GUIA = 'o que é a aba assistente v-energy?'
 PERGUNTA_BLOQUEADA = 'drop table clientes'
 # Pedido de alterar ou apagar dados: bloqueado, como no mock do front (services/mock/ia.ts)
 DESTRUTIVA = re.compile(r'\b(drop|delete|truncate|apague|apagar|exclua|excluir|remova|remover)\b', re.IGNORECASE)
@@ -29,6 +31,8 @@ def responder(dados: PerguntaIA) -> dict:
         return exemplo('resposta_ia_bloqueado')
     if pergunta == PERGUNTA_OK:
         return exemplo('resposta_ia')
+    if pergunta == PERGUNTA_GUIA:
+        return exemplo('resposta_ia_guia')
     # Esclarecimento com um bairro fictício que existe em três municípios ("Qual a receita do Centro?")
     esclarecer = esclarecimento_ia.detectar(dados.pergunta, [], BAIRROS_AMBIGUOS_DEMO)
     if esclarecer:

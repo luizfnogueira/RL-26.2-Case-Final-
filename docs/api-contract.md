@@ -347,6 +347,10 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
 | `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
 | `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
+| `metadados.fonte` | `"dados"` (padrão) ou `"guia"` | De onde veio a resposta. Ausente vale como `"dados"`. |
+| `metadados.secoes_guia` | lista de `{id, titulo}` | Seções do guia da plataforma em que a resposta se apoiou; vazia em resposta de dados. |
+
+**Pergunta sobre a plataforma.** Perguntas sobre o uso do portal ("O que é a aba Assistente V-Energy?", "Como gero uma ordem de inspeção?") são respondidas pelo [guia da plataforma](../backend/app/ai/guia/plataforma.md), não pela Gold. A resposta vem com `metadados.fonte: "guia"`, `sql: null`, `tabelas` e `dados` vazios, sem gráfico, e `status` `ok` ou `nao_sei`. Com `ok`, `metadados.secoes_guia` lista as seções usadas, e o bloco "Como cheguei nisso" mostra essas seções no lugar do SQL. O agente do guia só recebe as seções de nível público. O que não estiver no guia volta `nao_sei`. [Exemplo](../backend/app/services/fixtures/resposta_ia_guia.json).
 
 **Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta três casos:
 
@@ -422,6 +426,7 @@ Cenários demonstrativos:
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 | Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
 | Qual a receita do Centro? / Qual foi a receita deste ano? | esclarecer — exemplos acima (no mock, "Centro" é um bairro fictício de Recife, Olinda e Paulista) |
+| O que é a aba Assistente V-Energy? | [ok pelo guia](../backend/app/services/fixtures/resposta_ia_guia.json) — `metadados.fonte: "guia"`, sem SQL |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
