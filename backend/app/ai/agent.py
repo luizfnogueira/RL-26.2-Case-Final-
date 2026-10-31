@@ -225,6 +225,13 @@ _SOMA_SIMPLES_DEC_FEC = re.compile(r"\bsum\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_d
 # Uma linha por alimentador: agrupar ou filtrar por alimentador mantém a soma dos meses de um alimentador só
 _POR_ALIMENTADOR = re.compile(
     r"\bgroup\s+by\b[^;]*\balimentador\b|\balimentador\s*(?:=|\bin\b)|^\s*select\s+(?:\w+\.)?alimentador\b")
+# Ponderação pelas UCs: SUM(dec * ucs_atendidas) dividido por SUM(ucs_atendidas), aceitando NULLIF e casts
+_INDICE = r"(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?(?:\s*::\s*\w+)?"
+_UCS = r"(?:\w+\.)?ucs_atendidas(?:\s*::\s*\w+)?"
+_NUMERADOR_PONDERADO = rf"\bsum\s*\(\s*(?:{_INDICE}\s*\*\s*{_UCS}|{_UCS}\s*\*\s*{_INDICE})\s*\)"
+_RAZAO_PONDERADA = re.compile(
+    rf"{_NUMERADOR_PONDERADO}[^/;]{{0,40}}/\s*(?:(?:nullif|cast)?\s*\(\s*)*sum\s*\(\s*{_UCS}\s*\)")
+_NUMERADOR_PONDERADO = re.compile(_NUMERADOR_PONDERADO)
 
 
 def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
@@ -241,8 +248,17 @@ def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
             "O DEC mensal já é uma média por UC. Para um grupo de alimentadores, pondere pelas UCs em cada mês "
             "(`SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)`) e depois some os meses."
         )
-    if ("agg_dec_fec_mensal" in sql_lower and _SOMA_SIMPLES_DEC_FEC.search(sql_lower)
-            and "ucs_atendidas" not in sql_lower and not _POR_ALIMENTADOR.search(sql_lower)):
+    if "agg_dec_fec_mensal" not in sql_lower:
+        return
+    razoes = len(_RAZAO_PONDERADA.findall(sql_lower))
+    # Basta a coluna aparecer não serve: SUM(dec) ao lado de SUM(ucs_atendidas), ou SUM(dec * ucs) / COUNT(*)
+    if len(_NUMERADOR_PONDERADO.findall(sql_lower)) > razoes:
+        raise ErroConsulta(
+            "Regra de negócio violada: a ponderação do DEC/FEC pelas UCs divide pela soma das UCs do mesmo mês: "
+            "`SUM(dec * ucs_atendidas) / NULLIF(SUM(ucs_atendidas), 0)`, agrupando por `mes_referencia`; "
+            "depois some os meses."
+        )
+    if _SOMA_SIMPLES_DEC_FEC.search(sql_lower) and not razoes and not _POR_ALIMENTADOR.search(sql_lower):
         raise ErroConsulta(
             "Regra de negócio violada: em `agg_dec_fec_mensal` cada linha é um alimentador, e `SUM(dec)` por "
             "município, bairro ou sem agrupar soma o DEC de alimentadores diferentes. Pondere pelas UCs em cada "
