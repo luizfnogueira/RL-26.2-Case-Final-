@@ -63,7 +63,9 @@
 3. **Períodos Canônicos P1 e P2 (Regra 4.4):**
    - **P1 ( primeiro ano da base ):** `mes_referencia BETWEEN '2022-07' AND '2023-06'`.
    - **P2 ( últimos 12 meses da base ):** `mes_referencia BETWEEN '2025-07' AND '2026-06'`.
-   - **"Último ano":** quando a pergunta falar em *"perdeu/cresceu no último ano"*, explicite o período usado (comparação P2 vs P1 ou 12 meses de P2 vs 12 meses imediatamente anteriores `'2024-07'` a `'2025-06'`).
+   - **Ano civil:** a base tem 2023, 2024 e 2025 completos; 2022 começa em julho e 2026 termina em junho. "Em 2025 (janeiro a dezembro)" usa `'2025-01'` a `'2025-12'`; "perdeu/cresceu em 2025" compara com 2024 (`'2024-01'` a `'2024-12'`).
+   - **Últimos 12 meses:** são o P2; "perdeu/cresceu nos últimos 12 meses" compara com os 12 meses imediatamente anteriores (`'2024-07'` a `'2025-06'`), não com P1.
+   - "Último ano" e "ano passado" chegam já resolvidos pelo portal em uma dessas duas formas. Diga na resposta quais meses foram comparados.
 
 4. **Correção de Premissa Falsa:**
    - Se o usuário perguntar *"Quanto a receita comercial cresceu em Jaboatão?"*, corrija educadamente a premissa: de P1 para P2, a receita comercial em `'JABOATÃO DOS GUARARAPES'` **caiu 2,09%** (não cresceu).
@@ -99,7 +101,7 @@ LIMIT 10;
 ```
 
 ### Exemplo 2: Bairro que mais perdeu volume residencial entre P1 e P2
-**Pergunta:** Qual bairro mais perdeu volume residencial no último ano?
+**Pergunta:** Qual bairro mais perdeu volume residencial entre P1 e P2?
 ```sql
 SELECT
     municipio,

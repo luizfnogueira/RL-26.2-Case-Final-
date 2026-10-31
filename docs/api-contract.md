@@ -348,12 +348,13 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
 | `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
 
-**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta dois casos:
+**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta três casos:
 
 | Caso | Exemplo | Opções |
 | --- | --- | --- |
 | Bairro que existe em 2 municípios ou mais, sem nenhum município na pergunta. A troca anterior só resolve numa continuação ("E no Centro?") logo depois de uma pergunta com um município só | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 10) e "Todos os municípios juntos". Um município citado resolve, mesmo sem esse bairro: aí o agente responde que não há dados |
 | "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
+| "Último ano", "ano passado" sem ano nem P1/P2 | "Qual bairro mais perdeu volume residencial no último ano?" | "2025 (jan a dez)" e "Últimos 12 meses (jul/2025 a jun/2026)": a base tem 2025 inteiro, e 2026 só até junho |
 
 ```json
 {

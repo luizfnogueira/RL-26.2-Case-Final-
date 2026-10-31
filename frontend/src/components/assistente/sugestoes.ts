@@ -1,6 +1,6 @@
 /**
  * Perguntas sugeridas da Tela 7 (GENAI-16), por categoria, incluindo as 3 perguntas do case.
- * Toda sugestão precisa estar no golden set com status ok (ai-agent/avaliacao/perguntas.yaml):
+ * Toda sugestão precisa estar no golden set com status ok ou esclarecer (ai-agent/avaliacao/perguntas.yaml):
  * o teste backend/tests/test_sugestoes_golden.py confere quando o golden set existir.
  */
 export const SUGESTOES_POR_CATEGORIA = [

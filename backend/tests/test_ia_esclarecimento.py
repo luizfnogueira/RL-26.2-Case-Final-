@@ -99,9 +99,37 @@ def test_este_ano_pede_2026_ou_p2(pergunta, em_2026, em_p2):
     assert perguntas(detectar(pergunta, [], {})) == [em_2026, em_p2]
 
 
-@pytest.mark.parametrize("pergunta", ["Receita deste ano de 2025", "DEC deste ano em P2", "Receita do ano passado"])
+@pytest.mark.parametrize("pergunta", ["Receita deste ano de 2025", "DEC deste ano em P2",
+                                      "Receita do ano passado (2025)", "Volume do último ano em P2",
+                                      "Receita dos últimos 12 meses", "Receita nos últimos anos"])
 def test_ano_explicito_nao_pede_esclarecimento(pergunta):
     assert detectar(pergunta, [], {}) is None
+
+
+# ---------- "último ano" e "ano passado" ----------
+
+@pytest.mark.parametrize("pergunta, em_2025, em_12_meses", [
+    # Pergunta do case: a base tem 2025 inteiro, mas "último ano" também pode ser os 12 meses mais recentes
+    ("Qual bairro mais perdeu volume residencial no último ano?",
+     "Qual bairro mais perdeu volume residencial em 2025 (janeiro a dezembro)?",
+     "Qual bairro mais perdeu volume residencial nos últimos 12 meses (jul/2025 a jun/2026)?"),
+    ("Qual foi a receita do ano passado?", "Qual foi a receita de 2025 (janeiro a dezembro)?",
+     "Qual foi a receita dos últimos 12 meses (jul/2025 a jun/2026)?"),
+    ("Compare o DEC de Olinda com o ano passado", "Compare o DEC de Olinda com 2025 (janeiro a dezembro)",
+     "Compare o DEC de Olinda com os últimos 12 meses (jul/2025 a jun/2026)"),
+    ("ultimo ano: receita?", "2025 (janeiro a dezembro): receita?",
+     "Os últimos 12 meses (jul/2025 a jun/2026): receita?"),
+])
+def test_ultimo_ano_pede_2025_ou_os_ultimos_12_meses(pergunta, em_2025, em_12_meses):
+    pedido = detectar(pergunta, [], {})
+    assert [o["rotulo"] for o in pedido["opcoes"]] == ["2025 (jan a dez)", "Últimos 12 meses (jul/2025 a jun/2026)"]
+    assert perguntas(pedido) == [em_2025, em_12_meses]
+    assert pedido["pergunta"].startswith("Os dados vão até junho de 2026.")
+
+
+def test_opcao_escolhida_nao_pede_esclarecimento_de_novo():
+    for opcao in perguntas(detectar("Qual foi a receita do ano passado?", [], {})):
+        assert detectar(opcao, [], {}) is None
 
 
 def test_bairro_vem_antes_do_ano():

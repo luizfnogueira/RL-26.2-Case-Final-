@@ -5,7 +5,9 @@ Dois casos, detectados por código e sem gastar tokens:
   continuação "E no Centro?" depois de uma pergunta com um município só)
   ("Centro" existe em 10 municípios da Gold; somá-los daria um número sem sentido);
 - "este ano" sem ano nem período: a base termina em jun/2026, então 2026 tem só 6 meses e P2 é
-  jul/2025 a jun/2026.
+  jul/2025 a jun/2026;
+- "último ano" ou "ano passado" sem ano nem período: 2025 completo (jan a dez, que a base tem inteiro)
+  ou os últimos 12 meses da base (jul/2025 a jun/2026).
 Cada opção leva a pergunta já completa: o clique reenvia na mesma conversa e o agente responde direto.
 """
 import re
@@ -18,6 +20,7 @@ MAX_OPCOES = 10
 TODOS = "somando todos os municípios"
 _MINUSCULAS = {"de", "da", "do", "das", "dos", "e"}
 _ESTE_ANO = re.compile(r"\b(?:(n|d)?(?:este|esse)\s+ano|(no|do)\s+ano\s+atual)\b", re.IGNORECASE)
+_ULTIMO_ANO = re.compile(r"\b(?:(n|d)?o\s+)?(?:[uú]ltimo\s+ano|ano\s+passado)\b", re.IGNORECASE)
 _ANO_OU_PERIODO = re.compile(r"\b(20\d{2}|p[12])\b", re.IGNORECASE)
 # Continuação curta da troca anterior: "E no Centro?", "e o centro"
 _CONTINUACAO = re.compile(r"^E\b")
@@ -89,10 +92,38 @@ def _este_ano(pergunta: str) -> dict | None:
     }
 
 
+def _ultimo_ano(pergunta: str) -> dict | None:
+    achado = _ULTIMO_ANO.search(pergunta)
+    if not achado or _ANO_OU_PERIODO.search(pergunta):
+        return None
+    preposicao = (achado.group(1) or "").lower()
+
+    def trocar(com_em: str, com_de: str, sem: str) -> str:
+        por = {"n": com_em, "d": com_de}.get(preposicao, sem)
+        texto = _ULTIMO_ANO.sub(por, pergunta.strip(), count=1)
+        return texto[:1].upper() + texto[1:]
+
+    expressao = re.sub(r"^(?:n|d)?o\s+", "", achado.group(0), flags=re.IGNORECASE)
+    return {
+        "pergunta": f"Os dados vão até junho de 2026. \"{expressao[:1].upper()}{expressao[1:]}\" é 2025 completo "
+                    "(janeiro a dezembro) ou os últimos 12 meses da base (jul/2025 a jun/2026)?",
+        "opcoes": [
+            {"rotulo": "2025 (jan a dez)",
+             "pergunta": trocar("em 2025 (janeiro a dezembro)", "de 2025 (janeiro a dezembro)",
+                                "2025 (janeiro a dezembro)")},
+            {"rotulo": "Últimos 12 meses (jul/2025 a jun/2026)",
+             "pergunta": trocar("nos últimos 12 meses (jul/2025 a jun/2026)",
+                                "dos últimos 12 meses (jul/2025 a jun/2026)",
+                                "os últimos 12 meses (jul/2025 a jun/2026)")},
+        ],
+    }
+
+
 def detectar(pergunta: str, historico: list[dict], ambiguos: dict[str, set[str]],
              municipios: set[str] = frozenset()) -> dict | None:
     """O pedido de esclarecimento (pergunta e opções) ou None quando a pergunta já é clara."""
-    return _bairro_ambiguo(pergunta, historico, ambiguos, set(municipios)) or _este_ano(pergunta)
+    return (_bairro_ambiguo(pergunta, historico, ambiguos, set(municipios)) or _este_ano(pergunta)
+            or _ultimo_ano(pergunta))
 
 
 def resposta(esclarecimento: dict, gold_atualizada_em: Any) -> dict:
