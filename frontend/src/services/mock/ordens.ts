@@ -163,6 +163,8 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
 
 /** Como a API: os motivos da fila vêm no campo motivo da ordem, unidos por " · ". */
 const SEPARADOR_MOTIVOS = ' · '
+/** Como a API: o kwh_estimado da fila cobre 3 meses; o kWh do resultado de campo é por mês. */
+const MESES_ESTIMATIVA_FILA = 3
 const pct = (parte: number, todo: number) => (todo ? Math.round((1000 * parte) / todo) / 10 : null)
 
 export async function indicadoresDasOrdens(params: Registro): Promise<IndicadoresOrdens> {
@@ -178,6 +180,8 @@ export async function indicadoresDasOrdens(params: Registro): Promise<Indicadore
         (o.data_conclusao !== null && mesNoPeriodo(o.data_conclusao.slice(0, 7), janela))),
   )
   const certas = concluidas.filter((o) => o.resultado?.irregularidade_detectada)
+  // Sem estimativa da fila, a ordem fica fora das duas somas de kWh
+  const comparaveis = concluidas.filter((o) => o.kwh_estimado !== null)
   const motivos = new Map<string, { concluidas: number; certas: number }>()
   for (const ordem of concluidas) {
     const daOrdem = new Set(
@@ -209,10 +213,13 @@ export async function indicadoresDasOrdens(params: Registro): Promise<Indicadore
     concluidas: concluidas.length,
     com_irregularidade: certas.length,
     taxa_acerto_pct: pct(certas.length, concluidas.length),
-    kwh_recuperado: arredondar(
-      concluidas.reduce((s, o) => s + (o.resultado?.kwh_recuperado ?? 0), 0),
+    ordens_comparadas: comparaveis.length,
+    kwh_mes_campo: arredondar(
+      comparaveis.reduce((s, o) => s + (o.resultado?.kwh_recuperado ?? 0), 0),
     ),
-    kwh_estimado: arredondar(concluidas.reduce((s, o) => s + (o.kwh_estimado ?? 0), 0)),
+    kwh_mes_fila: arredondar(
+      comparaveis.reduce((s, o) => s + (o.kwh_estimado ?? 0), 0) / MESES_ESTIMATIVA_FILA,
+    ),
     por_motivo: porMotivo,
     metadados: base.metadados,
   }

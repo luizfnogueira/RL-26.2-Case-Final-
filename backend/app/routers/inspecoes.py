@@ -103,7 +103,9 @@ async def listar_inspecoes(
 @router.get('/indicadores', response_model=IndicadoresOrdens, summary='Taxa de acerto das inspeções',
             description=(
                 'Calculado sobre as ordens CONCLUIDA do portal: quantas encontraram irregularidade (taxa de acerto), '
-                'kWh recuperado em campo contra o kWh estimado pela fila e acerto por motivo da suspeita (o campo '
+                'kWh/mês informado em campo contra a estimativa da fila por mês (kwh_estimado ÷ 3, a janela da '
+                'tb_fila_perdas), só com as ordens que têm estimativa (ordens_comparadas), e acerto por motivo da '
+                'suspeita (o campo '
                 'motivo, com os motivos da fila separados por " · "; uma ordem conta em cada motivo dela). '
                 'periodo_conclusao filtra pela data de conclusão; sem ele, todas as concluídas. '
                 'taxa_acerto_pct é null sem ordens concluídas.'

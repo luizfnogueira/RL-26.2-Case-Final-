@@ -355,7 +355,8 @@ def test_indicadores_contam_so_as_concluidas_e_respeitam_os_filtros(client, engi
 
     dados = client.get("/inspecoes/indicadores").json()
     assert (dados["concluidas"], dados["com_irregularidade"], dados["taxa_acerto_pct"]) == (2, 1, 50.0)
-    assert (dados["kwh_recuperado"], dados["kwh_estimado"]) == (80.0, 200.0)
+    # Estimativa da fila de 3 meses (100 kWh cada) vira kWh/mês: 200 ÷ 3
+    assert (dados["ordens_comparadas"], dados["kwh_mes_campo"], dados["kwh_mes_fila"]) == (2, 80.0, 66.67)
     assert [(m["motivo"], m["concluidas"], m["taxa_acerto_pct"]) for m in dados["por_motivo"]] == [
         ("Queda de consumo", 2, 50.0), ("Religação", 1, 100.0),
     ]

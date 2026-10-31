@@ -80,13 +80,35 @@ describe('OrdensPage', () => {
     expect(await screen.findByText('Resultado das inspeções')).toBeTruthy()
     expect(await screen.findByText('75,0%')).toBeTruthy()
     expect(screen.getByText('3 de 4 encontraram irregularidade')).toBeTruthy()
-    expect(screen.getByText('1,5 MWh')).toBeTruthy()
-    expect(screen.getByText('a fila estimava 1,8 MWh')).toBeTruthy()
+    // kWh por mês: o de campo contra a estimativa da fila (3 meses ÷ 3), nas ordens que têm estimativa
+    expect(screen.getByText('480 kWh/mês')).toBeTruthy()
+    expect(screen.getByText('estimativa da fila: 607 kWh/mês · em 4 de 4 ordens')).toBeTruthy()
     expect(screen.getByText('Histórico de religação')).toBeTruthy()
     expect(buscarIndicadoresOrdens).toHaveBeenCalledWith(
       expect.objectContaining({ municipio: 'Recife' }),
       expect.anything(),
     )
+  })
+
+  it('sem ordens com estimativa da fila, não compara kWh e diz por quê', async () => {
+    vi.mocked(listarInspecoes).mockResolvedValue(inspecoesFixture as unknown as Ordens)
+    vi.mocked(buscarIndicadoresOrdens).mockResolvedValue({
+      ...(indicadoresFixture as IndicadoresOrdens),
+      ordens_comparadas: 0,
+      kwh_mes_campo: 0,
+      kwh_mes_fila: 0,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/ordens']}>
+        <OrdensPage />
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByText('Nenhuma ordem concluída tem estimativa da fila para comparar.'),
+    ).toBeTruthy()
+    expect(screen.queryByText(/kWh\/mês/)).toBeNull()
   })
 
   it('sem inspeções concluídas, explica que a taxa ainda não existe', async () => {
@@ -96,8 +118,9 @@ describe('OrdensPage', () => {
       concluidas: 0,
       com_irregularidade: 0,
       taxa_acerto_pct: null,
-      kwh_recuperado: 0,
-      kwh_estimado: 0,
+      ordens_comparadas: 0,
+      kwh_mes_campo: 0,
+      kwh_mes_fila: 0,
       por_motivo: [],
     })
 
@@ -343,11 +366,13 @@ describe('OrdensPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Irregularidade confirmada/i }))
     expect((screen.getByLabelText(/Tipo de irregularidade/i) as HTMLSelectElement).value).toBe('')
-    expect((screen.getByLabelText(/Energia recuperada/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/Irregularidade por mês/i) as HTMLInputElement).value).toBe('')
     fireEvent.change(screen.getByLabelText(/Tipo de irregularidade/i), {
       target: { value: 'BY-PASS' },
     })
-    fireEvent.change(screen.getByLabelText(/Energia recuperada/i), { target: { value: '150' } })
+    fireEvent.change(screen.getByLabelText(/Irregularidade por mês/i), {
+      target: { value: '150' },
+    })
     fireEvent.change(screen.getByLabelText(/Observações e laudo técnico/i), {
       target: { value: 'Fraude confirmada e eliminada' },
     })

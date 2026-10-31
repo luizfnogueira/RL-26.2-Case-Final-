@@ -405,14 +405,16 @@ describe('ordens de inspeção', () => {
   })
 
   it('GET /inspecoes/indicadores calcula o acerto das concluídas e acompanha novas conclusões', async () => {
-    // Snapshot: uma concluída (UC-DEMO-003) com irregularidade, 310 kWh recuperados de 280 estimados
+    // Snapshot: uma concluída (UC-DEMO-003) com irregularidade: 310 kWh/mês em campo; a fila estimava
+    // 280 kWh em 3 meses, ou seja 93,33 kWh/mês
     const antes = await buscarIndicadoresOrdens()
     expect(antes).toMatchObject({
       concluidas: 1,
       com_irregularidade: 1,
       taxa_acerto_pct: 100,
-      kwh_recuperado: 310,
-      kwh_estimado: 280,
+      ordens_comparadas: 1,
+      kwh_mes_campo: 310,
+      kwh_mes_fila: 93.33,
     })
     expect(antes.por_motivo.map((m) => m.motivo)).toEqual(['Consumo abaixo da média do bairro.'])
 

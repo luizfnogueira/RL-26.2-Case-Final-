@@ -6,6 +6,7 @@ import { useConsulta } from '@/hooks/useConsulta'
 import { buscarIndicadoresOrdens } from '@/services'
 import type { ParamsIndicadoresOrdens } from '@/types/inspecoes'
 import { formatarEnergia, formatarPercentual } from '@/utils/formatacao'
+import { formatarPeriodo } from '@/utils/periodos'
 
 /** Motivos mostrados no ranking; o resto fica na API. */
 const MAX_MOTIVOS = 5
@@ -30,7 +31,11 @@ export default function ResultadoInspecoes({ filtros, versao, className }: Props
   return (
     <Card
       titulo="Resultado das inspeções"
-      subtitulo="Quanto das vistorias concluídas encontrou irregularidade"
+      subtitulo={
+        periodo_conclusao
+          ? `Vistorias concluídas em ${formatarPeriodo(periodo_conclusao)} (mês de conclusão)`
+          : 'Quanto das vistorias concluídas encontrou irregularidade'
+      }
       aria-busy={consulta.carregando}
       className={className}
     >
@@ -56,11 +61,24 @@ export default function ResultadoInspecoes({ filtros, versao, className }: Props
               </dd>
             </div>
             <div>
-              <dt className="text-legenda text-ink-2">Energia recuperada</dt>
-              <dd className="text-titulo-lg text-ink">{formatarEnergia(dados.kwh_recuperado)}</dd>
-              <dd className="text-legenda text-ink-2">
-                a fila estimava {formatarEnergia(dados.kwh_estimado)}
-              </dd>
+              <dt className="text-legenda text-ink-2">
+                Irregularidade por mês (informada em campo)
+              </dt>
+              {dados.ordens_comparadas === 0 ? (
+                <dd className="text-legenda text-ink-2">
+                  Nenhuma ordem concluída tem estimativa da fila para comparar.
+                </dd>
+              ) : (
+                <>
+                  <dd className="text-titulo-lg text-ink">
+                    {formatarEnergia(dados.kwh_mes_campo)}/mês
+                  </dd>
+                  <dd className="text-legenda text-ink-2">
+                    estimativa da fila: {formatarEnergia(dados.kwh_mes_fila)}/mês · em{' '}
+                    {dados.ordens_comparadas} de {dados.concluidas} ordens
+                  </dd>
+                </>
+              )}
             </div>
           </dl>
 

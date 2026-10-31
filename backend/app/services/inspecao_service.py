@@ -32,16 +32,23 @@ from app.schemas.inspecao import (
 SEPARADOR_MOTIVOS = " · "
 
 
+# kwh_estimado da fila (gold.tb_fila_perdas) = queda_kwh_mensal × meses_atuais, sempre 3 meses; o kWh do
+# resultado de campo é por mês. A comparação divide a estimativa pelos meses para ficar na mesma base.
+MESES_ESTIMATIVA_FILA = 3
+
+
 def _pct(parte: int, todo: int) -> float | None:
     return round(100 * parte / todo, 1) if todo else None
 
 
 def calcular_indicadores(concluidas: list[OrdemConcluida]) -> dict[str, Any]:
-    """Taxa de acerto, kWh recuperado × estimado e acerto por motivo da suspeita.
+    """Taxa de acerto, kWh/mês informado em campo × estimado pela fila e acerto por motivo da suspeita.
 
     Uma ordem com vários motivos conta em cada um deles; o motivo vazio fica de fora do ranking.
+    A comparação de kWh só usa ordens com estimativa da fila: sem ela, as duas somas a ignoram.
     """
     acertos = sum(ordem.irregularidade for ordem in concluidas)
+    comparaveis = [ordem for ordem in concluidas if ordem.kwh_estimado is not None]
     motivos: dict[str, list[int]] = {}
     for ordem in concluidas:
         for motivo in {m.strip() for m in (ordem.motivo or "").split(SEPARADOR_MOTIVOS) if m.strip()}:
@@ -62,8 +69,9 @@ def calcular_indicadores(concluidas: list[OrdemConcluida]) -> dict[str, Any]:
         "concluidas": len(concluidas),
         "com_irregularidade": acertos,
         "taxa_acerto_pct": _pct(acertos, len(concluidas)),
-        "kwh_recuperado": round(sum(ordem.kwh_recuperado for ordem in concluidas), 2),
-        "kwh_estimado": round(sum(ordem.kwh_estimado or 0 for ordem in concluidas), 2),
+        "ordens_comparadas": len(comparaveis),
+        "kwh_mes_campo": round(sum(ordem.kwh_recuperado for ordem in comparaveis), 2),
+        "kwh_mes_fila": round(sum(ordem.kwh_estimado for ordem in comparaveis) / MESES_ESTIMATIVA_FILA, 2),
         "por_motivo": por_motivo,
     }
 

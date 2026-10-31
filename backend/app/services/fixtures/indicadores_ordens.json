@@ -2,8 +2,9 @@
   "concluidas": 4,
   "com_irregularidade": 3,
   "taxa_acerto_pct": 75.0,
-  "kwh_recuperado": 1450.0,
-  "kwh_estimado": 1820.0,
+  "ordens_comparadas": 4,
+  "kwh_mes_campo": 480.0,
+  "kwh_mes_fila": 606.67,
   "por_motivo": [
     {
       "motivo": "Queda de 42% no consumo sem geração distribuída",

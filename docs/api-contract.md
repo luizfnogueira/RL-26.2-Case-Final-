@@ -208,7 +208,7 @@ Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadore
 - Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
 - `data_prevista` é campo, não status. Uma ordem ativa por UC.
 - Resposta usa id_ordem inteiro, id_uc, equipe_responsavel, datas, motivo, kwh_estimado, observacoes, resultado e historico[].
-- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado, observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
+- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado (**kWh por mês** da irregularidade, estimado em campo; 0 sem irregularidade), observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
 - Com irregularidade: tipo obrigatório e kWh não negativo. Sem irregularidade: tipo null e kWh zero. Não há `classificacao` ou `INCONCLUSIVA` neste contrato, para corresponder ao modelo existente.
 - `historico[]`: id_historico, id_ordem, status_anterior, status_novo, data_mudanca, usuario, justificativa_ou_motivo e detalhes.
 
@@ -285,8 +285,9 @@ Resultado das inspeções concluídas, para saber se a fila está acertando. Cal
 | `concluidas` | Ordens concluídas no recorte |
 | `com_irregularidade` | Concluídas com `irregularidade_detectada = true` |
 | `taxa_acerto_pct` | `com_irregularidade ÷ concluidas × 100`, uma casa; `null` sem concluídas |
-| `kwh_recuperado` | Σ `kwh_recuperado` dos resultados |
-| `kwh_estimado` | Σ `kwh_estimado` das mesmas ordens (o que a fila previa) |
+| `ordens_comparadas` | Concluídas com `kwh_estimado`; só elas entram nas duas somas de kWh abaixo |
+| `kwh_mes_campo` | Σ `resultado.kwh_recuperado` dessas ordens, em kWh/mês (informado em campo) |
+| `kwh_mes_fila` | Σ `kwh_estimado` dessas ordens ÷ 3, em kWh/mês. O `kwh_estimado` da `tb_fila_perdas` é `queda_kwh_mensal × meses_atuais`, uma janela de 3 meses |
 | `por_motivo` | Para cada motivo da suspeita: concluídas, com irregularidade e taxa. O motivo vem do campo `motivo` da ordem, com os motivos da fila separados por ` · `; uma ordem com dois motivos conta nos dois. Ordenado por concluídas e depois pela taxa |
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/indicadores_ordens.json)**

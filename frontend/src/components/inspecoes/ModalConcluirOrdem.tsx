@@ -12,6 +12,9 @@ interface Props {
   aoSucesso: (ordemAtualizada: Ordem) => void
 }
 
+/** O kwh_estimado da fila cobre 3 meses (queda mensal × 3); o campo pede o valor por mês. */
+const MESES_ESTIMATIVA_FILA = 3
+
 const TIPOS_IRREGULARIDADE = [
   'BY-PASS',
   'LIGAÇÃO DIRETA',
@@ -69,7 +72,7 @@ function ModalConcluirOrdemForm({
 
     const valorKwh = irregularidade ? Number(kwh) : 0
     if (irregularidade && (!kwh.trim() || !Number.isFinite(valorKwh) || valorKwh < 0)) {
-      setErro('O volume recuperado (kWh) deve ser maior ou igual a zero.')
+      setErro('Informe a irregularidade por mês (kWh/mês), maior ou igual a zero.')
       return
     }
 
@@ -210,7 +213,7 @@ function ModalConcluirOrdemForm({
 
               <div className="flex flex-col gap-1">
                 <label htmlFor="kwh-recuperado" className="text-xs font-semibold text-[#2d425a]">
-                  Energia recuperada (kWh) *
+                  Irregularidade por mês (kWh/mês) *
                 </label>
                 <input
                   id="kwh-recuperado"
@@ -223,9 +226,11 @@ function ModalConcluirOrdemForm({
                   className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
                 />
                 <span className="text-[11px] text-[#7d858d]">
-                  Volume medido em campo.
+                  Consumo mensal desviado, estimado em campo.
                   {ordem.kwh_estimado !== null &&
-                    ` A fila estimava ${ordem.kwh_estimado.toLocaleString('pt-BR')} kWh.`}
+                    ` Estimativa da fila: ${(
+                      ordem.kwh_estimado / MESES_ESTIMATIVA_FILA
+                    ).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kWh/mês.`}
                 </span>
               </div>
             </div>
@@ -233,8 +238,8 @@ function ModalConcluirOrdemForm({
         )}
         {irregularidade === false && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-800">
-            A instalação do consumidor foi avaliada e nenhuma anomalia ou desvio foi detectado. O
-            volume recuperado será automaticamente registrado como 0 kWh.
+            A instalação do consumidor foi avaliada e nenhuma anomalia ou desvio foi detectado. A
+            irregularidade por mês será registrada como 0 kWh.
           </div>
         )}
 

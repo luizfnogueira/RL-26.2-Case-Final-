@@ -79,8 +79,12 @@ export interface IndicadoresOrdens {
   com_irregularidade: number
   /** null sem ordens concluídas. */
   taxa_acerto_pct: number | null
-  kwh_recuperado: number
-  kwh_estimado: number
+  /** Concluídas com estimativa da fila: só elas entram nas duas somas de kWh. */
+  ordens_comparadas: number
+  /** kWh/mês da irregularidade informado em campo (resultado.kwh_recuperado). */
+  kwh_mes_campo: number
+  /** Estimativa da fila por mês: kwh_estimado (janela de 3 meses) ÷ 3. */
+  kwh_mes_fila: number
   /** Uma ordem com vários motivos conta em cada um deles. */
   por_motivo: AcertoPorMotivo[]
   metadados: Metadados

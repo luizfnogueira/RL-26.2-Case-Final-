@@ -74,8 +74,10 @@ class IndicadoresOrdens(Schema):
     concluidas: int
     com_irregularidade: int
     taxa_acerto_pct: float | None
-    kwh_recuperado: float
-    kwh_estimado: float
+    # Comparação de kWh por mês, só com as ordens que têm estimativa da fila
+    ordens_comparadas: int
+    kwh_mes_campo: float
+    kwh_mes_fila: float
     por_motivo: list[AcertoPorMotivo]
     metadados: Metadados
 
