@@ -57,7 +57,12 @@ Os dados vão de julho de 2022 a junho de 2026.
 - **P1:** julho de 2022 a junho de 2023 (o primeiro ano da base).
 - **P2:** julho de 2025 a junho de 2026 (os últimos 12 meses).
 
-**Filtros.** [COMPLETAR: onde ficam os filtros, quais existem (período, município, bairro, classe) e o que acontece ao mudar um filtro.]
+**Filtros.** O Painel executivo, o Diagnóstico da receita, a Fila de inspeção, as Ordens de inspeção e a Continuidade DEC / FEC têm uma barra de filtros no topo.
+1. Escolha um valor em cada lista. Os campos variam por tela, entre **Período atual**, **Comparar com**, **Município**, **Bairro**, **Classe** e **Alimentador**. "Todos" quer dizer sem filtro.
+2. A tela se atualiza na hora, a cada escolha.
+3. **Bairro** só libera depois de escolher um **Município**. Em **Alimentador**, com um município escolhido, aparecem só os alimentadores que o atendem.
+4. Para voltar ao início, clique em **Limpar filtros**. O botão aparece quando algum filtro foi mudado.
+5. Os filtros ficam no endereço da página: copie o link para mandar a um colega a mesma visão.
 
 ## Assistente V-Energy {#assistente}
 <!-- nivel: publico | rota: /assistente | palavras: assistente, aba v-energy, aba venergy, ia, inteligência artificial, chat, perguntar, pergunte à ia, conversa, agente -->
@@ -87,7 +92,11 @@ relatório. Ele também responde dúvidas sobre como usar esta plataforma.
 
 **Quando ele diz que não sabe.** Se a informação não existir nos dados, ou estiver fora do período da base, ele diz que não sabe em vez de inventar um número.
 
-[COMPLETAR: limites que o usuário percebe, por exemplo o tamanho máximo da pergunta e o que fazer quando aparecer a mensagem de assistente indisponível.]
+**Limites**
+- A pergunta pode ter até 2.000 caracteres. Perguntas curtas e diretas funcionam melhor.
+- A base vai de julho de 2022 a junho de 2026. Perguntas fora desse período recebem "não sei".
+- O assistente não mostra CPF, CNPJ nem nome do titular. Pedidos assim são recusados.
+- Se aparecer **"O assistente está indisponível no momento"**, a sua pergunta continua no campo. Espere alguns instantes e clique em **Enviar** de novo.
 
 ## Como o assistente chega à resposta {#assistente-como-funciona}
 <!-- nivel: publico | rota: /assistente | palavras: como funciona o assistente, como a ia funciona, de onde vem a resposta, confiar, auditar, como cheguei nisso, inventa -->
