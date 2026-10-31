@@ -268,6 +268,53 @@ def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
         )
 
 
+_COL = r"(?:\w+\.)?"
+_FILTROS_INTERRUPCAO = {
+    "flag_sem_interrupcao = FALSE": re.compile(
+        rf"{_COL}flag_sem_interrupcao\s*(?:=\s*false|is\s+false|<>\s*true)|\bnot\s+{_COL}flag_sem_interrupcao\b"),
+    "flag_antes_ligacao = FALSE": re.compile(
+        rf"{_COL}flag_antes_ligacao\s*(?:=\s*false|is\s+false|<>\s*true)|\bnot\s+{_COL}flag_antes_ligacao\b"),
+}
+# Qualquer corte a partir de 3 min serve: "interrupções acima de 30 min" já deixa a oscilação de fora
+_CORTE_DURACAO = re.compile(rf"{_COL}duracao_efetiva_min\s*>=?\s*(\d+(?:\.\d+)?)")
+
+
+def _corta_oscilacao(sql_lower: str) -> bool:
+    return any(float(minutos) >= 3 for minutos in _CORTE_DURACAO.findall(sql_lower))
+_AGREGA = re.compile(r"\b(?:count|sum|avg)\s*\(")
+_DURACAO_BRUTA = re.compile(rf"\b(?:sum|avg)\s*\([^)]*\b{_COL}duracao_min\b")
+# Quem pergunta pelas oscilações ou por todas as ocorrências quer justamente o que o filtro tira
+PEDIDO_OSCILACAO = re.compile(
+    r"oscila|piscad|pisca|sem\s+interrup|antes\s+da\s+liga|todas\s+as\s+ocorr|ocorr[eê]ncias\s+brutas",
+    re.IGNORECASE)
+
+
+def validar_regra_interrupcoes_no_sql(sql: str, pergunta: str) -> None:
+    """Contar ou somar interrupções em `uc_interrupcoes` segue a regra do DEC (skill de continuidade, regra 5).
+
+    Oscilação (menos de 3 min), ocorrência sem interrupção e ocorrência antes da ligação da UC não são
+    interrupção; a duração é a efetiva, sem o tempo sobreposto. Sem os filtros, a contagem infla.
+    """
+    sql_lower = (sql or "").lower()
+    if "uc_interrupcoes" not in sql_lower or PEDIDO_OSCILACAO.search(pergunta or ""):
+        return
+    if _DURACAO_BRUTA.search(sql_lower):
+        raise ErroConsulta(
+            "Regra de negócio violada: em `uc_interrupcoes`, some a duração por `duracao_efetiva_min` "
+            "(sem o tempo sobreposto), nunca por `duracao_min`."
+        )
+    if not _AGREGA.search(sql_lower):
+        return
+    faltando = [nome for nome, padrao in _FILTROS_INTERRUPCAO.items() if not padrao.search(sql_lower)]
+    if not _corta_oscilacao(sql_lower):
+        faltando.append("duracao_efetiva_min >= 3")
+    if faltando:
+        raise ErroConsulta(
+            "Regra de negócio violada: ao contar ou somar interrupções em `uc_interrupcoes`, oscilação não é "
+            f"interrupção. Inclua no WHERE: {' AND '.join(faltando)}."
+        )
+
+
 MESES_DOS_PERIODOS = {"p1": ("2022-07", "2023-06"), "p2": ("2025-07", "2026-06")}
 
 
@@ -387,6 +434,7 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
         try:
             validar_regra_consumo_negativo_no_sql(sql, ctx.deps.consumo_negativo_solicitado)
             validar_regra_dec_fec_no_sql(sql, ctx.deps.pergunta_original)
+            validar_regra_interrupcoes_no_sql(sql, ctx.deps.pergunta_original)
             validar_regra_periodo_no_sql(sql, ctx.deps.pergunta_original)
             if ctx.deps.executar_sql_fn is None:
                 raise ErroConsulta("Função de consulta ao banco não configurada.")
