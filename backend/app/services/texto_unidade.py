@@ -16,6 +16,8 @@ BANDEIRAS = {'VERDE': 'verde', 'AMARELA': 'amarela', 'VERMELHA P1': 'vermelha pa
 # Rótulo de cada número: a direção vai no rótulo, porque o valor sai sem sinal.
 ROTULO_VARIACAO = {'subiu': 'Aumento', 'caiu': 'Queda'}
 ROTULO_MEDIA = {'subiu': 'acima', 'caiu': 'abaixo'}
+# Motivos cuja frase fala da variação do consumo: com eles, a frase da média sai
+MOTIVOS_DE_CONSUMO = ('consumo_subiu', 'consumo_caiu', 'consumo_e_preco_kwh')
 
 
 def _milhar(valor: float, casas: int) -> str:
@@ -90,19 +92,52 @@ class _Redacao:
         anterior = f'{mes_texto(f["mes_ano_anterior"])} ({self.valor_conta_anterior()})'
         return [('situacao', f'O valor da conta de {mes} foi de {valor}, {comparacao} {anterior}{final}.')]
 
+    def variacao_consumo(self) -> str:
+        """'subiu 19%' ou 'caiu 5%', com o sentido pela comparação dos dois consumos (o % vem sem sinal)."""
+        f = self.f
+        sentido = 'subiu' if f['consumo_mes_kwh'] > f['consumo_ano_anterior_kwh'] else 'caiu'
+        pct = self.numero('variacao_consumo_ano_anterior', f'{ROTULO_VARIACAO[sentido]} do consumo',
+                          f['variacao_consumo_ano_anterior_pct'], '%', f['mes_analisado'])
+        return 'ficou igual' if _percentual(pct) == '0%' else f'{sentido} {_percentual(pct)}'
+
+    def consumos(self) -> str:
+        f = self.f
+        anterior = kwh(self.numero('consumo_ano_anterior', 'Consumo no mesmo mês do ano anterior',
+                                   f['consumo_ano_anterior_kwh'], 'kWh', f['mes_ano_anterior']))
+        return f'de {anterior} para {self.consumo_mes()}'
+
+    def variacao_preco(self) -> tuple[str, str]:
+        """('subiu 3%', sentido) do preço médio por kWh; o sentido decide se a bandeira entra como detalhe."""
+        f = self.f
+        sentido = 'subiu' if f['preco_kwh_mes'] > f['preco_kwh_ano_anterior'] else 'caiu'
+        pct = self.numero('variacao_preco_kwh', f'{ROTULO_VARIACAO[sentido]} do preço médio por kWh',
+                          f['variacao_preco_kwh_pct'], '%', f['mes_analisado'])
+        return ('ficou igual' if _percentual(pct) == '0%' else f'{sentido} {_percentual(pct)}'), sentido
+
+    def bandeira_do_preco(self, sentido: str) -> str:
+        """A bandeira é detalhe do preço, e só quando anda no mesmo sentido dele."""
+        f = self.f
+        if (f['direcao_bandeira'], sentido) not in (('mais_cara', 'subiu'), ('mais_barata', 'caiu')):
+            return ''
+        return (f", com a bandeira passando de {bandeira(f['bandeira_ano_anterior'])} para "
+                f"{bandeira(f['bandeira_mes'])}")
+
     def motivo(self, motivo: str) -> str:
         f = self.f
         if motivo in ('consumo_subiu', 'consumo_caiu'):
-            direcao = f['direcao_consumo_ano_anterior']
-            pct = self.numero('variacao_consumo_ano_anterior', f'{ROTULO_VARIACAO[direcao]} do consumo',
-                              f['variacao_consumo_ano_anterior_pct'], '%', f['mes_analisado'])
-            anterior = kwh(self.numero('consumo_ano_anterior', 'Consumo no mesmo mês do ano anterior',
-                                       f['consumo_ano_anterior_kwh'], 'kWh', f['mes_ano_anterior']))
-            return f'O consumo {direcao} {_percentual(pct)}, de {anterior} para {self.consumo_mes()}.'
-        if motivo in ('bandeira_mais_cara', 'bandeira_mais_barata'):
-            preco = 'mais cara' if motivo == 'bandeira_mais_cara' else 'mais barata'
-            return (f"A bandeira tarifária passou de {bandeira(f['bandeira_ano_anterior'])} para "
-                    f"{bandeira(f['bandeira_mes'])}, que é {preco}.")
+            return f'O consumo {self.variacao_consumo()}, {self.consumos()}.'
+        if motivo in ('preco_kwh_subiu', 'preco_kwh_caiu'):
+            variacao, sentido = self.variacao_preco()
+            anterior = reais(self.numero('preco_kwh_ano_anterior', 'Preço médio por kWh no mesmo mês do ano anterior',
+                                         f['preco_kwh_ano_anterior'], 'BRL', f['mes_ano_anterior']))
+            atual = reais(self.numero('preco_kwh_mes', 'Preço médio por kWh', f['preco_kwh_mes'], 'BRL',
+                                      f['mes_analisado']))
+            return f'O preço médio por kWh {variacao}, de {anterior} para {atual}{self.bandeira_do_preco(sentido)}.'
+        if motivo == 'consumo_e_preco_kwh':
+            # Os dois percentuais lado a lado, sem somar nem dividir a mudança do valor entre eles
+            consumo = f'O consumo {self.variacao_consumo()} ({self.consumos()})'
+            variacao, sentido = self.variacao_preco()
+            return f'{consumo} e o preço médio por kWh {variacao}{self.bandeira_do_preco(sentido)}.'
         return f"A unidade passou a gerar a própria energia em {mes_texto(f['mes_conexao_gd'])}."
 
     def motivos(self) -> list[tuple[str, str]]:
@@ -118,10 +153,10 @@ class _Redacao:
         return []
 
     def contexto_media(self) -> list[tuple[str, str]]:
-        """Consumo contra a média, só sem motivo de consumo (junto de "subiu 27%" soaria contraditório)."""
+        """Consumo contra a média, só sem motivo que fale do consumo (junto de "subiu 27%" soaria contraditório)."""
         f = self.f
         direcao = f['direcao_consumo_media']
-        if direcao not in ROTULO_MEDIA or {'consumo_subiu', 'consumo_caiu'} & set(f['motivos']):
+        if direcao not in ROTULO_MEDIA or set(MOTIVOS_DE_CONSUMO) & set(f['motivos']):
             return []
         consumo = self.consumo_mes()
         self.numero('desvio_consumo_media', f'Consumo {ROTULO_MEDIA[direcao]} da média',
@@ -161,6 +196,8 @@ class _Redacao:
                                       f['faturas_em_aberto_valor'], 'BRL', f['mes_analisado']))
             itens.append(f'há 1 fatura em aberto, de {valor}' if qtd == 1
                          else f'há {qtd} faturas em aberto, somando {valor}')
+        if 'preco_kwh_fora_do_padrao' in f['avisos']:
+            itens.append('o preço por kWh deste mês está fora do padrão; vale conferir a fatura')
         return [('aviso', f'Pontos a verificar: {_juntar(itens)}.')] if itens else []
 
 
@@ -169,15 +206,9 @@ def redigir(fatos: dict) -> tuple[str, list[tuple[str, str]], list[dict]]:
     if fatos['mes_analisado'] is None:
         return 'Sem dados no período', [('situacao', 'Não há dados desta unidade no período analisado.')], []
     r = _Redacao(fatos)
+    # No máximo 2 motivos (consumo e preço, ou consumo e GD, que não decompõe): situação, motivos e avisos
+    # sempre cabem nas 4 frases; o contexto entra só se sobrar espaço.
     situacao, motivos, avisos = r.situacao(), r.motivos(), r.avisos()
-    if len(situacao) + len(motivos) + len(avisos) > MAXIMO_FRASES and {'consumo_caiu', 'gd_conectada'} <= set(
-            fatos['motivos']):
-        # Só consumo caindo + bandeira mais barata + GD + avisos passa de 4: a GD (que pela regra só explica
-        # queda de consumo) vira parte da frase do consumo.
-        consumo = next(i for i, (_, frase) in enumerate(motivos) if frase.startswith('O consumo'))
-        gd = motivos.pop()
-        motivos[consumo] = ('motivo', motivos[consumo][1][:-1] + ', e a unidade passou a gerar '
-                            + gd[1].split('passou a gerar ', 1)[1])
     frases = situacao + motivos
     # Os números dos avisos entram por último, para a lista seguir a ordem do texto
     numeros_avisos = {n: r.numeros.pop(n) for n in ('faturas_em_aberto_valor',) if n in r.numeros}

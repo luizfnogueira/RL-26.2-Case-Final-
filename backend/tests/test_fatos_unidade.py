@@ -115,6 +115,7 @@ def test_valor_exatamente_20_por_cento_acima_ainda_e_estavel():
 
 VALOR_SUBIU, VALOR_CAIU = contas(valor=300, valor_anterior=200), contas(valor=100, valor_anterior=200)
 CAIU = {'ultimo': 100, 'ano_anterior': 300, 'base': 300}
+ESTAVEL = {'ultimo': 305, 'ano_anterior': 298}
 
 
 def test_consumo_e_valor_subindo_e_motivo():
@@ -151,27 +152,94 @@ def test_consumo_subiu_e_consumo_caiu_nunca_saem_juntos(kwargs, conta):
     assert not {'consumo_subiu', 'consumo_caiu'} <= set(fatos(historico(**kwargs), conta)['motivos'])
 
 
-def test_bandeira_mais_cara_com_valor_subindo_e_motivo():
-    f = fatos(conta=contas(valor=300, valor_anterior=200, bandeira='VERMELHA P1', bandeira_anterior='VERDE'))
-    assert f['direcao_bandeira'] == 'mais_cara'
-    assert f['motivos'] == ['bandeira_mais_cara']
+# ---------- preço médio por kWh e decomposição ----------
+
+def por_preco(ultimo, ano_anterior, preco, preco_anterior=0.8, **bandeiras):
+    """Contas montadas como na Gold: valor = consumo × preço médio por kWh de cada mês."""
+    return contas(valor=round(ultimo * preco, 2), valor_anterior=round(ano_anterior * preco_anterior, 2),
+                  **bandeiras)
 
 
-def test_bandeira_mais_barata_com_valor_caindo_e_motivo():
-    f = fatos(conta=contas(valor=100, valor_anterior=200, bandeira='AMARELA', bandeira_anterior='VERMELHA P1'))
-    assert f['motivos'] == ['bandeira_mais_barata']
+def test_preco_medio_por_kwh_sai_sem_sinal_e_com_a_direcao_a_parte():
+    f = fatos(historico(**ESTAVEL), por_preco(305, 298, 0.6))
+    assert (f['preco_kwh_mes'], f['preco_kwh_ano_anterior']) == (0.6, 0.8)
+    assert (f['variacao_preco_kwh_pct'], f['direcao_preco_kwh']) == (25.0, 'caiu')
+    assert f['decomposicao_aplicavel'] is True
 
 
-def test_bandeira_mais_barata_com_valor_subindo_nao_e_motivo():
-    f = fatos(conta=contas(valor=300, valor_anterior=200, bandeira='AMARELA', bandeira_anterior='VERMELHA P1'))
-    assert f['direcao_bandeira'] == 'mais_barata'
-    assert f['situacao_valor_conta'] == 'alta'
+def test_preco_subindo_com_o_valor_e_motivo():
+    f = fatos(historico(**ESTAVEL), por_preco(305, 298, 1.0))
+    assert (f['direcao_consumo_ano_anterior'], f['direcao_valor_conta']) == ('estável', 'subiu')
+    assert f['motivos'] == ['preco_kwh_subiu']
+
+
+def test_preco_caindo_com_o_valor_e_motivo():
+    assert fatos(historico(**ESTAVEL), por_preco(305, 298, 0.6))['motivos'] == ['preco_kwh_caiu']
+
+
+def test_consumo_e_preco_acima_do_limiar_sao_dois_motivos():
+    assert fatos(historico(), por_preco(412, 298, 1.0))['motivos'] == ['consumo_subiu', 'preco_kwh_subiu']
+
+
+def test_preco_contra_o_sentido_do_valor_nao_e_motivo():
+    # Consumo +38% e preço −22%: o valor sobe 8% (estável); nenhum dos dois é motivo
+    f = fatos(historico(), por_preco(412, 298, 0.62))
+    assert (f['direcao_preco_kwh'], f['direcao_valor_conta']) == ('caiu', 'estável')
     assert f['motivos'] == []
 
 
-def test_bandeira_diferente_com_valor_estavel_nao_e_motivo():
-    f = fatos(conta=contas(bandeira='AMARELA', bandeira_anterior='VERMELHA P1'))
-    assert f['motivos'] == []
+@pytest.mark.parametrize('ultimo, preco, direcao', [
+    (357, 0.82, 'subiu'),       # consumo +19,8% e preço +2,5%: o valor sobe 22,8%
+    (245, 0.76, 'caiu'),        # consumo −17,8% e preço −5%: o valor cai 21,9%
+])
+def test_nenhum_componente_passa_do_limiar_e_o_motivo_e_a_combinacao(ultimo, preco, direcao):
+    f = fatos(historico(ultimo=ultimo, ano_anterior=298), por_preco(ultimo, 298, preco))
+    assert f['direcao_valor_conta'] == direcao
+    assert (f['direcao_consumo_ano_anterior'], f['direcao_preco_kwh']) == ('estável', 'estável')
+    assert f['motivos'] == ['consumo_e_preco_kwh']
+
+
+@pytest.mark.parametrize('ultimo', range(240, 360, 7))
+@pytest.mark.parametrize('preco', [0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
+def test_combinacao_nunca_tem_consumo_e_preco_em_sentidos_opostos(ultimo, preco):
+    # Sentidos opostos e os dois abaixo de 20%: o valor muda menos que o maior deles e não passa de 20%
+    f = fatos(historico(ultimo=ultimo, ano_anterior=298), por_preco(ultimo, 298, preco))
+    if 'consumo_e_preco_kwh' in f['motivos']:
+        assert (f['consumo_mes_kwh'] > f['consumo_ano_anterior_kwh']) == (f['preco_kwh_mes'] > f['preco_kwh_ano_anterior'])
+
+
+def test_bandeira_nunca_e_motivo_proprio():
+    assert not {m for m in MOTIVOS if 'bandeira' in m}
+    f = fatos(historico(**ESTAVEL), por_preco(305, 298, 1.0, bandeira='VERMELHA P2', bandeira_anterior='VERDE'))
+    assert (f['direcao_bandeira'], f['motivos']) == ('mais_cara', ['preco_kwh_subiu'])
+
+
+@pytest.mark.parametrize('preco, aplica', [(1.2, True), (1.21, False), (0.39, False)])
+def test_preco_variando_mais_de_50_por_cento_nao_decompoe_e_vira_aviso(preco, aplica):
+    f = fatos(historico(**ESTAVEL), por_preco(305, 298, preco))
+    assert f['decomposicao_aplicavel'] is aplica
+    assert ('preco_kwh_fora_do_padrao' in f['avisos']) is not aplica
+    if not aplica:
+        assert f['direcao_preco_kwh'] is None
+        assert not {'preco_kwh_subiu', 'preco_kwh_caiu', 'consumo_e_preco_kwh'} & set(f['motivos'])
+
+
+def test_gd_conectada_no_periodo_nao_decompoe():
+    f = fatos(historico(ultimo=357, ano_anterior=298), por_preco(357, 298, 0.82), geracao=gd(date(2025, 11, 20)))
+    assert (f['decomposicao_aplicavel'], f['direcao_preco_kwh']) == (False, None)
+    assert f['motivos'] == []                                            # consumo não caiu: GD não é motivo
+
+
+def test_gd_anterior_ao_periodo_decompoe_normalmente():
+    f = fatos(historico(ultimo=357, ano_anterior=298), por_preco(357, 298, 0.82), geracao=gd(date(2025, 2, 1)))
+    assert f['motivos'] == ['consumo_e_preco_kwh']
+
+
+@pytest.mark.parametrize('conta', [contas(valor_anterior=None), []])
+def test_sem_valor_ou_sem_ano_anterior_nao_tem_preco(conta):
+    f = fatos(historico(), conta)
+    assert (f['preco_kwh_mes'], f['preco_kwh_ano_anterior'], f['variacao_preco_kwh_pct']) == (None, None, None)
+    assert (f['direcao_preco_kwh'], f['decomposicao_aplicavel']) == (None, False)
 
 
 def test_gd_conectada_no_periodo_com_consumo_caindo_e_motivo():
@@ -236,7 +304,8 @@ def test_faturas_em_aberto_e_aviso_com_quantidade_e_valor_somado():
 def test_todos_os_avisos_juntos_saem_na_ordem_fixa():
     meses = [replace(m, troca_medidor=True) if m.mes == '2026-01' else m
              for m in historico(ultimo=305, ano_anterior=298, tipo='ESTIMADA')]
-    assert fatos(meses, abertas=[_fatura('2026-06', 'EM ABERTO')])['avisos'] == list(AVISOS)
+    f = fatos(meses, por_preco(305, 298, 1.3), abertas=[_fatura('2026-06', 'EM ABERTO')])
+    assert f['avisos'] == list(AVISOS)
 
 
 def test_identificadores_de_motivos_e_avisos_nao_se_misturam():
@@ -286,8 +355,8 @@ def test_sem_conta_nos_meses_valor_e_bandeira_ficam_nulos_e_consumo_nao_vira_mot
 
 
 def test_bandeira_fora_do_dominio_nao_tem_direcao():
-    f = fatos(conta=contas(valor=300, valor_anterior=200, bandeira='ROXA', bandeira_anterior='VERDE'))
-    assert (f['direcao_bandeira'], f['motivos']) == (None, [])
+    f = fatos(conta=contas(bandeira='ROXA', bandeira_anterior='VERDE'))
+    assert f['direcao_bandeira'] is None
 
 
 def test_janela_sem_dado_da_uc_nao_tem_mes_nem_motivo():

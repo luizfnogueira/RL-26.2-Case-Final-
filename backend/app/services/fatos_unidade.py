@@ -3,6 +3,9 @@
 Os números saem do mesmo diagnosticar_conta e dos mesmos dados do GET /unidades/{id}. O código decide
 os motivos (o que explica a mudança do valor da conta contra o ano anterior, só quando a direção
 combina) e os avisos (o que pede cautela e nunca é causa). A IA só redige a partir daqui.
+
+O valor é consumo × preço médio por kWh: quando o valor muda e nenhum dos dois passa do limiar sozinho,
+o motivo é a combinação dos dois. A bandeira não é motivo próprio, só detalhe do preço.
 """
 from decimal import Decimal
 
@@ -19,9 +22,13 @@ DIRECAO = {'acima': 'subiu', 'abaixo': 'caiu', 'em linha': 'estável'}
 SITUACAO_VALOR = {'subiu': 'alta', 'caiu': 'baixa', 'estável': 'normal'}
 # Domínio da Gold, da mais barata para a mais cara. "P1/P2" aqui é patamar, não período.
 ORDEM_BANDEIRA = ('VERDE', 'AMARELA', 'VERMELHA P1', 'VERMELHA P2')
+# Variação do preço médio por kWh acima disto não é tarifa nem bandeira (nenhuma passa de ~26% na Gold):
+# a decomposição não se aplica e vira aviso.
+LIMITE_PRECO_PCT = 50
 # Ordem fixa: a lista sai sempre na mesma ordem, com só os que se aplicam.
-MOTIVOS = ('consumo_subiu', 'consumo_caiu', 'bandeira_mais_cara', 'bandeira_mais_barata', 'gd_conectada')
-AVISOS = ('leitura_estimada', 'troca_medidor', 'faturas_em_aberto')
+MOTIVOS = ('consumo_subiu', 'consumo_caiu', 'preco_kwh_subiu', 'preco_kwh_caiu', 'consumo_e_preco_kwh',
+           'gd_conectada')
+AVISOS = ('leitura_estimada', 'troca_medidor', 'faturas_em_aberto', 'preco_kwh_fora_do_padrao')
 # Lista branca: a saída tem exatamente estes campos. Nada de nome, CPF, endereço ou identificadores.
 CAMPOS = (
     'mes_analisado', 'mes_ano_anterior', 'periodo_media', 'veredito_titulo',
@@ -30,6 +37,8 @@ CAMPOS = (
     'desvio_consumo_media_pct', 'direcao_consumo_media',
     'valor_conta_mes', 'valor_conta_ano_anterior', 'variacao_valor_conta_pct', 'direcao_valor_conta',
     'situacao_valor_conta',
+    'preco_kwh_mes', 'preco_kwh_ano_anterior', 'variacao_preco_kwh_pct', 'direcao_preco_kwh',
+    'decomposicao_aplicavel',
     'bandeira_mes', 'bandeira_ano_anterior', 'direcao_bandeira',
     'leitura_estimada_mes', 'leitura_estimada_ano_anterior', 'mes_troca_medidor',
     'tem_gd', 'mes_conexao_gd',
@@ -88,29 +97,45 @@ def montar_fatos_unidade(meses: list[MesConsumo], periodo: str, contas: list[Con
     direcao_bandeira = _direcao_bandeira(bandeira_mes, bandeira_anterior)
 
     mes_conexao_gd = gd.data_conexao.strftime('%Y-%m') if gd and gd.data_conexao else None
+    gd_no_periodo = mes_conexao_gd is not None and ano_anterior is not None and (
+        ano_anterior < mes_conexao_gd <= analisado)
     # Troca entre o mesmo mês do ano anterior (exclusive) e o mês analisado (inclusive): a última delas.
     trocas = [m.mes for m in meses if analisado and ano_anterior < m.mes <= analisado and m.troca_medidor]
 
-    # Motivos explicam o valor da conta, que é comparado com o ano anterior: o consumo só é motivo quando
-    # anda junto com o valor. A comparação com a média fica nos fatos, como contexto.
+    # Preço médio por kWh (valor ÷ consumo) dos dois meses. Só com consumo e valor > 0 nos dois lados.
+    consumo_anterior = _positivo(diagnostico['mesmo_mes_ano_anterior']['valor'])
+    preco_mes = preco_anterior = variacao_preco = None
+    if None not in (consumo, consumo_anterior, valor_mes, valor_anterior, direcao_ano):
+        preco_mes, preco_anterior = valor_mes / consumo, valor_anterior / consumo_anterior
+        variacao_preco = round((preco_mes / preco_anterior - 1) * 100, 2)
+    fora_do_padrao = variacao_preco is not None and abs(variacao_preco) > LIMITE_PRECO_PCT
+    # GD conectada no período muda o que o kWh faturado significa; o motivo gd_conectada cobre esse caso.
+    decompoe = variacao_preco is not None and not fora_do_padrao and not gd_no_periodo
+    direcao_preco = _direcao_pct(variacao_preco) if decompoe else None
+
+    # Motivos explicam o valor da conta, que é comparado com o ano anterior: consumo e preço só são motivo
+    # quando andam junto com o valor. A comparação com a média fica nos fatos, como contexto.
     aplica = {
         'consumo_subiu': direcao_ano == 'subiu' and direcao_valor == 'subiu',
         'consumo_caiu': direcao_ano == 'caiu' and direcao_valor == 'caiu',
-        'bandeira_mais_cara': direcao_bandeira == 'mais_cara' and direcao_valor == 'subiu',
-        'bandeira_mais_barata': direcao_bandeira == 'mais_barata' and direcao_valor == 'caiu',
-        'gd_conectada': (mes_conexao_gd is not None and ano_anterior is not None
-                         and ano_anterior < mes_conexao_gd <= analisado and direcao_ano == 'caiu'),
+        'preco_kwh_subiu': direcao_preco == 'subiu' and direcao_valor == 'subiu',
+        'preco_kwh_caiu': direcao_preco == 'caiu' and direcao_valor == 'caiu',
+        'gd_conectada': gd_no_periodo and direcao_ano == 'caiu',
         'leitura_estimada': any(m is not None and m.tipo_leitura == 'ESTIMADA' for m in (ultimo, anterior)),
         'troca_medidor': bool(trocas),
         'faturas_em_aberto': bool(faturas_abertas),
+        'preco_kwh_fora_do_padrao': fora_do_padrao,
     }
+    # Valor mudando sem que consumo ou preço passe do limiar sozinho: o motivo é a combinação dos dois.
+    aplica['consumo_e_preco_kwh'] = decompoe and direcao_valor in ('subiu', 'caiu') and not any(
+        aplica[m] for m in ('consumo_subiu', 'consumo_caiu', 'preco_kwh_subiu', 'preco_kwh_caiu'))
     return {
         'mes_analisado': analisado,
         'mes_ano_anterior': ano_anterior,
         'periodo_media': diagnostico['media_12_meses']['periodo_referencia'] if analisado else None,
         'veredito_titulo': diagnostico['veredito']['titulo'] if diagnostico['veredito'] else None,
         'consumo_mes_kwh': consumo,
-        'consumo_ano_anterior_kwh': _positivo(diagnostico['mesmo_mes_ano_anterior']['valor']),
+        'consumo_ano_anterior_kwh': consumo_anterior,
         'media_consumo_kwh': media,
         'meses_na_media': diagnostico['meses_media'],
         'variacao_consumo_ano_anterior_pct': (round(abs(variacao_gold), 2)
@@ -124,6 +149,11 @@ def montar_fatos_unidade(meses: list[MesConsumo], periodo: str, contas: list[Con
         'variacao_valor_conta_pct': None if variacao_valor is None else abs(variacao_valor),
         'direcao_valor_conta': direcao_valor,
         'situacao_valor_conta': SITUACAO_VALOR.get(direcao_valor),
+        'preco_kwh_mes': None if preco_mes is None else round(preco_mes, 4),
+        'preco_kwh_ano_anterior': None if preco_anterior is None else round(preco_anterior, 4),
+        'variacao_preco_kwh_pct': None if variacao_preco is None else abs(variacao_preco),
+        'direcao_preco_kwh': direcao_preco,
+        'decomposicao_aplicavel': decompoe,
         'bandeira_mes': bandeira_mes,
         'bandeira_ano_anterior': bandeira_anterior,
         'direcao_bandeira': direcao_bandeira,
