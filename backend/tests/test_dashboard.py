@@ -196,8 +196,10 @@ def test_receita_de_energia_da_ponte_bate_com_as_faturas(client):
     {"nivel": "municipio"},
     {"nivel": "bairro", "municipio": MUNICIPIO},
     {"nivel": "classe", "municipio": MUNICIPIO, "bairro": BAIRRO},
+    {"nivel": "classe", "municipio": MUNICIPIO},  # classes do município, sem escolher bairro
+    {"nivel": "classe"},  # classes de toda a área
 ])
-def test_drill_fecha_com_a_ponte_e_ordena_pela_maior_queda(client, filtros):
+def test_drill_fecha_com_a_ponte_e_ordena_pelo_efeito_volume(client, filtros):
     dados = get(client, **filtros, page_size=100)
     ponte, drill = valores(dados["ponte_receita"]), dados["drill_down"]
     itens = drill["items"]
@@ -205,7 +207,8 @@ def test_drill_fecha_com_a_ponte_e_ordena_pela_maior_queda(client, filtros):
     assert {i["nome"] for i in itens} == nomes and drill["total"] == len(nomes)
     for campo in ("receita_energia_atual", "efeito_preco", "efeito_volume"):
         assert sum(i[campo]["valor"] for i in itens) == pytest.approx(ponte[campo], abs=0.01)
-    chaves = [(-i["queda_kwh"]["valor"], i["nome"]) for i in itens]
+    # Maior perda de receita por volume primeiro (efeito-volume mais negativo)
+    chaves = [(i["efeito_volume"]["valor"], i["nome"]) for i in itens]
     assert chaves == sorted(chaves)
     for item in itens:
         assert item["queda_kwh"]["valor"] == pytest.approx(item["energia_comparacao"]["valor"] - item["energia_atual"]["valor"])
@@ -217,6 +220,16 @@ def test_drill_breadcrumb_e_paginacao(client):
     assert [b["nivel"] for b in drill["breadcrumb"]] == ["consolidado", "municipio", "bairro"]
     assert drill["breadcrumb"][2]["filtros"] == {"municipio": MUNICIPIO, "bairro": BAIRRO, "classe": None}
     assert len(drill["items"]) == 1 and drill["total"] == len({r["classe"] for r in recortes(municipio=MUNICIPIO, bairro=BAIRRO)})
+
+
+@pytest.mark.parametrize("filtros, caminho", [
+    ({}, ["consolidado"]),
+    ({"municipio": MUNICIPIO}, ["consolidado", "municipio"]),
+])
+def test_breadcrumb_das_classes_sem_bairro_so_tem_os_pais_escolhidos(client, filtros, caminho):
+    drill = get(client, nivel="classe", **filtros)["drill_down"]
+    assert [b["nivel"] for b in drill["breadcrumb"]] == caminho
+    assert all(i["filtros"]["bairro"] is None for i in drill["items"])
 
 
 def test_outro_periodo_tem_kpis_e_ponte_ausente(client):

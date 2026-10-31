@@ -126,7 +126,12 @@ function indicadores(
     }
   }
   return {
-    receita_faturada: kpi('Receita faturada', soma.receita_atual, soma.receita_comparacao, 'BRL'),
+    receita_faturada: kpi(
+      'Receita faturada (com tributos)',
+      soma.receita_atual,
+      soma.receita_comparacao,
+      'BRL',
+    ),
     energia_faturada: kpi('Volume faturado', soma.energia_atual, soma.energia_comparacao, 'kWh'),
     ucs_ativas: kpi('UCs ativas', soma.ucs_ativas_atual, soma.ucs_ativas_comparacao, 'UCs'),
     inadimplencia: {
@@ -197,10 +202,8 @@ function validar(params: Registro): ParamsNormalizados {
   const nivel = (texto(params, 'nivel') ?? 'municipio') as NivelDrill
   if (!['municipio', 'bairro', 'classe'].includes(nivel)) throw invalido('nivel inválido.')
   const filtros = regiao(params)
+  // Como a API: classe não exige pais (sem bairro, é o ranking de classes do recorte)
   if (nivel === 'bairro' && !filtros.municipio) throw invalido('nivel bairro exige municipio.')
-  if (nivel === 'classe' && !(filtros.municipio && filtros.bairro)) {
-    throw invalido('nivel classe exige municipio e bairro.')
-  }
   const { page, pageSize } = paginacao(params)
   return { periodo_atual: atual, periodo_comparacao: comparacao, nivel, page, pageSize, ...filtros }
 }
@@ -239,23 +242,25 @@ function drill(p: ParamsNormalizados, recortes: Recorte[]) {
       filtros,
     }
   })
+  // Maior perda de receita por volume primeiro (efeito-volume mais negativo)
   linhas.sort(
     (a, b) =>
-      (b.queda_kwh.valor ?? 0) - (a.queda_kwh.valor ?? 0) || a.nome.localeCompare(b.nome, 'pt-BR'),
+      (a.efeito_volume.valor ?? 0) - (b.efeito_volume.valor ?? 0) ||
+      a.nome.localeCompare(b.nome, 'pt-BR'),
   )
 
   const vazio = { municipio: null, bairro: null, classe: null }
   const breadcrumb: Dashboard['drill_down']['breadcrumb'] = [
     { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
   ]
-  if (p.nivel === 'bairro' || p.nivel === 'classe') {
+  if ((p.nivel === 'bairro' || p.nivel === 'classe') && p.municipio) {
     breadcrumb.push({
       nivel: 'municipio',
       rotulo: p.municipio as string,
       filtros: { ...vazio, municipio: p.municipio ?? null },
     })
   }
-  if (p.nivel === 'classe') {
+  if (p.nivel === 'classe' && p.bairro) {
     breadcrumb.push({
       nivel: 'bairro',
       rotulo: p.bairro as string,

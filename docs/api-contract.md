@@ -75,19 +75,20 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 
 - `indicadores`: exatamente seis KPIs — receita_faturada, energia_faturada, ucs_ativas, inadimplencia, dec_medio, fec_medio. Cada um tem atual, comparação, diferença e variação percentual; campos não aplicáveis retornam null.
 - Definições da Gold (`agg_kpis_mensal`; com filtro, as mesmas regras sobre `fato_uc_mes`):
-  - `receita_faturada` = Σ `valor_total` (com tributos).
+  - `receita_faturada` = Σ `valor_total` (com tributos). Rótulo na tela: **“Receita faturada (com tributos)”**; a ponte da Tela 2 usa a receita de energia, sem tributos.
   - `energia_faturada` = Σ `consumo_kwh_valido` do `fato_uc_mes` (consumo sem as leituras negativas não recuperadas).
   - `ucs_ativas` = UCs **ligadas até o fim do último mês** de cada janela (`data_ligacao`; sem data, conta sempre), a mesma regra do Cc da `gold.fato_alimentador_mes`: o retrato da base de clientes, como as distribuidoras reportam.
   - `inadimplencia` = Σ `valor_total` das faturas `EM ABERTO` no período (`valor_em_aberto` da Gold); inclui o percentual da receita em cada período e a variação em pontos percentuais. Rótulo na tela: **“Valor em aberto”**. No mercado, inadimplência é o valor **vencido** e não pago; nesta base o histórico termina em jun/2026 e toda fatura em aberto já venceu, então os dois números coincidem.
   - `dec_medio` / `fec_medio` = soma dos DEC/FEC mensais da janela; cada mês divide pelas UCs atendidas naquele mês (Cc mensal). Seguem as regras da `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais (PRODIST Módulo 8), sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva (sem contar em dobro o tempo sobreposto). Com filtro de bairro, classe ou alimentador, retornam null: a continuidade só é agregada por alimentador e município.
 - `serie_historica`: 48 pontos mensais, jul/2022–jun/2026, cada um com receita e energia. A janela da série é independente das duas janelas de comparação.
 - `ponte_receita`: decompõe a **receita de energia** (sem tributos), como `gold.agg_preco_volume`: receita_energia_comparacao + efeito_preco + efeito_volume = receita_energia_atual, sem resíduo. Exemplo do stub: 205,9 + 24,7 − 8,2 = 222,4 milhões. efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação, por recorte e depois somado; efeito_preco = variação da receita de energia − efeito_volume. reajuste_percentual = variação da tarifa média de energia. Não há parcela de bandeira/mix.
-- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
-- Nível bairro exige município; nível classe exige município e bairro. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
+- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado pelo efeito-volume em BRL, da maior perda de receita por volume (mais negativo) para a menor, depois nome.
+- Nível bairro exige município (bairros homônimos existem em vários municípios). Nível classe aceita qualquer combinação dos pais: sem filtros é o ranking das classes de toda a área; com município, as classes do município; com município e bairro, as do bairro. O breadcrumb traz só os pais enviados. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
 
 ```http
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=bairro&municipio=Recife
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
+GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe
 ```
 
 A API lê os efeitos pré-calculados em `gold.agg_preco_volume` e só os soma; não refaz a decomposição. A tabela existe para P1 × P2 (`periodo_atual=2025-07/2026-06`, `periodo_comparacao=2022-07/2023-06`) e por município, bairro e classe. Fora disso — outras janelas ou filtro de alimentador — `ponte_receita` vem com todos os valores null e `drill_down` com a lista vazia, e `metadados.observacoes` diz o motivo; os KPIs e a série seguem calculados normalmente.

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
 import AnaliseIA from '@/components/receita/AnaliseIA'
-import DrillDownReceita from '@/components/receita/DrillDownReceita'
+import DrillDownReceita, { type Visao } from '@/components/receita/DrillDownReceita'
 import ExplicacaoDoResultado from '@/components/receita/ExplicacaoDoResultado'
 import { explicarResultado, numerosDoInsight } from '@/components/receita/explicacao'
 import PonteDaReceita from '@/components/receita/PonteDaReceita'
@@ -42,7 +42,10 @@ export default function ReceitaPage() {
   const periodoComparacao = filtros.periodo_comparacao ?? PERIODO_COMPARACAO_PADRAO
   const { municipio, bairro, classe } = filtros
   // O nível do drill-down acompanha os filtros: sem município lista municípios, e assim por diante.
-  const nivel: NivelDrill = !municipio ? 'municipio' : !bairro ? 'bairro' : 'classe'
+  // Com "Ver por: Classes" (ver=classe na URL), lista as classes do recorte sem precisar descer até o bairro.
+  const visao: Visao = params.get('ver') === 'classe' && !bairro ? 'classe' : 'regiao'
+  const nivel: NivelDrill =
+    visao === 'classe' ? 'classe' : !municipio ? 'municipio' : !bairro ? 'bairro' : 'classe'
 
   const dashboard = useConsulta(
     (sinal) =>
@@ -97,6 +100,31 @@ export default function ReceitaPage() {
     [periodoAtual, periodoComparacao, municipio, bairro, classe, chaveNumeros],
     { habilitada: numeros !== null },
   )
+
+  const mudarVisao = (proxima: Visao) =>
+    setParams(
+      (atual) => {
+        const novo = new URLSearchParams(atual)
+        if (proxima === 'classe') novo.set('ver', 'classe')
+        else novo.delete('ver')
+        novo.delete('page')
+        return novo
+      },
+      { replace: true },
+    )
+
+  // Clicar numa classe do ranking filtra por ela e volta para a região: onde essa classe perdeu volume
+  const filtrarClasse = (classeEscolhida: string) =>
+    setParams(
+      (atual) => {
+        const novo = new URLSearchParams(atual)
+        novo.set('classe', classeEscolhida)
+        novo.delete('ver')
+        novo.delete('page')
+        return novo
+      },
+      { replace: true },
+    )
 
   const mudarPagina = (proxima: number) =>
     setParams(
@@ -153,11 +181,16 @@ export default function ReceitaPage() {
             carregando={atualizando}
             periodoAtual={periodoAtual}
             periodoComparacao={periodoComparacao}
+            visao={visao}
+            aoMudarVisao={bairro ? undefined : mudarVisao}
+            podeDescer={visao === 'classe' || undefined}
             aoSelecionar={(linha) =>
-              definir({
-                municipio: linha.filtros.municipio ?? '',
-                bairro: linha.filtros.bairro ?? '',
-              })
+              visao === 'classe'
+                ? filtrarClasse(linha.nome)
+                : definir({
+                    municipio: linha.filtros.municipio ?? '',
+                    bairro: linha.filtros.bairro ?? '',
+                  })
             }
             aoNavegar={(item) =>
               definir({
