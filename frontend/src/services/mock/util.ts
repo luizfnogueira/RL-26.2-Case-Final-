@@ -13,8 +13,13 @@ export function clonar<T>(valor: T): T {
   return JSON.parse(JSON.stringify(valor)) as T
 }
 
-export function erroApi(status: number, codigo: string, mensagem: string): ApiError {
-  return new ApiError(status, codigo, mensagem)
+export function erroApi(
+  status: number,
+  codigo: string,
+  mensagem: string,
+  detalhes?: Record<string, unknown>,
+): ApiError {
+  return new ApiError(status, codigo, mensagem, detalhes)
 }
 
 export function arredondar(valor: number, casas = 2): number {

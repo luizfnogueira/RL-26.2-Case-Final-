@@ -32,6 +32,12 @@ class AppException(Exception):
         return resp
 
 
+class LoteRejeitadoException(AppException):
+    status_code = 422
+    codigo = "LOTE_REJEITADO"
+    mensagem = "Nenhuma ordem do lote foi criada: corrija as UCs listadas em detalhes.falhas."
+
+
 class UCInexistenteException(AppException):
     status_code = 404
     codigo = "UC_INEXISTENTE"

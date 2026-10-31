@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "id_ordem": 5,
+      "id_uc": "UC-DEMO-001",
+      "status": "ABERTA",
+      "equipe_responsavel": "Equipe Norte 02",
+      "data_criacao": "2026-10-21T09:30:00-03:00",
+      "data_prevista": "2026-10-22",
+      "data_inicio_campo": null,
+      "data_conclusao": null,
+      "data_cancelamento": null,
+      "justificativa_cancelamento": null,
+      "motivo": "Verificar variação de consumo.",
+      "kwh_estimado": 120.0,
+      "observacoes": null,
+      "resultado": null,
+      "historico": [
+        {
+          "id_historico": 9,
+          "id_ordem": 5,
+          "status_anterior": null,
+          "status_novo": "ABERTA",
+          "data_mudanca": "2026-10-21T09:30:00-03:00",
+          "usuario": null,
+          "justificativa_ou_motivo": "Verificar variação de consumo.",
+          "detalhes": {
+            "equipe": "Equipe Norte 02",
+            "data_prevista": "2026-10-22"
+          }
+        }
+      ]
+    }
+  ],
+  "total": 1
+}

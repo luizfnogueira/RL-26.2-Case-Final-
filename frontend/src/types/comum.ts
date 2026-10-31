@@ -87,6 +87,8 @@ export type CodigoErro =
   | 'UC_INEXISTENTE'
   | 'ORDEM_NAO_ENCONTRADA'
   | 'ORDEM_ATIVA_EXISTENTE'
+  /** 422 do POST /inspecoes/lote: nenhuma ordem criada; as UCs com problema vêm em `detalhes.falhas`. */
+  | 'LOTE_REJEITADO'
   | 'DADOS_INVALIDOS'
   | 'CENARIO_STUB_INDISPONIVEL'
   | 'RECURSO_NAO_ENCONTRADO'

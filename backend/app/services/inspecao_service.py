@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from app.core.exceptions import (
     AppException,
     JustificativaObrigatoriaException,
+    LoteRejeitadoException,
     OrdemAtivaExistenteException,
     OrdemNaoEncontradaException,
     ResultadoIncompletoException,
@@ -13,6 +14,7 @@ from app.core.exceptions import (
 )
 from app.repositories.inspecao_repository import (
     MemoriaOrdemInspecaoRepository,
+    OrdemConcluida,
     OrdemInspecaoRepositoryInterface,
 )
 from app.schemas.inspecao import (
@@ -25,6 +27,53 @@ from app.schemas.inspecao import (
     ResultadoInspecao,
     StatusOrdem,
 )
+
+# A Fila grava os motivos da suspeita no campo motivo da ordem, unidos por este separador
+SEPARADOR_MOTIVOS = " · "
+
+
+# kwh_estimado da fila (gold.tb_fila_perdas) = queda_kwh_mensal × meses_atuais, sempre 3 meses; o kWh do
+# resultado de campo é por mês. A comparação divide a estimativa pelos meses para ficar na mesma base.
+MESES_ESTIMATIVA_FILA = 3
+
+
+def _pct(parte: int, todo: int) -> float | None:
+    return round(100 * parte / todo, 1) if todo else None
+
+
+def calcular_indicadores(concluidas: list[OrdemConcluida]) -> dict[str, Any]:
+    """Taxa de acerto, kWh/mês informado em campo × estimado pela fila e acerto por motivo da suspeita.
+
+    Uma ordem com vários motivos conta em cada um deles; o motivo vazio fica de fora do ranking.
+    A comparação de kWh só usa ordens com estimativa da fila: sem ela, as duas somas a ignoram.
+    """
+    acertos = sum(ordem.irregularidade for ordem in concluidas)
+    comparaveis = [ordem for ordem in concluidas if ordem.kwh_estimado is not None]
+    motivos: dict[str, list[int]] = {}
+    for ordem in concluidas:
+        for motivo in {m.strip() for m in (ordem.motivo or "").split(SEPARADOR_MOTIVOS) if m.strip()}:
+            contagem = motivos.setdefault(motivo, [0, 0])
+            contagem[0] += 1
+            contagem[1] += ordem.irregularidade
+    por_motivo = [
+        {
+            "motivo": motivo,
+            "concluidas": total,
+            "com_irregularidade": certas,
+            "taxa_acerto_pct": _pct(certas, total),
+        }
+        for motivo, (total, certas) in motivos.items()
+    ]
+    por_motivo.sort(key=lambda m: (-m["concluidas"], -m["taxa_acerto_pct"], m["motivo"]))
+    return {
+        "concluidas": len(concluidas),
+        "com_irregularidade": acertos,
+        "taxa_acerto_pct": _pct(acertos, len(concluidas)),
+        "ordens_comparadas": len(comparaveis),
+        "kwh_mes_campo": round(sum(ordem.kwh_recuperado for ordem in comparaveis), 2),
+        "kwh_mes_fila": round(sum(ordem.kwh_estimado for ordem in comparaveis) / MESES_ESTIMATIVA_FILA, 2),
+        "por_motivo": por_motivo,
+    }
 
 
 class OrdemInspecaoService:
@@ -41,6 +90,39 @@ class OrdemInspecaoService:
         dados: Union[OrdemInspecaoCreate, dict[str, Any]],
         usuario: Optional[str] = None,
     ) -> OrdemInspecaoResponse:
+        nova_ordem, evento_historico = self._preparar_ordem(dados, usuario)
+        return self.repository.salvar(nova_ordem, evento_historico=evento_historico)
+
+    def criar_ordens_em_lote(
+        self,
+        lista: list[OrdemInspecaoCreate],
+        usuario: Optional[str] = None,
+    ) -> list[OrdemInspecaoResponse]:
+        """Tudo ou nada: valida todas as UCs antes de gravar; uma falha rejeita o lote inteiro."""
+        preparadas = []
+        falhas = []
+        vistas: set[str] = set()
+        for dados in lista:
+            id_uc = dados.id_uc.strip()
+            try:
+                if id_uc in vistas:
+                    raise OrdemAtivaExistenteException(
+                        f"A Unidade Consumidora '{id_uc}' aparece mais de uma vez no lote."
+                    )
+                vistas.add(id_uc)
+                preparadas.append(self._preparar_ordem(dados, usuario))
+            except AppException as exc:
+                falhas.append({"id_uc": id_uc, "codigo": exc.codigo, "mensagem": exc.mensagem})
+        if falhas:
+            raise LoteRejeitadoException(detalhes={"falhas": falhas})
+        return self.repository.salvar_varias(preparadas)
+
+    def _preparar_ordem(
+        self,
+        dados: Union[OrdemInspecaoCreate, dict[str, Any]],
+        usuario: Optional[str],
+    ) -> tuple[OrdemInspecaoResponse, HistoricoOrdem]:
+        """Valida a UC e monta a ordem ABERTA com o primeiro evento do histórico, sem gravar."""
         if isinstance(dados, dict):
             try:
                 dados = OrdemInspecaoCreate(**dados)
@@ -93,8 +175,7 @@ class OrdemInspecaoService:
             justificativa_ou_motivo=dados.motivo or "Criação da ordem de inspeção",
             detalhes={"equipe": dados.equipe_responsavel, "data_prevista": str(dados.data_prevista)},
         )
-
-        return self.repository.salvar(nova_ordem, evento_historico=evento_historico)
+        return nova_ordem, evento_historico
 
     def avancar_para_campo(
         self,
@@ -313,6 +394,9 @@ class OrdemInspecaoService:
             page=page,
             page_size=page_size,
         )
+
+    def indicadores(self, **filtros: Optional[str]) -> dict[str, Any]:
+        return calcular_indicadores(self.repository.listar_concluidas(**filtros))
 
     def obter_ordem_ativa(self, id_uc: str) -> Optional[OrdemInspecaoResponse]:
         return self.repository.obter_ativa_por_uc(id_uc)
