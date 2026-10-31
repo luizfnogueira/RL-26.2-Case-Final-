@@ -201,6 +201,12 @@ def montar_ponte(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
     }
 
 
+def _soma_ou_nula(valores) -> Decimal | None:
+    """Soma dos efeitos de um grupo; um recorte sem efeito na Gold deixa o grupo sem efeito (null), não 500."""
+    valores = list(valores)
+    return None if any(valor is None for valor in valores) else sum(valores)
+
+
 def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dict:
     """Uma linha por item do nível pedido, ordenada pelo efeito-volume em R$ (a maior perda de receita
     por volume primeiro; depois nome), paginada."""
@@ -227,11 +233,15 @@ def montar_drill(linhas: list[AggPrecoVolume], filtros: FiltrosDashboard) -> dic
             "energia_comparacao": indicador(kwh_comparacao, "kWh", filtros.periodo_comparacao),
             "variacao_energia_percentual": indicador(variacao(kwh_atual, kwh_comparacao), "%", filtros.periodo_atual),
             "queda_kwh": indicador(kwh_comparacao - kwh_atual, "kWh", filtros.periodo_atual),
-            "efeito_preco": indicador(sum(linha.efeito_preco for linha in grupo), "BRL", filtros.periodo_atual),
-            "efeito_volume": indicador(sum(linha.efeito_volume for linha in grupo), "BRL", filtros.periodo_atual),
+            "efeito_preco": indicador(_soma_ou_nula(linha.efeito_preco for linha in grupo), "BRL",
+                                      filtros.periodo_atual),
+            "efeito_volume": indicador(_soma_ou_nula(linha.efeito_volume for linha in grupo), "BRL",
+                                       filtros.periodo_atual),
             "filtros": linha_filtros,
         })
-    itens.sort(key=lambda item: (item["efeito_volume"]["valor"], item["nome"]))
+    # Efeito-volume nulo vai para o fim
+    itens.sort(key=lambda item: (item["efeito_volume"]["valor"] is None, item["efeito_volume"]["valor"] or 0,
+                                 item["nome"]))
 
     vazio = {"municipio": None, "bairro": None, "classe": None}
     breadcrumb = [{"nivel": "consolidado", "rotulo": "Todos os municípios", "filtros": vazio}]

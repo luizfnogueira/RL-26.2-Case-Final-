@@ -39,6 +39,8 @@ type Props = {
   aoMudarVisao?: (visao: Visao) => void
   /** Se a linha leva a outro recorte. Padrão: todo nível menos classe. */
   podeDescer?: boolean
+  /** Filtro de classe ativo: a comparação não o aplica, então o botão fica desabilitado com o aviso. */
+  classeAtiva?: string
 }
 
 export type Visao = 'regiao' | 'classe'
@@ -49,13 +51,23 @@ const MAIORES_PERDAS = 5
 /** As maiores perdas de receita por volume do ranking (já ordenado pelo efeito-volume), em barras. */
 function MaioresPerdas({ linhas }: { linhas: LinhaDrill[] }) {
   const perdas = linhas.filter((l) => (l.efeito_volume.valor ?? 0) < 0).slice(0, MAIORES_PERDAS)
-  if (perdas.length === 0) return null
+  const titulo = (
+    <h3 id="maiores-perdas" className="mb-2 text-legenda text-ink-2">
+      Maiores perdas de receita por volume
+    </h3>
+  )
+  if (perdas.length === 0) {
+    return (
+      <section aria-labelledby="maiores-perdas" className="mb-5">
+        {titulo}
+        <p className="text-corpo text-ink-2">Nenhuma perda por volume neste recorte.</p>
+      </section>
+    )
+  }
   const maior = Math.abs(perdas[0].efeito_volume.valor as number)
   return (
     <section aria-labelledby="maiores-perdas" className="mb-5">
-      <h3 id="maiores-perdas" className="mb-2 text-legenda text-ink-2">
-        Maiores perdas de receita por volume
-      </h3>
+      {titulo}
       <ul className="flex flex-col gap-2">
         {perdas.map((l) => {
           const valor = l.efeito_volume.valor as number
@@ -113,12 +125,15 @@ export default function DrillDownReceita({
   visao = 'regiao',
   aoMudarVisao,
   podeDescer = drill.nivel !== 'classe',
+  classeAtiva,
 }: Props) {
   const navigate = useNavigate()
 
   // Leva os itens visíveis (de 2 a 4) para a aba de comparação
   const itensVisiveis = drill.items.slice(0, 4).map((l) => l.nome)
-  const podeComparar = itensVisiveis.length >= 2 && !carregando
+  // A API de comparação não aceita filtro de classe: com classe ativa, os números não bateriam com o card
+  const comparacaoIgnoraClasse = Boolean(classeAtiva) && drill.nivel !== 'classe'
+  const podeComparar = itensVisiveis.length >= 2 && !carregando && !comparacaoIgnoraClasse
 
   const municipioPai =
     drill.items[0]?.filtros.municipio ??
@@ -257,9 +272,11 @@ export default function DrillDownReceita({
             disabled={!podeComparar}
             onClick={lidarComComparar}
             title={
-              itensVisiveis.length < 2
-                ? 'Necessário ao menos 2 itens visíveis para comparar'
-                : `Comparar ${itensVisiveis.length} itens visíveis`
+              comparacaoIgnoraClasse
+                ? 'A comparação não aplica o filtro de classe: limpe a classe para comparar'
+                : itensVisiveis.length < 2
+                  ? 'Necessário ao menos 2 itens visíveis para comparar'
+                  : `Comparar ${itensVisiveis.length} itens visíveis`
             }
           >
             Comparar
@@ -294,7 +311,7 @@ export default function DrillDownReceita({
         </ol>
       </nav>
 
-      {drill.page === 1 && <MaioresPerdas linhas={drill.items} />}
+      {drill.page === 1 && drill.items.length > 0 && <MaioresPerdas linhas={drill.items} />}
 
       <Tabela
         legenda={`Variação de volume e efeitos por ${ROTULO_NIVEL[drill.nivel].toLowerCase()}`}
