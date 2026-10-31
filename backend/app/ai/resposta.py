@@ -465,3 +465,11 @@ def complementar_texto_para_tabela(
     ):
         texto_final += f" Período considerado: {periodo}."
     return texto_final
+
+
+
+def validar_fidelidade_guia(secoes_enviadas: list[Any], pergunta: str, saida: Any) -> None:
+    """Ponte para `validar_resposta_guia` em `app.ai.agente_guia` (T3)."""
+    from app.ai.agente_guia import validar_resposta_guia
+
+    validar_resposta_guia(secoes_enviadas, pergunta, saida)
