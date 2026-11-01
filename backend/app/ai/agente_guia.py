@@ -262,7 +262,9 @@ def _validar_elementos_ui_citados(
         ]
         if not palavras_ui:
             continue
-        encontrou = any(
+        # Fix: Todas as palavras do nome têm de estar no guia: com "any", "Faturamento Corporativo" passava
+        # só porque "faturamento" aparece na apresentação da plataforma
+        encontrou = all(
             p in palavras_corpus or (len(p) >= 4 and p[:4] in radicais_corpus)
             for p in palavras_ui
         )
