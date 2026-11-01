@@ -203,10 +203,10 @@ describe('resumo da conta na Visão 360', () => {
 
 describe('formatarNumeroResumo', () => {
   it.each([
-    [{ valor: 2357.68, unidade: 'BRL' }, 'R$ 2.357,68'],
-    [{ valor: 42.15, unidade: 'BRL' }, 'R$ 42,15'],
-    [{ valor: 3681, unidade: 'kWh' }, '3.681 kWh'],
-    [{ valor: 82.83, unidade: 'kWh' }, '82,83 kWh'],
+    [{ valor: 1234.56, unidade: 'BRL' }, 'R$ 1.234,56'],
+    [{ valor: 61.35, unidade: 'BRL' }, 'R$ 61,35'],
+    [{ valor: 1234, unidade: 'kWh' }, '1.234 kWh'],
+    [{ valor: 45.67, unidade: 'kWh' }, '45,67 kWh'],
     [{ valor: 41.81, unidade: '%' }, '42%'],
     [{ valor: 37.5, unidade: '%' }, '38%'],
     [{ valor: 2.36, unidade: '%' }, '2%'],

@@ -38,9 +38,12 @@ def perguntar(dados: Annotated[PerguntaIA, Body(openapi_examples={
              'metadados.observacoes (prefixo "Texto alternativo:"), nunca 503. Só existe para '
              'periodo_atual=2025-07/2026-06 × periodo_comparacao=2022-07/2023-06, sem alimentador: fora disso, '
              '422 DECOMPOSICAO_INDISPONIVEL. Indicadores enviados que não batem com a Gold: 422 DADOS_INVALIDOS. '
-             + STUB + ' Unidade: com GOLD_SOURCE=real, resumo por regra sobre os fatos da conta da UC (os '
-             'mesmos números do GET /unidades/{id}), marcado em metadados.observacoes como "Texto alternativo:"; '
-             'com seed, resumo fixo da UC-DEMO-001 (stub).',
+             + STUB + ' Unidade: com GOLD_SOURCE=real, os fatos da conta da UC são calculados por regra (os '
+             'mesmos números do GET /unidades/{id}). Com IA_MODO=real, a IA redige o resumo a partir deles e o '
+             'texto por regra é o plano B: se a IA falhar, passar de 20 s ou o texto não passar na conferência, a '
+             'resposta é 200 com o texto por regra e "Texto alternativo:" em metadados.observacoes. Com '
+             'IA_MODO=mock, sai o texto por regra, marcado da mesma forma. Com seed, resumo fixo da UC-DEMO-001 '
+             '(stub).',
              responses=respostas('resposta_insight', erros=(
                  'UC_INEXISTENTE', 'CENARIO_STUB_INDISPONIVEL', 'DECOMPOSICAO_INDISPONIVEL',
                  'GOLD_NAO_CARREGADA')))

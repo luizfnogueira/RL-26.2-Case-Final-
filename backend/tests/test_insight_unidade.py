@@ -169,4 +169,7 @@ def exemplo_real() -> dict:
 
 
 def test_fixture_do_modo_real_e_o_que_as_funcoes_produzem():
-    assert exemplo('resposta_insight_unidade_real') == exemplo_real()
+    fixture, gerado = exemplo('resposta_insight_unidade_real'), exemplo_real()
+    assert sem_horario(fixture) == sem_horario(gerado)
+    # O gerado_em sai no fuso da máquina (.astimezone(), como na Receita): vale o mesmo instante
+    assert datetime.fromisoformat(fixture['gerado_em']) == datetime.fromisoformat(gerado['gerado_em'])

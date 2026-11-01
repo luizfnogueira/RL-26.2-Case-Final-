@@ -21,7 +21,9 @@ from app.services.insight_service import PREFIXO_TEXTO_ALTERNATIVO, GeradorIA
 from app.services.insight_unidade import (
     OBSERVACAO_CONFERENCIA, OBSERVACAO_FALHA, OBSERVACAO_SEM_IA, OBSERVACAO_SEM_SITUACAO,
 )
-from app.services.redacao_ia_unidade import INSTRUCOES_UNIDADE, NUMERO_POR_EXTENSO, Caso, aparece, frases
+from app.services.redacao_ia_unidade import (
+    INSTRUCOES_UNIDADE, NUMERO_POR_EXTENSO, UNIDADE_REPETIDA, Caso, aparece, frases,
+)
 from app.services.texto_unidade import texto_por_regra_unidade
 from tests.test_diagnostico_conta import JANELA, _mes, historico
 from tests.test_fatos_unidade import ESTAVEL, MES, RepositorioComContas, contas, gd, por_preco
@@ -324,7 +326,7 @@ def test_leitura_estimada_no_mes_com_a_consequencia_passa(ia):
 
 
 def test_leitura_estimada_no_mes_sem_a_consequencia_reprova(ia):
-    # Como a IA fez na UC100046: "Verifique que a leitura de jun/2026 foi estimada", sem dizer o que isso muda
+    # Como a IA fez na validação: só que a leitura foi estimada, sem dizer o que isso muda
     sem = TEXTO_IA + ' Vale verificar que a leitura de {mes_analisado} foi estimada.'
     repo = repo_estimada(tipo='ESTIMADA')
     ia(ok(texto=sem), repo=repo)
@@ -341,9 +343,9 @@ def test_so_o_ano_anterior_estimado_nao_exige_a_consequencia(ia):
 # ---------- os dois meses no formato da tela ----------
 
 @pytest.mark.parametrize('texto', [
-    # Como na UC100015: "4% acima de R$ 40,68", sem o mês da comparação
+    # Como a IA fez na validação: o percentual e o valor, sem o mês da comparação
     TEXTO_IA.replace('{mes_ano_anterior} ({valor_conta_ano_anterior})', '{valor_conta_ano_anterior}'),
-    # Como na UC100021: o ano por extenso, fora do marcador
+    # Como a IA fez na validação: o ano por extenso, fora do marcador
     TEXTO_IA.replace('Em {mes_analisado}', 'Em jun/dois mil vinte e seis'),
 ], ids=['sem-o-mes-do-ano-anterior', 'ano-por-extenso'])
 def test_mes_fora_do_formato_da_tela_reprova(ia, texto):
@@ -368,7 +370,7 @@ def test_sem_ano_anterior_os_meses_nao_sao_exigidos(ia):
 # ---------- molde da frase de avisos e "verificar" ----------
 
 def test_caso_traz_a_frase_de_avisos_inteira_como_molde():
-    # Como a UC100011: troca de medidor e faturas em aberto
+    # Troca de medidor e faturas em aberto
     repo = repo_base()
     repo._meses = [replace(m, troca_medidor=True) if m.mes == '2025-12' else m for m in historico()]
     repo.faturas_abertas = lambda id_uc: [_fatura('2024-11', 'EM ABERTO'), _fatura('2025-01', 'EM ABERTO')]
@@ -386,7 +388,7 @@ def test_caso_sem_avisos_nao_traz_molde():
 
 
 def test_avisos_como_fatos_soltos_sem_verificar_reprova(ia):
-    # Como a UC100011: "Há 2 faturas em aberto, somando…", sem dizer que é ponto a verificar
+    # Como a IA fez na validação: as faturas em aberto como fato solto, sem dizer que é ponto a verificar
     ia(ok(texto=TEXTO_IA.replace('Vale verificar a fatura em aberto de', 'Há uma fatura em aberto de')))
     corpo = pedir()
     assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
@@ -407,7 +409,7 @@ def test_sem_avisos_verificar_nao_e_exigido(ia):
 
 # ---------- número por extenso ----------
 
-# O padrão da UC100021 na validação final, com os números fictícios do caso base: tudo por extenso, fora dos
+# O padrão de um texto recusado na validação final, com os números fictícios do caso base: tudo por extenso, fora dos
 # marcadores, então o validador do agente (que só barra algarismos) deixa passar
 TEXTO_TODO_POR_EXTENSO = (
     'O valor da conta de jun/dois mil e vinte e seis, de R$ trezentos e cinquenta reais e vinte centavos, ficou '
@@ -466,7 +468,7 @@ def test_sem_falso_positivo(trecho):
 
 
 def test_texto_aceito_com_dez_barra_ano_passa(ia):
-    # Como os textos aceitos da UC100011 na validação final: troca de medidor em dez/2025
+    # Como textos aceitos na validação final: troca de medidor num mês abreviado como dez/2025
     repo = repo_base()
     repo._meses = [replace(m, troca_medidor=True) if m.mes == '2025-12' else m for m in historico()]
     texto = TEXTO_IA.replace('Vale verificar a fatura em aberto de {faturas_em_aberto_valor}.',
@@ -480,6 +482,39 @@ def test_texto_aceito_com_dez_barra_ano_passa(ia):
 
 def test_instrucoes_proibem_numero_por_extenso():
     assert 'Nunca escreva números\n   por extenso; todo número, valor, percentual ou mês vem de um marcador.' in INSTRUCOES_UNIDADE
+
+
+# ---------- unidade repetida ----------
+
+# O marcador já traz a unidade; repeti-la fora dele duplica ("R$ R$ 350,20"), e o número-chave segue no texto
+@pytest.mark.parametrize('com_marcador, preenchido, repetida', [
+    (('de {valor_conta_mes}', 'de R$ {valor_conta_mes}'), ('de R$ 350,20', 'de R$ R$ 350,20'), 'R$ R$'),
+    (('de {valor_conta_mes}', 'de R${valor_conta_mes}'), ('de R$ 350,20', 'de R$R$ 350,20'), 'R$R$'),
+    (('para {consumo_mes}.', 'para {consumo_mes} kWh.'), ('para 412 kWh.', 'para 412 kWh kWh.'), 'kWh kWh'),
+    (('subiu {variacao_consumo_ano_anterior}', 'subiu {variacao_consumo_ano_anterior} %'),
+     ('subiu 38%', 'subiu 38% %'), '% %'),
+], ids=['reais', 'reais-sem-espaco', 'kwh', 'percentual'])
+def test_unidade_repetida_reprova(ia, com_marcador, preenchido, repetida):
+    ia(ok(texto=TEXTO_IA.replace(*com_marcador)))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+    # É a única falha: sem a checagem, o texto passaria (o número-chave continua lá)
+    assert Caso(fatos_base()).conferir(PREENCHIDO.replace(*preenchido)) == [f'unidade repetida: {repetida}']
+
+
+@pytest.mark.parametrize('trecho', [
+    'de R$ 0,85 por kWh',                     # preço por kWh: R$ antes e kWh depois, sem repetir
+    'de 298 kWh para 412 kWh',
+    'subiu 38% e o preço 6%',
+    'de R$ 238,40 para R$ 350,20',
+])
+def test_unidade_sem_repetir_nao_e_recusada(trecho):
+    assert not UNIDADE_REPETIDA.search(trecho)
+
+
+def test_instrucoes_dizem_que_o_marcador_ja_traz_a_unidade():
+    assert ('Os marcadores de valor em reais,\n   de kWh e de percentual já trazem a unidade (R$, kWh, %): nunca '
+            'repita a unidade antes ou depois do\n   marcador.') in INSTRUCOES_UNIDADE
 
 
 def test_valor_do_ano_anterior_omitido_reprova(ia):
@@ -545,7 +580,7 @@ def test_bandeira_do_caso_com_a_palavra_passa(ia):
 
 
 def test_bandeira_do_caso_sem_a_palavra_reprova(ia):
-    # Como a IA fez na UC100021: "com a mudança de vermelha patamar 1 para amarela"
+    # Como a IA fez na validação: "com a mudança de <uma bandeira> para <outra>", sem a palavra "bandeira"
     texto = TEXTO_BANDEIRA.replace('com a bandeira passando de', 'com a mudança de')
     ia(ok(texto=texto), repo=repo_bandeira())
     corpo = pedir()
@@ -553,7 +588,7 @@ def test_bandeira_do_caso_sem_a_palavra_reprova(ia):
 
 
 def test_frases_nao_corta_no_ponto_do_milhar():
-    assert frases('O valor foi de R$ 2.357,68. Ficou estável.') == ['O valor foi de R$ 2.357,68', 'Ficou estável']
+    assert frases('O valor foi de R$ 1.234,56. Ficou estável.') == ['O valor foi de R$ 1.234,56', 'Ficou estável']
 
 
 def test_instrucoes_exigem_os_dois_valores_em_reais_na_primeira_frase():
@@ -578,8 +613,8 @@ def test_conferencia_aceita_o_proprio_texto_por_regra():
     ('4%', 'O valor subiu 4,5%.', False),
     ('52 kWh', 'de 152 kWh para 160 kWh', False),
     ('52 kWh', 'de 52 kWh para 60 kWh', True),
-    ('R$ 42,15', 'foi de R$ 42,15.', True),
-    ('R$ 2,15', 'foi de R$ 42,15.', False),
+    ('R$ 61,35', 'foi de R$ 61,35.', True),
+    ('R$ 1,35', 'foi de R$ 61,35.', False),
 ])
 def test_busca_do_valor_respeita_o_limite_do_numero(valor, texto, esperado):
     assert aparece(valor, texto) is esperado

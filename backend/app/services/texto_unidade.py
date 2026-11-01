@@ -26,12 +26,12 @@ def _milhar(valor: float, casas: int) -> str:
 
 
 def reais(valor: float) -> str:
-    """'R$ 2.357,68', como as faturas na tela."""
+    """'R$ 1.234,56', como as faturas na tela."""
     return f'R$ {_milhar(valor, 2)}'
 
 
 def kwh(valor: float) -> str:
-    """'3.681 kWh' ou '82,83 kWh': por extenso, até 2 casas (formatarEnergiaCompleta do front)."""
+    """'1.234 kWh' ou '45,67 kWh': por extenso, até 2 casas (formatarEnergiaCompleta do front)."""
     texto = _milhar(valor, 2)
     return f"{texto.rstrip('0').rstrip(',')} kWh"
 

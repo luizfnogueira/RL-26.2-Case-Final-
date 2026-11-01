@@ -20,7 +20,10 @@ distribuidora de energia, que vai repetir o texto ao telefone para o cliente.
 Regras:
 1. Todo número, mês ou valor com algarismo vem dos marcadores listados na mensagem. Escreva o marcador
    entre chaves, como {valor_conta_mes}, no lugar do valor. Nunca digite algarismos. Nunca escreva números
-   por extenso; todo número, valor, percentual ou mês vem de um marcador.
+   por extenso; todo número, valor, percentual ou mês vem de um marcador. Os marcadores de valor em reais,
+   de kWh e de percentual já trazem a unidade (R$, kWh, %): nunca repita a unidade antes ou depois do
+   marcador. Escreva "foi de {valor_conta_mes}", nunca "foi de R$ {valor_conta_mes}", "{consumo_mes} kWh"
+   ou "{variacao_valor_conta} %".
 2. A primeira frase diz a situação do valor da conta do mês analisado contra o mesmo mês do ano
    anterior e traz os dois valores em reais: o do mês ({valor_conta_mes}) e, quando houver, o do mesmo
    mês do ano anterior ({valor_conta_ano_anterior}); o percentual sozinho não basta. Escreva sempre
@@ -59,6 +62,8 @@ _EXTENSO = (
     'por\\s+cento|reais|centavos?|quilowatts?'
 )
 NUMERO_POR_EXTENSO = re.compile(rf'\b(?:{_EXTENSO})\b(?!\s*/)', re.IGNORECASE)
+# O marcador já vem com a unidade: "R$ {valor_conta_mes}" vira "R$ R$ 350,20", e o número-chave ainda aparece
+UNIDADE_REPETIDA = re.compile(r'R\$\s*R\$|kWh\s*kWh|%\s*%', re.IGNORECASE)
 FIM_DE_FRASE = re.compile(r'[.!?](?=\s|$)')
 
 
@@ -252,6 +257,8 @@ class Caso:
             problemas.append('leitura estimada no mês sem "próxima leitura"')
         if extensos := sorted({m.group(0).lower() for m in NUMERO_POR_EXTENSO.finditer(texto)}):
             problemas.append(f'número por extenso: {", ".join(extensos)}')
+        if repetidas := sorted({' '.join(m.group(0).split()) for m in UNIDADE_REPETIDA.finditer(texto)}):
+            problemas.append(f'unidade repetida: {", ".join(repetidas)}')
         # Avisos são pontos a verificar, não fatos soltos
         if self.f['avisos'] and not VERIFICAR.search(texto):
             problemas.append('avisos sem "verificar" ou "verifique"')
@@ -286,7 +293,7 @@ class Caso:
 
 
 def frases(texto: str) -> list[str]:
-    """Frases do texto, cortadas no ponto final (o '.' do milhar, como em 'R$ 2.357,68', não corta)."""
+    """Frases do texto, cortadas no ponto final (o '.' do milhar, como em 'R$ 1.234,56', não corta)."""
     return [f.strip() for f in FIM_DE_FRASE.split(texto) if f.strip()]
 
 

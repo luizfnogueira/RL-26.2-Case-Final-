@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 import pytest
 
 from app.schemas.ia import RespostaInsight
+from app.services.redacao_ia_unidade import UNIDADE_REPETIDA
 from app.services.texto_unidade import MAXIMO_FRASES, kwh, reais, redigir, texto_por_regra_unidade
 from tests.test_diagnostico_conta import JANELA, _mes, historico
 from tests.test_fatos_unidade import CAIU, MES, VALOR_CAIU, VALOR_SUBIU, contas, fatos, gd, por_preco
@@ -35,11 +36,11 @@ def do_tipo(lista, tipo) -> list[str]:
 # ---------- formato ----------
 
 def test_numeros_no_formato_da_tela():
-    assert reais(2357.68) == 'R$ 2.357,68'
+    assert reais(1234.56) == 'R$ 1.234,56'
     assert reais(42.0) == 'R$ 42,00'
-    assert kwh(3681.0) == '3.681 kWh'
-    assert kwh(82.83) == '82,83 kWh'
-    assert kwh(82.8) == '82,8 kWh'
+    assert kwh(1234.0) == '1.234 kWh'
+    assert kwh(45.67) == '45,67 kWh'
+    assert kwh(45.6) == '45,6 kWh'
 
 
 def test_resposta_no_formato_do_ia_insight():
@@ -314,7 +315,7 @@ def test_gd_conectada_depois_do_mes_analisado_nao_aparece():
 
 
 def test_valor_estavel_com_media_gd_e_avisos_cabe_nas_4_frases():
-    # Como a UC100015: sem a frase de motivo, a GD de contexto volta a caber
+    # Sem a frase de motivo, a GD de contexto volta a caber
     lista = frases(meses=historico(**ABAIXO_DA_MEDIA), conta=contas(valor=180, valor_anterior=200),
                    geracao=gd(date(2025, 2, 1)), abertas=UMA_ABERTA)
     assert [t for t, _ in lista] == ['situacao', 'contexto', 'contexto', 'aviso']
@@ -399,6 +400,7 @@ def _garantias(consumo, conta, geracao, abertas):
     assert len(lista) <= MAXIMO_FRASES
     assert '-' not in texto + titulo and '−' not in texto + titulo           # direção só em palavras
     assert not re.search(r'(?<!\w)a conta\b', texto, re.IGNORECASE)          # sempre "o valor da conta"
+    assert not UNIDADE_REPETIDA.search(texto), texto                         # a mesma régua da IA
     assert lista[0][0] == 'situacao' and lista[0][1].startswith(('O valor da conta', 'Não há valor da conta'))
     tipos = [t for t, _ in lista]
     assert tipos == sorted(tipos, key=['situacao', 'motivo', 'contexto', 'aviso'].index)
