@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ArrowLeft, LogOut } from 'lucide-react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router'
 import Logo from '@/components/common/Logo'
+import BotaoTema from '@/theme/BotaoTema'
 import { tokenStorage } from '@/auth/tokenStorage'
 import { useRetornoAoLogin } from '@/auth/useRetornoAoLogin'
 import { cadastrarNaApi, entrarNaApi } from '@/auth/api'
@@ -37,23 +38,26 @@ export default function AuthPage({ etapa }: { etapa: EtapaAuth }) {
           <Link to={rotaAuth('login', destino)} aria-label="V-Energy Grid 360">
             <Logo />
           </Link>
-          {temToken && (
-            <div className="auth-header-actions">
-              <button
-                type="button"
-                className="auth-back"
-                onClick={() => {
-                  tokenStorage.clear()
-                  navegar(rotaAuth('login', destino), { replace: true, state: null })
-                }}
-              >
-                <LogOut size={16} aria-hidden="true" /> Sair da conta
-              </button>
-              <Link to={destino} className="auth-back">
-                <ArrowLeft size={16} aria-hidden="true" /> Voltar ao portal
-              </Link>
-            </div>
-          )}
+          <div className="auth-header-actions">
+            <BotaoTema compacto />
+            {temToken && (
+              <>
+                <button
+                  type="button"
+                  className="auth-back"
+                  onClick={() => {
+                    tokenStorage.clear()
+                    navegar(rotaAuth('login', destino), { replace: true, state: null })
+                  }}
+                >
+                  <LogOut size={16} aria-hidden="true" /> Sair da conta
+                </button>
+                <Link to={destino} className="auth-back">
+                  <ArrowLeft size={16} aria-hidden="true" /> Voltar ao portal
+                </Link>
+              </>
+            )}
+          </div>
         </header>
         <div className="auth-toolbar">
           <nav className="auth-tabs" aria-label="Acesso à conta">
