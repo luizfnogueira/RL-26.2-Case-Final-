@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>App de serviço — Painel executivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --warm:#FBF3EC; --card:#FFFFFF; --ink:#1F2328; --ink-2:#5C646E; --ink-3:#8A9199;
+    --action:#FF5A36; --action-soft:#FFE7E0; --green:#177A4C; --green-soft:#DFF3E8;
+    --red:#C0392B; --red-soft:#FBE4E1; --rule:#EFE6DC;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{width:1440px;height:900px;overflow:hidden;background:var(--warm);color:var(--ink);
+    font-family:Manrope,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{height:900px;display:flex;flex-direction:column}
+
+  header{height:78px;display:flex;align-items:center;gap:26px;padding:0 40px;flex:none}
+  .brand{display:flex;align-items:center;gap:10px;margin-right:10px}
+  .mark{width:36px;height:36px;border-radius:12px;background:var(--action);display:grid;place-items:center}
+  .mark svg{width:18px;height:18px}
+  .brand b{font-size:16px;letter-spacing:.06em;font-weight:800;line-height:1}
+  .brand span{display:block;font-size:9px;letter-spacing:.2em;color:var(--ink-3);margin-top:3px;font-weight:600}
+  nav{display:flex;gap:6px;font-size:12.5px;font-weight:600}
+  nav a{color:var(--ink-2);text-decoration:none;padding:8px 13px;border-radius:999px}
+  nav a.on{background:#fff;color:var(--ink);box-shadow:0 2px 10px rgb(31 35 40 / .06)}
+  .user{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-2)}
+  .avatar{width:34px;height:34px;border-radius:50%;background:#F0E2D6;color:#8A5A3B;display:grid;place-items:center;font-size:11px;font-weight:700}
+
+  main{flex:1;padding:6px 40px 24px;display:flex;flex-direction:column;gap:16px;min-height:0}
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+  h1{font-size:38px;line-height:1.05;font-weight:800;letter-spacing:-.02em}
+  .sub{font-size:13px;color:var(--ink-2);margin-top:7px}
+  .head .cta{display:flex;gap:10px;align-items:center}
+  .btn{border-radius:999px;padding:11px 18px;font-family:inherit;font-size:12.5px;font-weight:700;border:0;background:var(--action);color:#fff}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--rule)}
+  .chips{display:flex;gap:8px}
+  .chip{background:#fff;border:1px solid var(--rule);border-radius:999px;padding:8px 13px;font-size:11.5px;color:var(--ink-2);font-weight:600}
+  .chip b{color:var(--ink)}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .kpi{background:var(--card);border-radius:18px;padding:16px 18px 15px;box-shadow:0 2px 12px rgb(31 35 40 / .04)}
+  .kpi .top{display:flex;justify-content:space-between;align-items:center}
+  .kpi .lbl{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+  .kpi .ico{width:26px;height:26px;border-radius:9px;background:#F6EFE7;display:grid;place-items:center}
+  .kpi .ico svg{width:13px;height:13px;stroke:var(--ink-2);fill:none;stroke-width:1.8}
+  .kpi .val{font-size:36px;font-weight:800;letter-spacing:-.025em;margin:10px 0 3px}
+  .kpi .val small{font-size:13px;font-weight:600;color:var(--ink-3);margin-left:3px;letter-spacing:0}
+  .kpi .foot{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-3)}
+  .pill{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px}
+  .pill.g{background:var(--green-soft);color:var(--green)}
+  .pill.r{background:var(--red-soft);color:var(--red)}
+
+  .lower{flex:1;display:grid;grid-template-columns:1fr 340px;gap:12px;min-height:0}
+  .card{background:var(--card);border-radius:20px;box-shadow:0 2px 12px rgb(31 35 40 / .04);padding:16px 18px 10px;display:flex;flex-direction:column;min-height:0}
+  .card h2{font-size:15px;font-weight:800;letter-spacing:-.01em}
+  .card .meta{font-size:11px;color:var(--ink-3);margin-top:2px}
+  .card svg{width:100%;flex:1;margin-top:6px}
+  .note{background:#FFF8F4;border-radius:16px;padding:15px 16px;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+  .note b{color:var(--ink)}
+  .note .go{margin-top:10px;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:var(--action)}
+  .side{display:flex;flex-direction:column;gap:12px;min-height:0}
+  .side .list{background:var(--card);border-radius:20px;box-shadow:0 2px 12px rgb(31 35 40 / .04);padding:14px 16px;flex:1}
+  .side .list h2{font-size:14px;font-weight:800;margin-bottom:8px}
+  .item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F5EEE6;font-size:12px}
+  .item:last-child{border-bottom:0}
+  .item .n{font-weight:700}
+  .item .d{font-size:10.5px;color:var(--ink-3)}
+  .item .v{font-weight:800;color:var(--red);font-size:12.5px}
+  footer{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3);padding:0 4px;letter-spacing:.03em}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l1-7Z" fill="#fff"/></svg></div>
+      <div><b>V-ENERGY</b><span>GRID 360</span></div>
+    </div>
+    <nav>
+      <a class="on" href="#">Painel</a><a href="#">Receita</a><a href="#">Unidades</a><a href="#">Fila</a><a href="#">Ordens</a><a href="#">Operação</a><a href="#">Assistente</a>
+    </nav>
+    <div class="user"><span>Henrique Duarte</span><div class="avatar">HD</div></div>
+  </header>
+
+  <main>
+    <div class="head">
+      <div>
+        <h1>Painel executivo</h1>
+        <div class="sub">Como está o negócio no período de jul/2025 a jun/2026, comparado a jul/2022 a jun/2023.</div>
+      </div>
+      <div class="cta">
+        <button class="btn ghost">Comparar recortes</button>
+        <button class="btn">Ver diagnóstico da receita</button>
+      </div>
+    </div>
+
+    <div class="chips">
+      <div class="chip">Período <b>P2 · jul/25–jun/26</b></div>
+      <div class="chip">Comparação <b>P1 · jul/22–jun/23</b></div>
+      <div class="chip">Recorte <b>Todos os municípios</b></div>
+    </div>
+
+    <div class="grid">
+      <div class="kpi"><div class="top"><div class="lbl">Receita faturada</div><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div>
+        <div class="val">R$ 284,7<small>mi</small></div><div class="foot"><span class="pill g">+8,0%</span> sobre P1 263,6 mi</div></div>
+      <div class="kpi"><div class="top"><div class="lbl">Volume faturado</div><div class="ico"><svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l1-7Z"/></svg></div></div>
+        <div class="val">394,4<small>GWh</small></div><div class="foot"><span class="pill r">−3,9%</span> sobre P1 410,4 GWh</div></div>
+      <div class="kpi"><div class="top"><div class="lbl">UCs ativas</div><div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg></div></div>
+        <div class="val">412.350</div><div class="foot"><span class="pill g">+3,4%</span> sobre P1 398.920</div></div>
+      <div class="kpi"><div class="top"><div class="lbl">Valor em aberto</div><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg></div></div>
+        <div class="val">R$ 12,8<small>mi</small></div><div class="foot"><span class="pill r">+27,9%</span> sobre P1 10,0 mi</div></div>
+      <div class="kpi"><div class="top"><div class="lbl">DEC médio</div><div class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div></div>
+        <div class="val">11,46<small>h/UC</small></div><div class="foot"><span class="pill g">−13,6%</span> sobre P1 13,27</div></div>
+      <div class="kpi"><div class="top"><div class="lbl">FEC médio</div><div class="ico"><svg viewBox="0 0 24 24"><path d="M4 18 10 6l4 12 6-12"/></svg></div></div>
+        <div class="val">6,00<small>int/UC</small></div><div class="foot"><span class="pill g">−13,7%</span> sobre P1 6,95</div></div>
+    </div>
+
+    <div class="lower">
+      <div class="card">
+        <h2>Receita e volume ao longo de 48 meses</h2>
+        <div class="meta">O reajuste homologado de 10,5% entra em mai/2025; o volume segue caindo.</div>
+        <svg viewBox="0 0 740 180" preserveAspectRatio="none">
+          <g stroke="#F3ECE4" stroke-width="1"><line x1="0" y1="36" x2="740" y2="36"/><line x1="0" y1="72" x2="740" y2="72"/><line x1="0" y1="108" x2="740" y2="108"/><line x1="0" y1="144" x2="740" y2="144"/></g>
+          <path d="M0 140 L41 134 L82 129 L123 121 L164 125 L205 114 L246 107 L287 102 L328 98 L369 104 L410 110 L451 103 L492 94 L533 86 L574 90 L615 78 L656 71 L697 64 L740 57" fill="none" stroke="#FF5A36" stroke-width="3"/>
+          <path d="M0 92 L41 88 L82 86 L123 84 L164 85 L205 82 L246 84 L287 86 L328 88 L369 91 L410 95 L451 99 L492 104 L533 108 L574 114 L615 120 L656 126 L697 132 L740 138" fill="none" stroke="#1F2328" stroke-width="2.4" stroke-dasharray="7 5"/>
+        </svg>
+      </div>
+      <div class="side">
+        <div class="note">A receita subiu <b>8,0%</b> com <b>3,9%</b> menos energia vendida. O reajuste explica o preço; a queda de volume pede ação por território.</div>
+        <div class="list">
+          <h2>Onde o volume caiu mais</h2>
+          <div class="item"><div><div class="n">Jaboatão dos Guararapes</div><div class="d">52.912 UCs</div></div><div class="v">−9,4%</div></div>
+          <div class="item"><div><div class="n">Olinda</div><div class="d">58.204 UCs</div></div><div class="v">−5,1%</div></div>
+          <div class="item"><div><div class="n">Ipojuca</div><div class="d">18.702 UCs</div></div><div class="v">−4,3%</div></div>
+          <div class="item"><div><div class="n">Recife · Boa Vista</div><div class="d">49.939 UCs</div></div><div class="v">−2,6%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <footer><span>Dado fictício · Gold exportada em 28/10/2026</span><span>Os filtros ficam na URL</span></footer>
+  </main>
+</div>
+</body>
+</html>

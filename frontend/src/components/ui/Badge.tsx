@@ -10,11 +10,11 @@ type Props = ComponentProps<'span'> & {
 }
 
 const VARIANTES: Record<VarianteBadge, { caixa: string; ponto: string }> = {
-  neutro: { caixa: 'bg-surface-alt text-ink', ponto: 'bg-ink-3' },
-  info: { caixa: 'bg-azul-50 text-teal-profundo', ponto: 'bg-teal' },
-  sucesso: { caixa: 'bg-sucesso-suave text-sucesso-texto', ponto: 'bg-lima-escuro' },
-  alerta: { caixa: 'bg-alerta-suave text-alerta-escuro', ponto: 'bg-alerta' },
-  perigo: { caixa: 'bg-perigo-suave text-perigo-escuro', ponto: 'bg-perigo' },
+  neutro: { caixa: 'border-borda bg-surface-alt text-ink-2', ponto: 'bg-ink-3' },
+  info: { caixa: 'border-teal/25 bg-azul-50 text-teal-profundo', ponto: 'bg-teal' },
+  sucesso: { caixa: 'border-sucesso-texto/20 bg-sucesso-suave text-sucesso-texto', ponto: 'bg-sucesso-texto' },
+  alerta: { caixa: 'border-alerta/30 bg-alerta-suave text-alerta-escuro', ponto: 'bg-alerta' },
+  perigo: { caixa: 'border-perigo/25 bg-perigo-suave text-perigo-escuro', ponto: 'bg-perigo' },
 }
 
 /** Etiqueta de status, motivo ou categoria. A cor nunca é a única pista: sempre leva texto. */
@@ -29,7 +29,7 @@ export default function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-legenda font-normal whitespace-nowrap',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-legenda font-medium whitespace-nowrap',
         estilo.caixa,
         className,
       )}

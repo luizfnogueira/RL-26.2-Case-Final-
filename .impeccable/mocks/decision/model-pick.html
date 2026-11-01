@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Atlas da rede — Painel executivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B2239; --navy-2:#16344F; --paper:#F2F4F1; --card:#FFFFFF;
+    --ink:#12212E; --ink-2:#55636E; --ink-3:#7C8993;
+    --green:#12A36B; --green-soft:#D8F0E4; --magenta:#E23E57; --blue:#2D7FF9;
+    --rule:#D9DEDA;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{width:1440px;height:900px;overflow:hidden;background:var(--paper);color:var(--ink);
+    font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{display:flex;flex-direction:column;height:900px}
+
+  header{height:70px;background:var(--navy);color:#E8EEF3;display:flex;align-items:center;gap:34px;padding:0 26px;flex:none}
+  .brand{display:flex;align-items:center;gap:10px;min-width:190px}
+  .mark{width:32px;height:32px;border:1.5px solid var(--green);display:grid;place-items:center}
+  .mark svg{width:16px;height:16px}
+  .brand b{font-family:'Archivo Narrow';font-size:17px;letter-spacing:.14em;font-weight:700;line-height:1}
+  .brand span{font-size:9px;letter-spacing:.26em;color:#8FA6B8;display:block;margin-top:4px}
+  nav{display:flex;gap:22px;font-size:12.5px;letter-spacing:.01em}
+  nav a{color:#9FB3C3;text-decoration:none;padding:6px 0;position:relative}
+  nav a.on{color:#fff}
+  nav a.on:after{content:"";position:absolute;left:0;right:0;bottom:-8px;height:2px;background:var(--green)}
+  .user{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:11.5px;color:#C6D4DF}
+  .avatar{width:28px;height:28px;border-radius:50%;background:var(--navy-2);display:grid;place-items:center;font-size:10px;color:#fff}
+
+  /* faixa de território */
+  .strip{height:58px;background:var(--card);border-bottom:1px solid var(--rule);display:flex;flex:none}
+  .strip .lab{width:236px;padding:9px 18px;border-right:1px solid var(--rule);flex:none;overflow:hidden}
+  .strip .lab b{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+  .strip .lab span{font-size:12px;font-weight:600}
+  .seg{flex:1;position:relative;border-right:1px solid #EDF0EC;padding:9px 9px 7px;display:flex;flex-direction:column;justify-content:space-between;background:var(--card)}
+  .seg b{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);white-space:nowrap;overflow:hidden}
+  .seg span{font-size:9.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden}
+  .seg.hot{background:#FADDE2}
+  .seg.hot b,.seg.hot span{color:#A32A3D}
+  .seg.warm{background:#FBF0DA}
+  .seg.warm b,.seg.warm span{color:#7A5A12}
+
+  main{flex:1;display:grid;grid-template-columns:1fr 520px;gap:20px;padding:20px 26px 16px;min-height:0}
+  .left{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}
+  h1{font-family:'Archivo Narrow';font-size:42px;line-height:.95;font-weight:700;letter-spacing:-.01em}
+  .sub{font-size:12px;color:var(--ink-2);margin-top:6px}
+  .periods{display:flex;gap:6px}
+  .periods div{border:1px solid var(--rule);background:var(--card);padding:6px 10px;font-size:11px;color:var(--ink-2)}
+  .periods div.on{border-color:var(--navy);color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--green)}
+
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
+  .kpi{background:var(--card);padding:13px 14px 12px}
+  .kpi .lbl{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)}
+  .kpi .val{font-family:'Archivo Narrow';font-size:33px;font-weight:700;line-height:1.05;margin-top:7px;letter-spacing:-.01em}
+  .kpi .val small{font-family:Archivo;font-size:12px;font-weight:500;color:var(--ink-2);margin-left:3px;letter-spacing:0}
+  .delta{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;margin-top:5px}
+  .delta svg{width:11px;height:11px;fill:currentColor}
+  .delta.pos{color:var(--green)} .delta.neg{color:var(--magenta)}
+
+  .chart{flex:1;background:var(--card);border:1px solid var(--rule);padding:12px 16px 8px;display:flex;flex-direction:column;min-height:0}
+  .chart .ch{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .chart h2{font-family:'Archivo Narrow';font-size:18px;font-weight:700;letter-spacing:.01em}
+  .chart .meta{font-size:10.5px;color:var(--ink-3)}
+  .chart svg{width:100%;flex:1}
+
+  .map{background:var(--card);border:1px solid var(--rule);display:flex;flex-direction:column;min-height:0}
+  .map .mh{padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:baseline}
+  .map .mh h2{font-family:'Archivo Narrow';font-size:18px;font-weight:700}
+  .map .mh span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .map .canvas{flex:1;position:relative;background:#EDF1EC}
+  .map .canvas svg{width:100%;height:100%;display:block}
+  .pin{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;color:var(--navy);background:rgb(255 255 255 / .82);padding:2px 5px;white-space:nowrap}
+  .pin i{width:9px;height:9px;border-radius:50%;background:var(--magenta);box-shadow:0 0 0 3px #fff}
+  .map .foot{border-top:1px solid var(--rule);padding:11px 16px;display:flex;justify-content:space-between;align-items:center}
+  .map .foot .sel{font-size:11px;color:var(--ink-2)}
+  .map .foot .sel b{display:block;font-size:15px;color:var(--ink)}
+  .map .foot .go{background:var(--navy);color:#fff;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:8px 11px;font-weight:600}
+
+  footer{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:10px;color:var(--ink-3);letter-spacing:.05em;flex:none}
+  .seal{border:1px solid var(--rule);padding:2px 7px;text-transform:uppercase;letter-spacing:.14em;font-size:9px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l1-7Z" fill="#12A36B"/></svg></div>
+      <div><b>V-ENERGY</b><span>GRID 360</span></div>
+    </div>
+    <nav>
+      <a class="on" href="#">Painel</a><a href="#">Receita</a><a href="#">Unidades</a><a href="#">Fila</a><a href="#">Ordens</a><a href="#">Operação</a><a href="#">Assistente</a>
+    </nav>
+    <div class="user"><span>Henrique Duarte · Diretor Comercial</span><div class="avatar">HD</div></div>
+  </header>
+
+  <div class="strip">
+    <div class="lab"><b>Território</b><span>14 municípios · por UCs</span></div>
+    <div class="seg"><b>Recife</b><span>171,4 mil UCs</span></div>
+    <div class="seg"><b>Olinda</b><span>58,2 mil</span></div>
+    <div class="seg"><b>Jaboatão</b><span>52,9 mil</span></div>
+    <div class="seg"><b>Paulista</b><span>44,1 mil</span></div>
+    <div class="seg"><b>Cabo</b><span>29,3 mil</span></div>
+    <div class="seg hot"><b>Ipojuca</b><span>18,7 mil · −4,3%</span></div>
+    <div class="seg"><b>Camaragibe</b><span>15,2 mil</span></div>
+    <div class="seg warm"><b>S. Lourenço</b><span>10,8 mil · −2,1%</span></div>
+    <div class="seg"><b>+6</b><span>11,7 mil</span></div>
+  </div>
+
+  <main>
+    <div class="left">
+      <div class="head">
+        <div>
+          <h1>Painel executivo</h1>
+          <div class="sub">Recorte: todos os municípios · 412.350 UCs ativas</div>
+        </div>
+        <div class="periods">
+          <div class="on">P2 jul/25–jun/26</div>
+          <div>P1 jul/22–jun/23</div>
+          <div>Comparar</div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">Receita faturada</div><div class="val">R$ 284,7<small>mi</small></div><div class="delta pos"><svg viewBox="0 0 12 12"><path d="M6 1 11 9H1z"/></svg>+8,0% · P1 263,6 mi</div></div>
+        <div class="kpi"><div class="lbl">Volume faturado</div><div class="val">394,4<small>GWh</small></div><div class="delta neg"><svg viewBox="0 0 12 12"><path d="M6 11 1 3h10z"/></svg>−3,9% · P1 410,4 GWh</div></div>
+        <div class="kpi"><div class="lbl">UCs ativas</div><div class="val">412.350</div><div class="delta pos"><svg viewBox="0 0 12 12"><path d="M6 1 11 9H1z"/></svg>+3,4% · P1 398.920</div></div>
+        <div class="kpi"><div class="lbl">Valor em aberto</div><div class="val">R$ 12,8<small>mi</small></div><div class="delta neg"><svg viewBox="0 0 12 12"><path d="M6 1 11 9H1z"/></svg>+27,9% · piora</div></div>
+        <div class="kpi"><div class="lbl">DEC médio</div><div class="val">11,46<small>h/UC</small></div><div class="delta pos"><svg viewBox="0 0 12 12"><path d="M6 11 1 3h10z"/></svg>−13,6% · melhora</div></div>
+        <div class="kpi"><div class="lbl">FEC médio</div><div class="val">6,00<small>int/UC</small></div><div class="delta pos"><svg viewBox="0 0 12 12"><path d="M6 11 1 3h10z"/></svg>−13,7% · melhora</div></div>
+      </div>
+
+      <div class="chart">
+        <div class="ch"><h2>Receita e volume · 48 meses</h2><span class="meta">reajuste homologado de 10,5% em mai/2025 · queda de volume marcada</span></div>
+        <svg viewBox="0 0 760 190" preserveAspectRatio="none">
+          <g stroke="#E7EBE7" stroke-width="1"><line x1="0" y1="40" x2="760" y2="40"/><line x1="0" y1="80" x2="760" y2="80"/><line x1="0" y1="120" x2="760" y2="120"/><line x1="0" y1="160" x2="760" y2="160"/></g>
+          <rect x="560" y="0" width="200" height="190" fill="#FADDE2" opacity=".5"/>
+          <path d="M0 150 L40 143 L80 138 L120 128 L160 133 L200 120 L240 111 L280 106 L320 100 L360 107 L400 115 L440 108 L480 96 L520 88 L560 92 L600 78 L640 70 L680 62 L720 55 L760 48" fill="none" stroke="#12A36B" stroke-width="2.4"/>
+          <path d="M0 96 L40 92 L80 90 L120 88 L160 89 L200 86 L240 88 L280 90 L320 92 L360 95 L400 99 L440 103 L480 108 L520 112 L560 118 L600 124 L640 130 L680 136 L720 142 L760 148" fill="none" stroke="#2D7FF9" stroke-width="2.4" stroke-dasharray="6 4"/>
+          <line x1="560" y1="0" x2="560" y2="190" stroke="#E23E57" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="566" y="14" font-family="Archivo" font-size="10" fill="#E23E57">reajuste 10,5%</text>
+        </svg>
+      </div>
+    </div>
+
+    <aside class="map">
+      <div class="mh"><h2>Onde a receita cresce sem volume</h2><span>por UC</span></div>
+      <div class="canvas">
+        <svg viewBox="0 0 520 470" preserveAspectRatio="none">
+          <path d="M30 300 L70 190 L150 150 L230 175 L300 140 L390 165 L455 240 L470 330 L400 380 L300 400 L190 385 L100 360 Z" fill="#DCE9DC" stroke="#B9CDBB" stroke-width="1"/>
+          <path d="M150 150 L230 175 L245 260 L175 285 L140 225 Z" fill="#C9E6D5" stroke="#9EC4AC" stroke-width="1"/>
+          <path d="M245 260 L230 175 L300 140 L360 200 L330 285 Z" fill="#EFD9DD" stroke="#D6AAB1" stroke-width="1"/>
+          <path d="M330 285 L360 200 L390 165 L455 240 L470 330 L400 380 L330 350 Z" fill="#DCE9DC" stroke="#B9CDBB" stroke-width="1"/>
+          <path d="M175 285 L245 260 L330 285 L330 350 L250 380 L190 385 Z" fill="#CFE8DA" stroke="#9EC4AC" stroke-width="1"/>
+          <g fill="none" stroke="#2D7FF9" stroke-width="1.2" opacity=".85">
+            <path d="M70 250 C160 220 240 250 320 200 S430 170 470 210"/>
+            <path d="M60 320 C150 300 220 330 300 300 S420 270 462 300"/>
+            <path d="M120 180 C170 240 210 300 240 380"/>
+          </g>
+          <circle cx="410" cy="270" r="4" fill="#2D7FF9"/>
+          <circle cx="120" cy="300" r="4" fill="#2D7FF9"/>
+        </svg>
+        <div class="pin" style="left:270px;top:240px"><i></i>Recife · 171,4 mil UCs</div>
+        <div class="pin" style="left:120px;top:300px"><i></i>Jaboatão · −6,2% volume</div>
+      </div>
+      <div class="foot">
+        <div class="sel">Selecionado<b>Recife · Boa Vista</b></div>
+        <div class="go">Abrir recorte →</div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <span class="seal">Dado fictício</span>
+    <span>Origem: gold.dashboard · manifesto 28/10/2026 · legenda: verde receita, azul volume, magenta pior valor</span>
+  </footer>
+</div>
+</body>
+</html>

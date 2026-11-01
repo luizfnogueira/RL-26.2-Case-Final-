@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Sinalização de terminal — Painel executivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700&family=Fira+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --yellow:#FFD100; --black:#111111; --white:#FFFFFF; --grey:#2D2D2D;
+    --paper:#F4F4F2; --ink:#111111; --ink-2:#4B4B4B; --ink-3:#777777; --rule:#DADAD5;
+    --red:#D32F2F; --green:#1F7A45;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{width:1440px;height:900px;overflow:hidden;background:var(--paper);color:var(--ink);
+    font-family:'Fira Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:212px 1fr;height:900px}
+
+  .rail{background:var(--black);color:#fff;display:flex;flex-direction:column;padding:20px 0}
+  .brand{display:flex;gap:10px;align-items:center;padding:0 18px 22px}
+  .mark{width:30px;height:30px;background:var(--yellow);display:grid;place-items:center;flex:none}
+  .mark svg{width:16px;height:16px}
+  .brand b{font-family:'Fira Sans Condensed';font-size:17px;letter-spacing:.12em;font-weight:700;line-height:1}
+  .brand span{display:block;font-size:9px;letter-spacing:.24em;color:#9A9A9A;margin-top:3px}
+  nav{display:flex;flex-direction:column}
+  nav a{display:flex;align-items:center;gap:12px;padding:12px 18px;color:#CFCFCF;text-decoration:none;font-size:13px}
+  nav a svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;flex:none}
+  nav a.on{background:var(--yellow);color:var(--black);font-weight:600}
+  .rail .spacer{flex:1}
+  .rail .who{padding:14px 18px 0;border-top:1px solid #2E2E2E;margin:0 12px;font-size:11px;color:#BDBDBD}
+  .rail .who b{display:block;color:#fff;font-size:12px}
+
+  main{padding:0 0 0 0;display:flex;flex-direction:column;min-width:0}
+
+  /* faixa de decisão */
+  .band{background:var(--yellow);height:104px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;flex:none}
+  .band .t{font-family:'Fira Sans Condensed';font-size:46px;font-weight:700;line-height:.95;letter-spacing:-.01em;text-transform:uppercase}
+  .band .t small{display:block;font-family:'Fira Sans';font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;color:#3A3200}
+  .band .next{display:flex;align-items:center;gap:14px;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;text-align:right}
+  .band .next svg{width:34px;height:34px;stroke:var(--black);fill:none;stroke-width:2}
+
+  .filters{height:54px;display:flex;align-items:center;gap:10px;padding:0 30px;border-bottom:1px solid var(--rule);background:var(--white);flex:none}
+  .filters .f{border:1px solid #C9C9C4;padding:6px 10px;font-size:11.5px;display:flex;gap:8px;align-items:center}
+  .filters .f span{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .filters .f b{font-weight:600}
+  .filters .sp{flex:1}
+  .filters .act{background:var(--black);color:#fff;padding:8px 13px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+
+  .work{flex:1;display:grid;grid-template-columns:1fr 400px;gap:0;min-height:0}
+  .left{padding:20px 26px 0 30px;display:flex;flex-direction:column;gap:14px;min-width:0}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--black);border-left:1px solid var(--rule)}
+  .kpi{border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:14px 16px 12px;background:var(--white)}
+  .kpi .lbl{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)}
+  .kpi .val{font-family:'Fira Sans Condensed';font-size:50px;line-height:1;font-weight:700;letter-spacing:-.015em;margin:8px 0 4px}
+  .kpi .val small{font-family:'Fira Sans';font-size:13px;font-weight:500;color:var(--ink-2);margin-left:3px;letter-spacing:0}
+  .kpi .var{font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:5px}
+  .kpi .var svg{width:12px;height:12px;fill:currentColor}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+
+  .chart{flex:1;background:var(--white);border:1px solid var(--rule);padding:12px 16px 8px;display:flex;flex-direction:column;min-height:0}
+  .chart .ch{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+  .chart h2{font-family:'Fira Sans Condensed';font-size:19px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .chart .ch span{font-size:10.5px;color:var(--ink-3)}
+  .chart svg{width:100%;flex:1}
+
+  aside{border-left:1px solid var(--rule);background:var(--white);display:flex;flex-direction:column}
+  .aside-h{padding:14px 20px;border-bottom:1px solid var(--rule)}
+  .aside-h b{font-family:'Fira Sans Condensed';font-size:18px;text-transform:uppercase;letter-spacing:.04em}
+  .aside-h span{display:block;font-size:10.5px;color:var(--ink-3);margin-top:2px}
+  .row{padding:12px 20px;border-bottom:1px solid #EDEDE9;display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .row .n{font-size:12.5px;font-weight:600}
+  .row .d{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+  .row .v{font-family:'Fira Sans Condensed';font-size:20px;font-weight:700;color:var(--red)}
+  .aside-foot{margin-top:auto;background:var(--black);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+  .aside-foot svg{width:20px;height:20px;stroke:var(--yellow);fill:none;stroke-width:2}
+  footer{height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 30px;font-size:10px;color:var(--ink-3);letter-spacing:.06em;flex:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l1-7Z" fill="#111"/></svg></div>
+      <div><b>V-ENERGY</b><span>GRID 360</span></div>
+    </div>
+    <nav>
+      <a class="on" href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Painel</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8"/></svg>Receita</a>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Unidades</a>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Fila</a>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="17"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Ordens</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Operação</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>Assistente</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="who"><b>Henrique Duarte</b>Diretor Comercial</div>
+  </aside>
+
+  <main>
+    <div class="band">
+      <div class="t"><small>Você está em · Painel executivo</small>Saúde do negócio</div>
+      <div class="next">Diagnóstico da receita
+        <svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="f"><span>Período</span><b>P2 jul/25–jun/26</b></div>
+      <div class="f"><span>Base</span><b>P1 jul/22–jun/23</b></div>
+      <div class="f"><span>Recorte</span><b>Todos os municípios</b></div>
+      <div class="sp"></div>
+      <div class="act">Comparar recortes</div>
+    </div>
+
+    <div class="work">
+      <div class="left">
+        <div class="grid">
+          <div class="kpi"><div class="lbl">Receita faturada</div><div class="val">R$ 284,7<small>mi</small></div><div class="var pos"><svg viewBox="0 0 12 12"><path d="M6 1 11 9H1z"/></svg>+8,0% vs P1</div></div>
+          <div class="kpi"><div class="lbl">Volume faturado</div><div class="val">394,4<small>GWh</small></div><div class="var neg"><svg viewBox="0 0 12 12"><path d="M6 11 1 3h10z"/></svg>−3,9% vs P1</div></div>
+          <div class="kpi"><div class="lbl">UCs ativas</div><div class="val">412.350</div><div class="var pos"><svg viewBox="0 0 12 12"><path d="M6 1 11 9H1z"/></svg>+3,4% vs P1</div></div>
+          <div class="kpi"><div class="lbl">Valor em aberto</div><div class="val">R$ 12,8<small>mi</small></div><div class="var neg"><svg viewBox="0 0 12 12"><path d="M6 1 11 9H1z"/></svg>+27,9% · piora</div></div>
+          <div class="kpi"><div class="lbl">DEC médio</div><div class="val">11,46<small>h/UC</small></div><div class="var pos"><svg viewBox="0 0 12 12"><path d="M6 11 1 3h10z"/></svg>−13,6% · melhora</div></div>
+          <div class="kpi"><div class="lbl">FEC médio</div><div class="val">6,00<small>int/UC</small></div><div class="var pos"><svg viewBox="0 0 12 12"><path d="M6 11 1 3h10z"/></svg>−13,7% · melhora</div></div>
+        </div>
+
+        <div class="chart">
+          <div class="ch"><h2>Receita × volume · 48 meses</h2><span>a partir de mai/2025 o reajuste de 10,5% separa as curvas</span></div>
+          <svg viewBox="0 0 720 170" preserveAspectRatio="none">
+            <g stroke="#ECECE7" stroke-width="1"><line x1="0" y1="34" x2="720" y2="34"/><line x1="0" y1="68" x2="720" y2="68"/><line x1="0" y1="102" x2="720" y2="102"/><line x1="0" y1="136" x2="720" y2="136"/></g>
+            <path d="M0 130 L40 124 L80 120 L120 112 L160 116 L200 105 L240 98 L280 94 L320 90 L360 96 L400 102 L440 96 L480 86 L520 78 L560 82 L600 70 L640 63 L680 56 L720 50" fill="none" stroke="#111" stroke-width="2.4"/>
+            <path d="M0 84 L40 80 L80 78 L120 76 L160 77 L200 74 L240 76 L280 78 L320 80 L360 83 L400 87 L440 91 L480 96 L520 100 L560 106 L600 112 L640 118 L680 124 L720 130" fill="none" stroke="#FFD100" stroke-width="8"/>
+            <path d="M0 84 L40 80 L80 78 L120 76 L160 77 L200 74 L240 76 L280 78 L320 80 L360 83 L400 87 L440 91 L480 96 L520 100 L560 106 L600 112 L640 118 L680 124 L720 130" fill="none" stroke="#111" stroke-width="1.6"/>
+            <line x1="530" y1="0" x2="530" y2="170" stroke="#D32F2F" stroke-width="1" stroke-dasharray="3 3"/>
+          </svg>
+        </div>
+      </div>
+
+      <aside>
+        <div class="aside-h"><b>Para onde ir</b><span>municípios com maior queda de volume</span></div>
+        <div class="row"><div><div class="n">Jaboatão dos Guararapes</div><div class="d">52.912 UCs · receita +6,1%</div></div><div class="v">−9,4%</div></div>
+        <div class="row"><div><div class="n">Recife · Boa Vista</div><div class="d">49.939 UCs · receita +8,9%</div></div><div class="v">−2,6%</div></div>
+        <div class="row"><div><div class="n">Olinda</div><div class="d">58.204 UCs · receita +5,8%</div></div><div class="v">−5,1%</div></div>
+        <div class="row"><div><div class="n">Ipojuca</div><div class="d">18.702 UCs · receita +7,4%</div></div><div class="v">−4,3%</div></div>
+        <div class="aside-foot">Abrir fila de inspeção
+          <svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+        </div>
+      </aside>
+    </div>
+    <footer><span>Dado fictício</span><span>Gold exportada em 28/10/2026 · filtros na URL</span></footer>
+  </main>
+</div>
+</body>
+</html>

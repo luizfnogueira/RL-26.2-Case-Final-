@@ -34,14 +34,19 @@ function Fala({
   children: ReactNode
 }) {
   return (
-    <div className="flex items-start gap-2.5">
+    <div className="flex w-full items-start gap-3">
       <span
         aria-hidden="true"
         className={cx('mt-0.5 grid size-8 shrink-0 place-items-center rounded-full', AVATAR[tom])}
       >
         {icone}
       </span>
-      <div className={cx('min-w-0 rounded-[14px] px-3.5 py-2.5 text-corpo', BALAO[tom])}>
+      <div
+        className={cx(
+          'min-w-0 max-w-[min(100%,42rem)] rounded-[16px] rounded-bl-xs px-4 py-3 text-corpo',
+          BALAO[tom],
+        )}
+      >
         {children}
       </div>
     </div>

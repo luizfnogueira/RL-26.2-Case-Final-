@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Talão de ordens — Painel executivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16264A; --red:#D22630; --carbon:#6B4FA0; --stock:#F0E7D2; --white:#FFFFFF;
+    --ink:#1B2230; --ink-2:#55606F; --ink-3:#7A8492; --rule:#D8CFB8; --rule-2:#E7E0CE;
+    --green:#1F7A45;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{width:1440px;height:900px;overflow:hidden;background:var(--stock);color:var(--ink);
+    font-family:'Libre Franklin',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:224px 1fr;height:900px}
+
+  .rail{background:var(--navy);color:#E9EDF5;display:flex;flex-direction:column;padding:20px 0}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 18px 22px}
+  .mark{width:32px;height:32px;border-radius:50%;background:var(--red);display:grid;place-items:center;flex:none}
+  .mark svg{width:16px;height:16px}
+  .brand b{font-family:Oswald;font-size:17px;letter-spacing:.14em;font-weight:600;line-height:1}
+  .brand span{display:block;font-size:9px;letter-spacing:.26em;color:#8FA0BE;margin-top:4px}
+  nav{display:flex;flex-direction:column;gap:1px;padding:0 10px}
+  nav a{display:flex;gap:11px;align-items:center;padding:10px 11px;color:#B9C4D8;text-decoration:none;font-size:12.5px;border-radius:3px}
+  nav a svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;flex:none}
+  nav a.on{background:var(--white);color:var(--navy);font-weight:600;position:relative}
+  nav a.on:before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:4px;background:var(--red)}
+  .rail .spacer{flex:1}
+  .rail .who{border-top:1px solid #2B3B5E;margin:0 16px;padding:13px 2px 0;font-size:10.5px;color:#93A2BC}
+  .rail .who b{display:block;color:#fff;font-size:12px;margin-bottom:2px}
+
+  main{padding:20px 26px 14px;display:flex;flex-direction:column;gap:14px;min-width:0}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}
+  h1{font-family:Oswald;font-size:40px;line-height:.95;font-weight:600;letter-spacing:.01em;text-transform:uppercase}
+  .sub{font-size:11.5px;color:var(--ink-2);margin-top:6px;letter-spacing:.02em}
+  .tabs{display:flex;gap:6px;align-items:flex-end}
+  .tabs .t{background:var(--white);border:1px solid var(--rule);border-bottom:0;padding:7px 12px 6px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+  .tabs .t.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .tabs .act{background:var(--red);color:#fff;padding:8px 13px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+
+  /* canhotos */
+  .coupons{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .coupon{background:var(--white);position:relative;padding:0 0 12px;border:1px solid var(--rule)}
+  .coupon .tab{background:var(--navy);color:#fff;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+    padding:5px 12px;display:flex;justify-content:space-between}
+  .coupon .tab i{font-style:normal;color:#A9B8D4;letter-spacing:.04em}
+  .coupon .body{padding:11px 14px 0}
+  .coupon .val{font-family:Oswald;font-size:40px;line-height:1;font-weight:500;color:var(--carbon);letter-spacing:.01em}
+  .coupon .val small{font-family:'Libre Franklin';font-size:12px;color:var(--ink-2);font-weight:500;margin-left:3px}
+  .coupon .line{margin-top:8px;border-top:1px dashed var(--rule);padding-top:7px;font-size:10.5px;color:var(--ink-3);
+    display:flex;justify-content:space-between;letter-spacing:.02em}
+  .coupon .line b{color:var(--ink);font-weight:600}
+  .coupon .stamp{position:absolute;right:12px;bottom:34px;border:1.5px solid var(--red);color:var(--red);
+    font-size:10px;font-weight:700;letter-spacing:.14em;padding:3px 7px;transform:rotate(-4deg);opacity:.85}
+  .coupon .stamp.ok{border-color:var(--green);color:var(--green)}
+  .coupon:after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;
+    background:radial-gradient(circle at 5px 7px, var(--stock) 3px, transparent 3.5px) repeat-x;background-size:10px 7px}
+
+  /* histórico */
+  .chart{flex:1;background:var(--white);border:1px solid var(--rule);padding:12px 16px 8px;display:flex;flex-direction:column;min-height:0}
+  .chart .ch{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+  .chart h2{font-family:Oswald;font-size:18px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .chart .ch span{font-size:10px;color:var(--ink-3);letter-spacing:.04em}
+  .chart svg{width:100%;flex:1}
+
+  .strip{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;padding:9px 14px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+  .strip b{color:#FFD9A8;font-weight:600}
+  footer{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l1-7Z" fill="#fff"/></svg></div>
+      <div><b>V-ENERGY</b><span>GRID 360</span></div>
+    </div>
+    <nav>
+      <a class="on" href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Painel</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8"/></svg>Receita</a>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Unidades</a>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Fila</a>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="17"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Ordens</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Operação</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>Assistente</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="who"><b>Henrique Duarte</b>Diretor Comercial</div>
+  </aside>
+
+  <main>
+    <div class="head">
+      <div>
+        <h1>Painel executivo</h1>
+        <div class="sub">Talão de competência · P2 jul/2025 – jun/2026 contra P1 jul/2022 – jun/2023</div>
+      </div>
+      <div class="tabs">
+        <div class="t on">Competência P2</div>
+        <div class="t">Base P1</div>
+        <div class="t">Recorte: todos</div>
+        <div class="act">Comparar recortes</div>
+      </div>
+    </div>
+
+    <div class="coupons">
+      <div class="coupon">
+        <div class="tab"><span>Receita faturada</span><i>com tributos</i></div>
+        <div class="body"><div class="val">R$ 284,7<small>mi</small></div>
+          <div class="line"><span>P1 263,6 mi</span><b>+21,1 mi</b></div></div>
+        <div class="stamp ok">+8,0%</div>
+      </div>
+      <div class="coupon">
+        <div class="tab"><span>Volume faturado</span><i>energia</i></div>
+        <div class="body"><div class="val">394,4<small>GWh</small></div>
+          <div class="line"><span>P1 410,4 GWh</span><b>−16,0 GWh</b></div></div>
+        <div class="stamp">−3,9%</div>
+      </div>
+      <div class="coupon">
+        <div class="tab"><span>UCs ativas</span><i>cadastro</i></div>
+        <div class="body"><div class="val">412.350</div>
+          <div class="line"><span>P1 398.920</span><b>+13.430</b></div></div>
+        <div class="stamp ok">+3,4%</div>
+      </div>
+      <div class="coupon">
+        <div class="tab"><span>Valor em aberto</span><i>inadimplência</i></div>
+        <div class="body"><div class="val">R$ 12,8<small>mi</small></div>
+          <div class="line"><span>P1 10,0 mi</span><b>+2,8 mi</b></div></div>
+        <div class="stamp">+27,9%</div>
+      </div>
+      <div class="coupon">
+        <div class="tab"><span>DEC médio</span><i>continuidade</i></div>
+        <div class="body"><div class="val">11,46<small>h/UC</small></div>
+          <div class="line"><span>P1 13,27 h/UC</span><b>−1,81</b></div></div>
+        <div class="stamp ok">−13,6%</div>
+      </div>
+      <div class="coupon">
+        <div class="tab"><span>FEC médio</span><i>continuidade</i></div>
+        <div class="body"><div class="val">6,00<small>int/UC</small></div>
+          <div class="line"><span>P1 6,95 int/UC</span><b>−0,95</b></div></div>
+        <div class="stamp ok">−13,7%</div>
+      </div>
+    </div>
+
+    <div class="chart">
+      <div class="ch"><h2>Bilhete de 48 meses</h2><span>receita em carbono · volume em vermelho · reajuste marcado</span></div>
+      <svg viewBox="0 0 900 168" preserveAspectRatio="none">
+        <g stroke="#EFE9DA" stroke-width="1"><line x1="0" y1="34" x2="900" y2="34"/><line x1="0" y1="68" x2="900" y2="68"/><line x1="0" y1="102" x2="900" y2="102"/><line x1="0" y1="136" x2="900" y2="136"/></g>
+        <path d="M0 132 L50 126 L100 121 L150 113 L200 117 L250 106 L300 99 L350 94 L400 90 L450 96 L500 103 L550 96 L600 87 L650 79 L700 83 L750 71 L800 64 L850 57 L900 50" fill="none" stroke="#6B4FA0" stroke-width="2.6"/>
+        <path d="M0 86 L50 82 L100 80 L150 78 L200 79 L250 76 L300 78 L350 80 L400 82 L450 85 L500 89 L550 93 L600 98 L650 102 L700 108 L750 114 L800 120 L850 126 L900 132" fill="none" stroke="#D22630" stroke-width="2.6" stroke-dasharray="8 4"/>
+        <line x1="660" y1="0" x2="660" y2="168" stroke="#16264A" stroke-width="1" stroke-dasharray="4 4"/>
+      </svg>
+    </div>
+
+    <div class="strip"><span>Leitura do período: <b>a receita cresceu 8,0% e o volume caiu 3,9%</b></span><span>Abrir diagnóstico →</span></div>
+    <footer><span>Dado fictício · origem gold.dashboard · manifesto 28/10/2026</span><span>Filtros na URL</span></footer>
+  </main>
+</div>
+</body>
+</html>

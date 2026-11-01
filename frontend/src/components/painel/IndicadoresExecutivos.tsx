@@ -1,13 +1,23 @@
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import type { IndicadoresDashboard } from '@/types/dashboard'
-import { formatarPercentual } from '@/utils/formatacao'
 import { cx } from '@/utils/cx'
+import { formatarPercentual } from '@/utils/formatacao'
+import { formatarPeriodo } from '@/utils/periodos'
 import { ORDEM_KPIS, valorExecutivo } from './indicadores'
 
 type Props = { indicadores: IndicadoresDashboard }
 
+const percentual = new Intl.NumberFormat('pt-BR', {
+  maximumFractionDigits: 2,
+  signDisplay: 'exceptZero',
+})
+
+/**
+ * Cartões de KPI. Além do valor, da variação e da comparação, cada cartão abre a origem do
+ * cálculo: os dois períodos, os valores de cada um e a conta que produziu a variação.
+ */
 export default function IndicadoresExecutivos({ indicadores }: Props) {
   return (
     <div
@@ -26,11 +36,14 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
         const motivo = continuidade
           ? 'DEC/FEC indisponíveis para este recorte na fonte consultada.'
           : 'A fonte não informou este valor para o recorte.'
+        const periodoAtual = kpi.atual.periodo_referencia
+        const periodoComparacao = kpi.comparacao.periodo_referencia
+
         return (
-          <Card key={nome} className="min-w-0 p-4!" aria-label={kpi.rotulo}>
-            <h3 className="min-h-8 text-corpo text-ink-2">{kpi.rotulo}</h3>
+          <Card key={nome} className="flex min-w-0 flex-col p-4!" aria-label={kpi.rotulo}>
+            <h3 className="min-h-8 text-corpo font-medium text-ink-2">{kpi.rotulo}</h3>
             <p
-              className="mt-2 truncate text-numero font-medium tracking-tight"
+              className="mt-1 truncate text-numero font-semibold tracking-tight text-ink"
               title={kpi.atual.valor === null ? motivo : valorExecutivo(kpi.atual, true)}
             >
               {valorExecutivo(kpi.atual)}
@@ -47,7 +60,7 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
             <div className="mt-3">
               <Badge
                 variante={neutra ? 'neutro' : favoravel ? 'sucesso' : 'perigo'}
-                title="Variação percentual em relação à comparação"
+                title="Variação percentual em relação ao período de comparação"
               >
                 <Seta size={13} aria-hidden="true" />
                 {variacao === null
@@ -55,13 +68,10 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
                   : formatarPercentual(variacao, { sinal: true })}
               </Badge>
             </div>
-            <p
-              className="mt-3 text-legenda leading-5 text-ink-2"
-              title={valorExecutivo(kpi.comparacao, true)}
-            >
-              Comparação
+            <p className="mt-3 text-legenda leading-5 text-ink-2" title={valorExecutivo(kpi.comparacao, true)}>
+              Comparação · {formatarPeriodo(periodoComparacao)}
               <br />
-              <span className="font-normal text-ink">{valorExecutivo(kpi.comparacao)}</span>
+              <span className="font-medium text-ink">{valorExecutivo(kpi.comparacao)}</span>
             </p>
             {nome === 'inadimplencia' ? (
               <p className="mt-2 text-legenda leading-4 text-ink-2">
@@ -74,7 +84,7 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
                 <span className="mt-1 block">
                   {indicadores.inadimplencia.variacao_pontos_percentuais.valor === null
                     ? '—'
-                    : `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2, signDisplay: 'exceptZero' }).format(indicadores.inadimplencia.variacao_pontos_percentuais.valor)} p.p.`}
+                    : `${percentual.format(indicadores.inadimplencia.variacao_pontos_percentuais.valor)} p.p.`}
                 </span>
               </p>
             ) : (
@@ -91,6 +101,56 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
                     : `Diferença: ${kpi.diferenca.valor > 0 ? '+' : ''}${valorExecutivo(kpi.diferenca)}`}
               </p>
             )}
+
+            <details className="group mt-auto pt-3">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-legenda font-medium text-teal-escuro marker:content-none hover:underline [&::-webkit-details-marker]:hidden">
+                <ChevronDown
+                  size={14}
+                  aria-hidden="true"
+                  className="transition-transform group-open:rotate-180"
+                />
+                Origem da comparação
+              </summary>
+              <div className="mt-2 flex flex-col gap-2 rounded-md border border-borda-leve bg-surface-sutil p-2.5 text-legenda leading-4 text-ink-2">
+                <dl className="flex flex-col gap-1">
+                  <div className="flex justify-between gap-2">
+                    <dt>Período atual</dt>
+                    <dd className="text-right font-medium text-ink">{formatarPeriodo(periodoAtual)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt>Período comparado</dt>
+                    <dd className="text-right font-medium text-ink">
+                      {formatarPeriodo(periodoComparacao)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt>Valor atual</dt>
+                    <dd className="text-right font-medium text-ink">
+                      {valorExecutivo(kpi.atual, true)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt>Valor comparado</dt>
+                    <dd className="text-right font-medium text-ink">
+                      {valorExecutivo(kpi.comparacao, true)}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="border-t border-borda-leve pt-2">
+                  {variacao === null || kpi.atual.valor === null || kpi.comparacao.valor === null
+                    ? 'A variação não é calculada quando um dos valores está ausente ou é zero na base.'
+                    : `Cálculo: (${valorExecutivo(kpi.atual, true)} − ${valorExecutivo(
+                        kpi.comparacao,
+                        true,
+                      )}) ÷ ${valorExecutivo(kpi.comparacao, true)} × 100 = ${percentual.format(
+                        variacao,
+                      )}%.`}
+                </p>
+                <p className="text-ink-3">
+                  Valores e variação vêm da API; o portal não recalcula os números.
+                </p>
+              </div>
+            </details>
           </Card>
         )
       })}

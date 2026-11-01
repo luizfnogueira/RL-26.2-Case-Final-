@@ -7,4 +7,6 @@ export function descricaoDoCampo(id: string, ajuda?: string, erro?: string): str
 /** Estilo compartilhado de Input e Select (a cor da borda muda com o erro). */
 export const ESTILO_CONTROLE =
   'h-10 w-full rounded-md border bg-surface-card px-3 text-corpo text-ink placeholder:text-ink-3 ' +
-  'disabled:cursor-not-allowed disabled:bg-surface-alt disabled:text-ink-3'
+  'transition-colors hover:border-ink-3 focus-visible:border-teal focus-visible:outline-2 ' +
+  'focus-visible:outline-offset-1 focus-visible:outline-foco ' +
+  'disabled:cursor-not-allowed disabled:border-borda-leve disabled:bg-surface-alt disabled:text-ink-3'

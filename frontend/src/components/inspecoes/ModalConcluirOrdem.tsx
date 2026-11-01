@@ -1,7 +1,12 @@
-import { AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
+import Aviso from '@/components/ui/Aviso'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
+import Select from '@/components/ui/Select'
+import Textarea from '@/components/ui/Textarea'
+import { cx } from '@/utils/cx'
 import { concluirInspecao, normalizarErro } from '@/services'
 import type { Ordem, ResultadoEnvio } from '@/types/inspecoes'
 
@@ -23,6 +28,8 @@ const TIPOS_IRREGULARIDADE = [
   'DESVIO CLANDESTINO',
   'OUTRO',
 ]
+
+const OPCOES_TIPO = TIPOS_IRREGULARIDADE.map((t) => ({ valor: t, rotulo: t }))
 
 export default function ModalConcluirOrdem({ ordem, aberto, aoFechar, aoSucesso }: Props) {
   if (!aberto || !ordem) return null
@@ -107,6 +114,13 @@ function ModalConcluirOrdemForm({
     }
   }
 
+  const ajudaKwh =
+    ordem.kwh_estimado !== null
+      ? `Consumo mensal desviado, estimado em campo. Estimativa da fila: ${(
+          ordem.kwh_estimado / MESES_ESTIMATIVA_FILA
+        ).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kWh/mês.`
+      : 'Consumo mensal desviado, estimado em campo.'
+
   return (
     <Modal
       aberto
@@ -124,6 +138,7 @@ function ModalConcluirOrdemForm({
             onClick={handleConfirmar}
             carregando={salvando}
             disabled={irregularidade === null}
+            motivoDesabilitado="Escolha se houve irregularidade para concluir a vistoria."
             icone={<CheckCircle2 size={16} aria-hidden="true" />}
           >
             Concluir vistoria
@@ -131,26 +146,28 @@ function ModalConcluirOrdemForm({
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        {/* Toggle Irregularidade */}
-        <div>
-          <label className="text-sm font-medium text-[#2d425a]">
-            Resultado da inspeção técnica *
-          </label>
-          <div className="mt-2 grid grid-cols-2 gap-3">
+      <div className="flex flex-col gap-5">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-legenda font-medium text-ink">
+            Resultado da inspeção técnica <span className="text-perigo-escuro">*</span>
+          </legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => setIrregularidade(true)}
               aria-pressed={irregularidade === true}
-              className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-all ${
+              className={cx(
+                'flex items-center justify-center gap-2 rounded-md border p-3 text-corpo font-medium transition-colors',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foco',
                 irregularidade === true
-                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-sm'
-                  : 'border-[#cfd9e0] bg-white text-[#59656d] hover:bg-[#f6f9fa]'
-              }`}
+                  ? 'border-alerta bg-alerta-suave text-alerta-escuro'
+                  : 'border-borda bg-surface-card text-ink-2 hover:border-ink-3 hover:bg-surface-alt',
+              )}
             >
               <AlertTriangle
                 size={18}
-                className={irregularidade === true ? 'text-amber-600' : 'text-[#7d858d]'}
+                aria-hidden="true"
+                className={irregularidade === true ? 'text-alerta-escuro' : 'text-ink-3'}
               />
               Irregularidade confirmada
             </button>
@@ -158,147 +175,103 @@ function ModalConcluirOrdemForm({
               type="button"
               onClick={() => setIrregularidade(false)}
               aria-pressed={irregularidade === false}
-              className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-all ${
+              className={cx(
+                'flex items-center justify-center gap-2 rounded-md border p-3 text-corpo font-medium transition-colors',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foco',
                 irregularidade === false
-                  ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm'
-                  : 'border-[#cfd9e0] bg-white text-[#59656d] hover:bg-[#f6f9fa]'
-              }`}
+                  ? 'border-sucesso bg-sucesso-suave text-sucesso-texto'
+                  : 'border-borda bg-surface-card text-ink-2 hover:border-ink-3 hover:bg-surface-alt',
+              )}
             >
               <CheckCircle2
                 size={18}
-                className={irregularidade === false ? 'text-emerald-600' : 'text-[#7d858d]'}
+                aria-hidden="true"
+                className={irregularidade === false ? 'text-sucesso-texto' : 'text-ink-3'}
               />
               Sem irregularidade (normal)
             </button>
           </div>
-        </div>
+        </fieldset>
 
-        {/* Campos condicionais de irregularidade */}
         {irregularidade === true && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+          <div className="rounded-md border border-alerta/30 bg-alerta-suave/40 p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="tipo-irregularidade"
-                  className="text-xs font-semibold text-[#2d425a]"
-                >
-                  Tipo de irregularidade *
-                </label>
-                <select
-                  id="tipo-irregularidade"
-                  value={tipo}
-                  onChange={(e) => setTipo(e.target.value)}
+              <div className="flex flex-col gap-2">
+                <Select
+                  rotulo="Tipo de irregularidade"
+                  valor={tipo}
+                  aoMudar={setTipo}
+                  opcoes={OPCOES_TIPO}
+                  vazio="Selecione o tipo"
                   disabled={salvando}
-                  className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-                >
-                  <option value="" disabled>
-                    Selecione o tipo
-                  </option>
-                  {TIPOS_IRREGULARIDADE.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                  required
+                />
                 {tipo === 'OUTRO' && (
-                  <input
-                    type="text"
-                    placeholder="Especifique o tipo..."
+                  <Input
+                    rotulo="Especifique o tipo"
                     value={outroTipo}
                     onChange={(e) => setOutroTipo(e.target.value)}
-                    className="mt-2 h-9 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
+                    placeholder="Descreva a irregularidade encontrada"
+                    disabled={salvando}
                   />
                 )}
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label htmlFor="kwh-recuperado" className="text-xs font-semibold text-[#2d425a]">
-                  Irregularidade por mês (kWh/mês) *
-                </label>
-                <input
-                  id="kwh-recuperado"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={kwh}
-                  onChange={(e) => setKwh(e.target.value)}
-                  disabled={salvando}
-                  className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-                />
-                <span className="text-[11px] text-[#7d858d]">
-                  Consumo mensal desviado, estimado em campo.
-                  {ordem.kwh_estimado !== null &&
-                    ` Estimativa da fila: ${(
-                      ordem.kwh_estimado / MESES_ESTIMATIVA_FILA
-                    ).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kWh/mês.`}
-                </span>
-              </div>
+              <Input
+                rotulo="Irregularidade por mês (kWh/mês)"
+                type="number"
+                min="0"
+                step="any"
+                value={kwh}
+                onChange={(e) => setKwh(e.target.value)}
+                disabled={salvando}
+                ajuda={ajudaKwh}
+                required
+              />
             </div>
           </div>
         )}
+
         {irregularidade === false && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-800">
+          <Aviso variante="sucesso">
             A instalação do consumidor foi avaliada e nenhuma anomalia ou desvio foi detectado. A
             irregularidade por mês será registrada como 0 kWh.
-          </div>
+          </Aviso>
         )}
 
-        {/* Metadados da inspeção */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="data-inspecao" className="text-sm font-medium text-[#2d425a]">
-              Data e horário da vistoria
-            </label>
-            <input
-              id="data-inspecao"
-              type="datetime-local"
-              value={dataHora}
-              onChange={(e) => setDataHora(e.target.value)}
-              disabled={salvando}
-              className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="inspetor" className="text-sm font-medium text-[#2d425a]">
-              Inspetor responsável
-            </label>
-            <input
-              id="inspetor"
-              type="text"
-              placeholder="Ex.: Inspetor Carlos Silva"
-              value={inspetor}
-              onChange={(e) => setInspetor(e.target.value)}
-              disabled={salvando}
-              className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-            />
-          </div>
-        </div>
-
-        {/* Observações da vistoria (obrigatório) */}
-        <div className="flex flex-col gap-1">
-          <label htmlFor="obs-vistoria" className="text-sm font-medium text-[#2d425a]">
-            Observações e laudo técnico *
-          </label>
-          <textarea
-            id="obs-vistoria"
-            rows={3}
-            value={observacoes}
-            onChange={(e) => setObservacoes(e.target.value)}
-            placeholder="Descreva as condições encontradas, ações realizadas e lacres aplicados..."
+          <Input
+            rotulo="Data e horário da vistoria"
+            type="datetime-local"
+            value={dataHora}
+            onChange={(e) => setDataHora(e.target.value)}
             disabled={salvando}
-            className="rounded-md border border-[#cfd9e0] bg-white p-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
           />
-          <span className="text-[11px] text-[#7d858d]">
-            Campo obrigatório para formalização da ordem no portal.
-          </span>
+
+          <Input
+            rotulo="Inspetor responsável"
+            type="text"
+            placeholder="Ex.: Inspetor Carlos Silva"
+            value={inspetor}
+            onChange={(e) => setInspetor(e.target.value)}
+            disabled={salvando}
+          />
         </div>
+
+        <Textarea
+          rotulo="Observações e laudo técnico"
+          value={observacoes}
+          onChange={(e) => setObservacoes(e.target.value)}
+          placeholder="Descreva as condições encontradas, ações realizadas e lacres aplicados..."
+          ajuda="Campo obrigatório para formalização da ordem no portal."
+          disabled={salvando}
+          required
+        />
 
         {erro && (
-          <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            <ShieldAlert size={16} aria-hidden="true" />
+          <Aviso variante="perigo" anunciar>
             {erro}
-          </div>
+          </Aviso>
         )}
       </div>
     </Modal>

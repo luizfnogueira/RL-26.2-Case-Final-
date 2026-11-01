@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import Logo from '@/components/common/Logo'
+import BotaoTema from '@/theme/BotaoTema'
 import NavList from './NavList'
 
 type Props = { aberto: boolean; onFechar: () => void }
@@ -25,9 +26,9 @@ export default function MenuMobile({ aberto, onFechar }: Props) {
         aria-label="Fechar menu"
         tabIndex={-1}
         onClick={onFechar}
-        className="absolute inset-0 bg-surface-tinta/45"
+        className="absolute inset-0 bg-surface-tinta/60 backdrop-blur-[2px]"
       />
-      <div className="relative flex h-full w-[300px] max-w-[85%] flex-col gap-7 overflow-y-auto rounded-r-card bg-surface-card p-6 shadow-modal">
+      <div className="relative flex h-full w-[300px] max-w-[85%] flex-col gap-8 overflow-y-auto rounded-r-card border-r border-borda bg-surface-card p-5 shadow-modal">
         <div className="flex items-center justify-between">
           <Logo />
           <button
@@ -35,12 +36,15 @@ export default function MenuMobile({ aberto, onFechar }: Props) {
             autoFocus
             onClick={onFechar}
             aria-label="Fechar menu"
-            className="grid size-9 place-items-center rounded-full text-ink-2 hover:bg-surface-alt"
+            className="grid size-9 place-items-center rounded-md text-ink-2 hover:bg-surface-alt hover:text-ink"
           >
-            <X size={20} strokeWidth={1.5} aria-hidden="true" />
+            <X size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
         <NavList variante="completa" aoNavegar={onFechar} />
+        <div className="mt-auto border-t border-borda-leve pt-4">
+          <BotaoTema />
+        </div>
       </div>
     </div>
   )

@@ -1,17 +1,18 @@
-import { FilterX } from 'lucide-react'
+import { FilterX, SlidersHorizontal } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Select, { type OpcaoSelect } from '@/components/ui/Select'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
 import type { CampoFiltro, FiltrosUrl, OpcoesFiltros } from '@/types/filtros'
+import { cx } from '@/utils/cx'
 import { formatarNome } from '@/utils/formatacao'
 import { PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO, formatarPeriodo } from '@/utils/periodos'
-import { cx } from '@/utils/cx'
 
 type Props = {
   campos: readonly CampoFiltro[]
   padroes?: FiltrosUrl
   opcoes?: OpcoesFiltros
   className?: string
+  /** Mantido por compatibilidade: a barra padrão sempre oferece "Limpar filtros". */
   mostrarLimparSempre?: boolean
 }
 
@@ -24,19 +25,37 @@ const ROTULOS: Record<CampoFiltro, string> = {
   alimentador: 'Alimentador',
 }
 
+/**
+ * Ordem única dos campos em todas as telas. A tela escolhe quais campos usa; a barra mantém
+ * sempre a mesma sequência, os mesmos rótulos e o mesmo comportamento.
+ */
+const ORDEM: readonly CampoFiltro[] = [
+  'periodo_atual',
+  'periodo_comparacao',
+  'municipio',
+  'bairro',
+  'classe',
+  'alimentador',
+]
+
 const PERIODOS_PADRAO = [PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO]
 
 const comoOpcoes = (valores: readonly string[] = [], nomes = false): OpcaoSelect[] =>
   valores.map((valor) => ({ valor, rotulo: nomes ? formatarNome(valor) : valor }))
 
+/**
+ * Barra de filtros comum às telas. Mesma ordem de campos, mesmos rótulos e mesmo botão de limpar
+ * em Fila de perdas, Receita, Ordens e Painel. Os valores vivem na URL, então recarregar a página
+ * preserva o recorte.
+ */
 export default function BarraDeFiltros({
   campos,
   padroes,
   opcoes = {},
   className,
-  mostrarLimparSempre = false,
 }: Props) {
   const { filtros, definir, limpar, alterados } = useFiltrosUrl(campos, padroes)
+  const visiveis = ORDEM.filter((campo) => campos.includes(campo))
 
   const periodos: OpcaoSelect[] = (opcoes.periodos ?? PERIODOS_PADRAO).map((valor) => ({
     valor,
@@ -75,11 +94,26 @@ export default function BarraDeFiltros({
   return (
     <section
       aria-label="Filtros"
-      className={cx('rounded-card bg-surface-card p-4 shadow-card md:px-6', className)}
+      className={cx(
+        'rounded-card border border-borda bg-surface-card p-4 shadow-card md:px-5',
+        className,
+      )}
     >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-legenda font-semibold tracking-wide text-ink-2 uppercase">
+          <SlidersHorizontal size={15} aria-hidden="true" />
+          Filtros
+        </h2>
+        {alterados && (
+          <span className="text-legenda text-ink-2" role="status">
+            Recorte personalizado
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
-        {campos.map((campo) => {
+        {visiveis.map((campo) => {
           const ehPeriodo = campo === 'periodo_atual' || campo === 'periodo_comparacao'
+          const bairroSemMunicipio = campo === 'bairro' && !filtros.municipio
           return (
             <Select
               key={campo}
@@ -88,22 +122,23 @@ export default function BarraDeFiltros({
               valor={filtros[campo] ?? ''}
               aoMudar={(valor) => definir({ [campo]: valor })}
               vazio={ehPeriodo ? (padroes?.[campo] ? undefined : 'Selecione') : 'Todos'}
-              disabled={campo === 'bairro' && !filtros.municipio}
-              className="lg:w-52"
+              disabled={bairroSemMunicipio}
+              title={bairroSemMunicipio ? 'Escolha um município para filtrar por bairro' : undefined}
+              className="lg:w-48"
             />
           )
         })}
-        {(alterados || mostrarLimparSempre) && (
-          <Button
-            variante="fantasma"
-            tamanho="sm"
-            icone={<FilterX size={16} aria-hidden="true" />}
-            onClick={limpar}
-            className="justify-self-start lg:mb-1.5"
-          >
-            Limpar filtros
-          </Button>
-        )}
+        <Button
+          variante="fantasma"
+          tamanho="sm"
+          icone={<FilterX size={16} aria-hidden="true" />}
+          onClick={limpar}
+          disabled={!alterados}
+          motivoDesabilitado="Nenhum filtro foi alterado neste recorte."
+          className="justify-self-start lg:mb-1.5"
+        >
+          Limpar filtros
+        </Button>
       </div>
     </section>
   )

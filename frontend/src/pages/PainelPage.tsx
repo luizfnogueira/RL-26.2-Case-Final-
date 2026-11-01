@@ -90,7 +90,7 @@ export default function PainelPage() {
         role="tablist"
         aria-label="Abas do painel executivo"
         onKeyDown={navegarAbas}
-        className="flex w-fit gap-1 rounded-full bg-surface-alt p-1"
+        className="flex w-fit gap-1 rounded-md border border-borda bg-surface-alt p-1"
       >
         <button
           type="button"
@@ -101,9 +101,9 @@ export default function PainelPage() {
           tabIndex={estaNaComparacao ? -1 : 0}
           onClick={() => alternarAba('geral')}
           className={cx(
-            'cursor-pointer rounded-full px-3.5 py-1 text-legenda transition-colors',
+            'cursor-pointer rounded-sm px-3.5 py-1.5 text-legenda font-medium transition-colors',
             !estaNaComparacao
-              ? 'bg-surface-card font-medium text-teal-profundo shadow-sm'
+              ? 'bg-surface-card text-teal-profundo shadow-sm'
               : 'text-ink-2 hover:text-ink',
           )}
         >
@@ -118,9 +118,9 @@ export default function PainelPage() {
           tabIndex={estaNaComparacao ? 0 : -1}
           onClick={() => alternarAba('comparar')}
           className={cx(
-            'cursor-pointer rounded-full px-3.5 py-1 text-legenda transition-colors',
+            'cursor-pointer rounded-sm px-3.5 py-1.5 text-legenda font-medium transition-colors',
             estaNaComparacao
-              ? 'bg-surface-card font-medium text-teal-profundo shadow-sm'
+              ? 'bg-surface-card text-teal-profundo shadow-sm'
               : 'text-ink-2 hover:text-ink',
           )}
         >
@@ -145,7 +145,7 @@ export default function PainelPage() {
             <ErrorState
               erro={consulta.erro}
               aoTentarNovamente={consulta.recarregar}
-              className="rounded-card bg-surface-card shadow-card"
+              className="rounded-card border border-borda bg-surface-card shadow-card"
             />
           ) : consulta.carregando ? (
             <div
@@ -155,7 +155,7 @@ export default function PainelPage() {
             >
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
                 {ORDEM_KPIS.map((nome) => (
-                  <Skeleton key={nome} className="h-60 rounded-card" />
+                  <Skeleton key={nome} className="h-64 rounded-card" />
                 ))}
               </div>
               <Skeleton className="h-96 w-full rounded-card" />
@@ -165,7 +165,7 @@ export default function PainelPage() {
               <section aria-labelledby="resumo-painel" className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <h2 id="resumo-painel" className="text-titulo-lg">
+                    <h2 id="resumo-painel" className="text-titulo-lg font-medium">
                       Resumo do período
                     </h2>
                     <p className="mt-1 text-legenda text-ink-2">
@@ -193,7 +193,7 @@ export default function PainelPage() {
               {!semDados && (
                 <>
                   <HistoricoExecutivo pontos={dados.serie_historica} />
-                  <div className="flex flex-col justify-between gap-4 rounded-card border border-teal/15 bg-azul-50 p-4 sm:flex-row sm:items-center md:px-6">
+                  <div className="flex flex-col justify-between gap-4 rounded-card border border-teal/20 bg-azul-50 p-4 sm:flex-row sm:items-center md:px-6">
                     <div className="flex items-start gap-3">
                       <ChartNoAxesCombined
                         size={22}
@@ -211,7 +211,7 @@ export default function PainelPage() {
                     </div>
                     <Link
                       to={`/receita${construirQuery({ periodo_atual, periodo_comparacao, municipio })}`}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-corpo font-normal text-teal-profundo hover:bg-azul-100"
+                      className="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-corpo font-medium text-teal-profundo transition-colors hover:bg-azul-100"
                     >
                       Ver diagnóstico da receita <ArrowRight size={16} aria-hidden="true" />
                     </Link>

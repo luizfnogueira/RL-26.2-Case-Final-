@@ -1,7 +1,9 @@
-import { AlertOctagon, ShieldAlert } from 'lucide-react'
+import { AlertOctagon } from 'lucide-react'
 import { useState } from 'react'
+import Aviso from '@/components/ui/Aviso'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
+import Textarea from '@/components/ui/Textarea'
 import { cancelarInspecao, normalizarErro } from '@/services'
 import type { Ordem } from '@/types/inspecoes'
 
@@ -15,13 +17,7 @@ interface Props {
 export default function ModalCancelarOrdem({ ordem, aberto, aoFechar, aoSucesso }: Props) {
   if (!aberto || !ordem) return null
 
-  return (
-    <ModalCancelarOrdemForm
-      ordem={ordem}
-      aoFechar={aoFechar}
-      aoSucesso={aoSucesso}
-    />
-  )
+  return <ModalCancelarOrdemForm ordem={ordem} aoFechar={aoFechar} aoSucesso={aoSucesso} />
 }
 
 function ModalCancelarOrdemForm({
@@ -68,7 +64,7 @@ function ModalCancelarOrdemForm({
       rodape={
         <>
           <Button variante="secundario" onClick={aoFechar} disabled={salvando}>
-            Voltar
+            Manter ordem
           </Button>
           <Button
             variante="perigo"
@@ -82,34 +78,27 @@ function ModalCancelarOrdemForm({
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        <Aviso variante="alerta">
           A ordem será encerrada sem realização de vistoria e o motivo será gravado de forma
           permanente no histórico. Ordens canceladas liberam a UC para nova fiscalização futura.
-        </div>
+        </Aviso>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="justificativa-cancelamento" className="text-sm font-medium text-[#2d425a]">
-            Justificativa do cancelamento *
-          </label>
-          <textarea
-            id="justificativa-cancelamento"
-            rows={3}
-            value={justificativa}
-            onChange={(e) => setJustificativa(e.target.value)}
-            placeholder="Ex.: Ordem gerada em duplicidade, consumidor com acesso impedido, erro cadastral..."
-            disabled={salvando}
-            className="rounded-md border border-[#cfd9e0] bg-white p-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-          />
-        </div>
+        <Textarea
+          rotulo="Justificativa do cancelamento"
+          value={justificativa}
+          onChange={(e) => setJustificativa(e.target.value)}
+          placeholder="Ex.: Ordem gerada em duplicidade, consumidor com acesso impedido, erro cadastral..."
+          ajuda="Obrigatório. Fica registrado no histórico da ordem."
+          disabled={salvando}
+          required
+        />
 
         {erro && (
-          <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            <ShieldAlert size={16} aria-hidden="true" />
+          <Aviso variante="perigo" anunciar>
             {erro}
-          </div>
+          </Aviso>
         )}
       </div>
     </Modal>
   )
 }
-

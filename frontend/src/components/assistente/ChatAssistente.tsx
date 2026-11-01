@@ -230,7 +230,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
         hidden={aba !== 'conversa'}
         className={cx('relative flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
       >
-        <div className={cx('flex w-full flex-col gap-4', pagina && 'mx-auto max-w-[760px]')}>
+        <div className={cx('flex w-full flex-col gap-6', pagina && 'mx-auto max-w-[760px]')}>
           {vazia ? (
             <>
               <div className="flex flex-col items-center gap-2 pt-2 text-center">
@@ -273,7 +273,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
                 >
                   <Sparkles size={16} strokeWidth={1.75} />
                 </span>
-                <p className="rounded-[14px] bg-surface-alt px-3.5 py-2.5 text-corpo">
+                <p className="rounded-[16px] rounded-bl-xs bg-surface-alt px-4 py-2.5 text-corpo">
                   Olá{primeiroNome ? `, ${primeiroNome}` : ''}. Posso consultar os dados
                   consolidados da V-Energy. O que você gostaria de saber?
                 </p>
@@ -282,15 +282,14 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
           ) : (
             mensagens.map((mensagem) =>
               mensagem.autor === 'usuario' ? (
-                <p
-                  key={mensagem.id}
-                  className="w-fit max-w-[85%] rounded-[14px] rounded-bl-xs bg-teal-escuro px-3.5 py-2 text-corpo whitespace-pre-line text-ink-inverso"
-                >
-                  <span className="sr-only">Você perguntou: </span>
-                  {mensagem.texto}
-                </p>
+                <div key={mensagem.id} className="flex justify-end">
+                  <p className="w-fit max-w-[85%] rounded-[16px] rounded-br-xs bg-balao-usuario px-4 py-2.5 text-corpo whitespace-pre-line text-balao-usuario-texto">
+                    <span className="sr-only">Você perguntou: </span>
+                    {mensagem.texto}
+                  </p>
+                </div>
               ) : (
-                <div key={mensagem.id} className="pr-4">
+                <div key={mensagem.id} className="flex justify-start">
                   <MensagemAssistente
                     mensagem={mensagem}
                     enviando={enviando}

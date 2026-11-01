@@ -2,7 +2,7 @@ import { USE_MOCKS } from '@/services/env'
 
 export default function Rodape() {
   return (
-    <footer className="py-7 pl-4 pr-24 text-left text-corpo text-teal-escuro md:px-4 md:text-center">
+    <footer className="px-4 py-6 pb-24 text-center text-legenda text-ink-3 md:pb-6">
       V-Energy Grid 360
       {USE_MOCKS && (
         <>

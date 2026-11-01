@@ -35,7 +35,7 @@ export default function AnaliseIA({ consulta, indisponivel }: Props) {
     <section
       aria-label="Análise da IA"
       aria-busy={carregando || undefined}
-      className="rounded-card border border-azul-300 bg-azul-50 p-4 shadow-card md:p-6"
+      className="rounded-card border border-teal/25 bg-azul-50 p-4 shadow-card md:p-6"
     >
       <div className="flex items-start gap-4">
         <span
@@ -46,7 +46,7 @@ export default function AnaliseIA({ consulta, indisponivel }: Props) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-legenda font-medium tracking-wider text-teal-profundo uppercase">
+            <p className="text-legenda font-semibold tracking-wider text-teal-profundo uppercase">
               Análise da IA
             </p>
             {textoAlternativo ? (
@@ -87,7 +87,7 @@ export default function AnaliseIA({ consulta, indisponivel }: Props) {
             </div>
           ) : (
             <div className={cx('transition-opacity', carregando && 'opacity-60')}>
-              <h2 className="mt-2 text-titulo-lg font-normal">{dados.titulo}</h2>
+              <h2 className="mt-2 text-titulo-lg font-medium">{dados.titulo}</h2>
               <p className="mt-1 text-corpo text-ink-2">{dados.texto}</p>
               {textoAlternativo && (
                 <p className="mt-1 text-legenda text-alerta-escuro">

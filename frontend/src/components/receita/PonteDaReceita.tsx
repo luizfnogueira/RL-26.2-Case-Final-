@@ -29,7 +29,7 @@ export default function PonteDaReceita({ dashboard, atualizando }: Props) {
           </Badge>
         )
       }
-      className={atualizando ? 'opacity-70 transition-opacity' : 'transition-opacity'}
+      className={`h-full ${atualizando ? 'opacity-70 transition-opacity' : 'transition-opacity'}`}
     >
       {etapas ? (
         <Cascata

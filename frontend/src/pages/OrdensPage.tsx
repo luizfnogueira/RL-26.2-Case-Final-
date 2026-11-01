@@ -5,6 +5,7 @@ import {
   MoreHorizontal,
   Search,
   Truck,
+  X,
   XCircle,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -16,6 +17,7 @@ import ModalConcluirOrdem from '@/components/inspecoes/ModalConcluirOrdem'
 import ModalDetalhesOrdem from '@/components/inspecoes/ModalDetalhesOrdem'
 import ModalIniciarCampo from '@/components/inspecoes/ModalIniciarCampo'
 import ResultadoInspecoes from '@/components/inspecoes/ResultadoInspecoes'
+import Aviso from '@/components/ui/Aviso'
 import Badge, { type VarianteBadge } from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
@@ -30,6 +32,7 @@ import Pagina from '@/layouts/Pagina'
 import { listarInspecoes } from '@/services'
 import type { CampoFiltro, OpcoesFiltros } from '@/types/filtros'
 import type { Ordem, StatusOrdem } from '@/types/inspecoes'
+import { cx } from '@/utils/cx'
 import { formatarAtualizacao } from '@/utils/datas'
 import { mesesRecentes } from '@/utils/periodos'
 
@@ -42,15 +45,15 @@ const CAMPOS: readonly CampoFiltro[] = [
 ]
 const LINHAS_POR_PAGINA = 10
 
-const STATUS_CONFIG: Record<
-  StatusOrdem,
-  { label: string; variante: VarianteBadge; bgCard: string }
-> = {
-  ABERTA: { label: 'Aberta', variante: 'info', bgCard: 'border-l-4 border-l-blue-400' },
-  EM_CAMPO: { label: 'Em campo', variante: 'alerta', bgCard: 'border-l-4 border-l-amber-400' },
-  CONCLUIDA: { label: 'Concluída', variante: 'sucesso', bgCard: 'border-l-4 border-l-emerald-400' },
-  CANCELADA: { label: 'Cancelada', variante: 'neutro', bgCard: 'border-l-4 border-l-slate-400' },
-}
+const STATUS_CONFIG: Record<StatusOrdem, { label: string; variante: VarianteBadge; ponto: string }> =
+  {
+    ABERTA: { label: 'Aberta', variante: 'info', ponto: 'bg-teal' },
+    EM_CAMPO: { label: 'Em campo', variante: 'alerta', ponto: 'bg-alerta' },
+    CONCLUIDA: { label: 'Concluída', variante: 'sucesso', ponto: 'bg-sucesso-texto' },
+    CANCELADA: { label: 'Cancelada', variante: 'neutro', ponto: 'bg-ink-3' },
+  }
+
+const ORDEM_STATUS: readonly StatusOrdem[] = ['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 
 function formatarData(dataStr?: string | null): string {
   if (!dataStr) return '—'
@@ -67,13 +70,19 @@ type AcoesOrdemProps = {
   aoVerDetalhes: (ordem: Ordem) => void
 }
 
+/**
+ * Ações de uma ordem, num único lugar por linha. A ação que faz o fluxo avançar fica visível;
+ * o menu guarda só as secundárias (cancelar e ver detalhes). Cada status mostra apenas o que é
+ * válido para ele.
+ */
 function AcoesOrdem({ ordem, aoIniciar, aoConcluir, aoCancelar, aoVerDetalhes }: AcoesOrdemProps) {
   const [aberto, setAberto] = useState(false)
   const [posicao, setPosicao] = useState({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
   const botaoRef = useRef<HTMLButtonElement>(null)
   const idMenu = `acoes-ordem-${ordem.id_ordem}`
-  const quantidadeAcoes = ordem.status === 'ABERTA' || ordem.status === 'EM_CAMPO' ? 3 : 1
+  const ativa = ordem.status === 'ABERTA' || ordem.status === 'EM_CAMPO'
+  const quantidadeAcoes = ativa ? 2 : 1
 
   useEffect(() => {
     if (!aberto) return
@@ -116,8 +125,8 @@ function AcoesOrdem({ ordem, aoIniciar, aoConcluir, aoCancelar, aoVerDetalhes }:
 
     const retangulo = botaoRef.current?.getBoundingClientRect()
     if (retangulo) {
-      const alturaMenu = quantidadeAcoes * 32 + 14
-      const larguraMenu = 208
+      const alturaMenu = quantidadeAcoes * 38 + 16
+      const larguraMenu = 200
       const margem = 8
       const abaixo = retangulo.bottom + margem
       const acima = retangulo.top - alturaMenu - margem
@@ -136,24 +145,62 @@ function AcoesOrdem({ ordem, aoIniciar, aoConcluir, aoCancelar, aoVerDetalhes }:
     setAberto(true)
   }
 
+  // Sem ação secundária, "Ver detalhes" aparece direto: não escondemos uma ação atrás de um menu.
+  if (!ativa) {
+    return (
+      <div
+        role="group"
+        aria-label={`Ações da ordem #${ordem.id_ordem}`}
+        className="flex justify-end"
+      >
+        <Button
+          variante="secundario"
+          tamanho="sm"
+          onClick={() => aoVerDetalhes(ordem)}
+          icone={<History size={14} aria-hidden="true" />}
+        >
+          Ver detalhes
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <>
       <div
         role="group"
         aria-label={`Ações da ordem #${ordem.id_ordem}`}
-        className="flex justify-center"
+        className="flex items-center justify-end gap-1.5"
       >
+        {ordem.status === 'ABERTA' && (
+          <Button
+            tamanho="sm"
+            onClick={() => aoIniciar(ordem)}
+            icone={<Truck size={15} aria-hidden="true" />}
+          >
+            Iniciar campo
+          </Button>
+        )}
+        {ordem.status === 'EM_CAMPO' && (
+          <Button
+            tamanho="sm"
+            onClick={() => aoConcluir(ordem)}
+            icone={<CheckCircle2 size={15} aria-hidden="true" />}
+          >
+            Registrar resultado
+          </Button>
+        )}
         <Button
           ref={botaoRef}
           variante="secundario"
           tamanho="sm"
-          aria-label={`Ações da ordem #${ordem.id_ordem}`}
+          aria-label={`Mais ações da ordem #${ordem.id_ordem}`}
           aria-expanded={aberto}
           aria-controls={idMenu}
-          title="Abrir ações"
-          className="size-9 border-transparent bg-[#f7fafb] p-0 text-[#526777] hover:border-[#dfeaf0] hover:bg-[#edf5f8]"
+          title="Mais ações"
+          className="size-8 p-0"
           onClick={alternarMenu}
-          icone={<MoreHorizontal size={20} aria-hidden="true" />}
+          icone={<MoreHorizontal size={18} aria-hidden="true" />}
         />
       </div>
 
@@ -163,51 +210,27 @@ function AcoesOrdem({ ordem, aoIniciar, aoConcluir, aoCancelar, aoVerDetalhes }:
           id={idMenu}
           hidden={!aberto}
           style={{ position: 'fixed', top: posicao.top, left: posicao.left }}
-          className="z-50 w-52 rounded-xl border border-[#dfeaf0] bg-white p-1.5 text-left shadow-lg"
+          className="z-50 w-50 rounded-md border border-borda bg-surface-card p-1.5 text-left shadow-flutuante"
           role="group"
-          aria-label={`Opções da ordem #${ordem.id_ordem}`}
+          aria-label={`Mais ações da ordem #${ordem.id_ordem}`}
         >
-          {ordem.status === 'ABERTA' && (
-            <Button
-              variante="fantasma"
-              tamanho="sm"
-              className="w-full justify-center rounded-lg px-3"
-              onClick={() => executarAcao(aoIniciar)}
-              icone={<Truck size={15} aria-hidden="true" />}
-            >
-              Iniciar campo
-            </Button>
-          )}
-          {ordem.status === 'EM_CAMPO' && (
-            <Button
-              variante="fantasma"
-              tamanho="sm"
-              className="w-full justify-center rounded-lg px-3"
-              onClick={() => executarAcao(aoConcluir)}
-              icone={<CheckCircle2 size={15} aria-hidden="true" />}
-            >
-              Registrar resultado
-            </Button>
-          )}
-          {(ordem.status === 'ABERTA' || ordem.status === 'EM_CAMPO') && (
-            <Button
-              variante="fantasma"
-              tamanho="sm"
-              className="w-full justify-center rounded-lg px-3 text-[#8a3333] hover:bg-rose-50"
-              onClick={() => executarAcao(aoCancelar)}
-              icone={<XCircle size={15} aria-hidden="true" />}
-            >
-              Cancelar ordem
-            </Button>
-          )}
           <Button
             variante="fantasma"
             tamanho="sm"
-            className="w-full justify-center rounded-lg px-3"
+            className="w-full justify-start rounded-sm px-3"
             onClick={() => executarAcao(aoVerDetalhes)}
             icone={<History size={15} aria-hidden="true" />}
           >
             Ver detalhes
+          </Button>
+          <Button
+            variante="perigo-fantasma"
+            tamanho="sm"
+            className="w-full justify-start rounded-sm px-3"
+            onClick={() => executarAcao(aoCancelar)}
+            icone={<XCircle size={15} aria-hidden="true" />}
+          >
+            Cancelar ordem
           </Button>
         </div>,
         document.body,
@@ -234,6 +257,17 @@ export default function OrdensPage() {
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '', 10) || 1)
   const statusFiltro = (params.get('status') as StatusOrdem) || undefined
   const ucFiltro = params.get('id_uc')?.trim() || ''
+  const destaqueParam = params.get('destaque') ?? ''
+  const destacadas = useMemo(
+    () =>
+      new Set(
+        destaqueParam
+          .split(',')
+          .map((valor) => Number.parseInt(valor, 10))
+          .filter((valor) => Number.isFinite(valor)),
+      ),
+    [destaqueParam],
+  )
 
   const [buscaUc, setBuscaUc] = useState(ucFiltro)
   const [anteriorUcFiltro, setAnteriorUcFiltro] = useState(ucFiltro)
@@ -272,7 +306,7 @@ export default function OrdensPage() {
 
   useEffect(() => {
     if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), 3500)
+    const timer = window.setTimeout(() => setToast(null), 4500)
     return () => window.clearTimeout(timer)
   }, [toast])
 
@@ -292,6 +326,16 @@ export default function OrdensPage() {
       { replace: true },
     )
   }
+
+  const limparDestaque = () =>
+    setParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual)
+        proximo.delete('destaque')
+        return proximo
+      },
+      { replace: true },
+    )
 
   const handleSubmeterBuscaUc = (e: React.FormEvent) => {
     e.preventDefault()
@@ -345,431 +389,327 @@ export default function OrdensPage() {
   }
   const totalGeral = contagem.ABERTA + contagem.EM_CAMPO + contagem.CONCLUIDA + contagem.CANCELADA
 
+  const cardsStatus: { status?: StatusOrdem; label: string; total: number; ponto?: string }[] = [
+    { label: 'Todas', total: totalGeral },
+    ...ORDEM_STATUS.map((status) => ({
+      status,
+      label: STATUS_CONFIG[status].label,
+      total: contagem[status],
+      ponto: STATUS_CONFIG[status].ponto,
+    })),
+  ]
+
   return (
     <Pagina titulo="Ordens de inspeção" subtitulo="Gestão do ciclo completo da fiscalização">
-      <div className="relative">
-        {toast && (
-          <div
-            aria-live="polite"
-            className={[
-              'fixed top-5 right-5 z-50 flex items-center gap-3 rounded-full border px-4 py-2.5 text-sm shadow-xl transition-all',
-              toast.tipo === 'sucesso'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-rose-200 bg-rose-50 text-rose-800',
-            ].join(' ')}
-          >
-            <span className="inline-flex size-2 rounded-full bg-current" aria-hidden="true" />
-            {toast.texto}
-          </div>
-        )}
+      <BarraDeFiltros campos={CAMPOS} opcoes={opcoesBarra} />
 
-        <div className="overflow-hidden rounded-[18px] border border-[#dfeaf0] bg-[#edf3f5] shadow-card">
-          <BarraDeFiltros
-            campos={CAMPOS}
-            opcoes={opcoesBarra}
-            mostrarLimparSempre
-            className="rounded-none border-b border-[#dfeaf0] bg-[#edf3f5] p-4 shadow-none"
-          />
+      {opcoesFiltros.erro && (
+        <Aviso variante="alerta">
+          Não foi possível carregar as opções de filtro da Gold. As ordens continuam disponíveis,
+          mas os filtros de região ficam sem valores.
+        </Aviso>
+      )}
 
-          {opcoesFiltros.erro && (
-            <p
-              role="status"
-              className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-[12px] text-amber-900"
-            >
-              Não foi possível carregar as opções de filtro da Gold. As ordens continuam
-              disponíveis, mas os filtros de região ficam sem valores.
-            </p>
-          )}
+      {toast && (
+        <Aviso variante={toast.tipo === 'sucesso' ? 'sucesso' : 'perigo'} anunciar>
+          {toast.texto}
+        </Aviso>
+      )}
 
-          {ordensConsulta.erro && !dados ? (
-            <ErrorState
-              erro={ordensConsulta.erro}
-              titulo="Não foi possível carregar as ordens de inspeção"
-              aoTentarNovamente={ordensConsulta.recarregar}
-              className="min-h-[320px] bg-white/50"
+      {destaqueParam && (
+        <Aviso
+          variante="info"
+          titulo="Ordem recém-criada em destaque"
+          acao={
+            <Button variante="fantasma" tamanho="sm" onClick={limparDestaque}>
+              Limpar destaque
+            </Button>
+          }
+        >
+          As ordens criadas a partir da fila aparecem com o selo “Recém-criada” na lista abaixo.
+        </Aviso>
+      )}
+
+      {ordensConsulta.erro && !dados ? (
+        <ErrorState
+          erro={ordensConsulta.erro}
+          titulo="Não foi possível carregar as ordens de inspeção"
+          aoTentarNovamente={ordensConsulta.recarregar}
+          className="rounded-card border border-borda bg-surface-card shadow-card"
+        />
+      ) : (
+        <>
+          <section aria-label="Filtrar ordens por status" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            {cardsStatus.map((card) => {
+              const ativo = statusFiltro === card.status
+              return (
+                <button
+                  key={card.label}
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => selecionarStatus(card.status)}
+                  className={cx(
+                    'flex flex-col items-start rounded-card border p-4 text-left shadow-card transition-colors',
+                    ativo
+                      ? 'border-teal bg-azul-50 ring-2 ring-teal/30'
+                      : 'border-borda bg-surface-card hover:border-ink-3',
+                  )}
+                >
+                  <span className="flex items-center gap-1.5 text-legenda font-semibold tracking-wide text-ink-2 uppercase">
+                    {card.ponto && (
+                      <span aria-hidden="true" className={cx('size-2 rounded-full', card.ponto)} />
+                    )}
+                    {card.label}
+                  </span>
+                  <span
+                    className={cx(
+                      'mt-1.5 text-numero font-semibold tracking-tight',
+                      ativo ? 'text-teal-profundo' : 'text-ink',
+                    )}
+                  >
+                    {card.total.toLocaleString('pt-BR')}
+                  </span>
+                </button>
+              )
+            })}
+          </section>
+
+          <div className="flex flex-col gap-4">
+            <ResultadoInspecoes
+              filtros={{
+                periodo_conclusao: periodoAtual,
+                municipio,
+                bairro,
+                classe,
+                alimentador,
+              }}
+              versao={contagem.CONCLUIDA}
             />
-          ) : (
-            <>
-              {/* Cards de Resumo por Status */}
-              <div className="mt-4 mb-4 grid grid-cols-2 gap-0 overflow-hidden rounded-[16px] bg-[#36465f] text-white sm:grid-cols-4">
-                <div
-                  onClick={() => selecionarStatus('ABERTA')}
-                  className={`cursor-pointer border-r border-white/10 px-5 py-4 transition-colors hover:bg-white/5 ${
-                    statusFiltro === 'ABERTA' ? 'bg-white/10' : ''
-                  }`}
-                >
-                  <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-blue-100/70">
-                    Aberta
+
+            <section
+              aria-label="Lista de ordens de inspeção"
+              className="overflow-hidden rounded-card border border-borda bg-surface-card shadow-card"
+            >
+              <div className="flex flex-col gap-3 border-b border-borda-leve p-4 md:flex-row md:items-start md:justify-between md:px-5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-titulo-lg font-medium">Ordens de fiscalização</h2>
+                    <SeloFicticio metadados={dados?.metadados} />
+                  </div>
+                  <p className="mt-1 text-legenda leading-5 text-ink-2">
+                    Acompanhe o status, despache equipes e registre laudos de vistoria.
                   </p>
-                  <p className="mt-2 text-[20px] font-semibold text-white">
-                    {contagem.ABERTA.toLocaleString('pt-BR')}
-                  </p>
+                  {dados?.metadados.gold_atualizada_em && (
+                    <p className="mt-1 text-legenda text-ink-3">
+                      Gold atualizada em {formatarAtualizacao(dados.metadados.gold_atualizada_em)}
+                    </p>
+                  )}
+                  {atualizando && (
+                    <p role="status" className="mt-1 text-legenda text-teal-profundo">
+                      Atualizando ordens…
+                    </p>
+                  )}
                 </div>
-                <div
-                  onClick={() => selecionarStatus('EM_CAMPO')}
-                  className={`cursor-pointer border-r border-white/10 px-5 py-4 transition-colors hover:bg-white/5 ${
-                    statusFiltro === 'EM_CAMPO' ? 'bg-white/10' : ''
-                  }`}
-                >
-                  <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-blue-100/70">
-                    Em campo
-                  </p>
-                  <p className="mt-2 text-[20px] font-semibold text-white">
-                    {contagem.EM_CAMPO.toLocaleString('pt-BR')}
-                  </p>
-                </div>
-                <div
-                  onClick={() => selecionarStatus('CONCLUIDA')}
-                  className={`cursor-pointer border-r border-white/10 px-5 py-4 transition-colors hover:bg-white/5 ${
-                    statusFiltro === 'CONCLUIDA' ? 'bg-white/10' : ''
-                  }`}
-                >
-                  <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-blue-100/70">
-                    Concluída
-                  </p>
-                  <p className="mt-2 text-[20px] font-semibold text-white">
-                    {contagem.CONCLUIDA.toLocaleString('pt-BR')}
-                  </p>
-                </div>
-                <div
-                  onClick={() => selecionarStatus('CANCELADA')}
-                  className={`cursor-pointer px-5 py-4 transition-colors hover:bg-white/5 ${
-                    statusFiltro === 'CANCELADA' ? 'bg-white/10' : ''
-                  }`}
-                >
-                  <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-blue-100/70">
-                    Cancelada
-                  </p>
-                  <p className="mt-2 text-[20px] font-semibold text-white">
-                    {contagem.CANCELADA.toLocaleString('pt-BR')}
-                  </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <form onSubmit={handleSubmeterBuscaUc} className="flex items-center gap-1.5">
+                    <div className="relative">
+                      <Search
+                        size={15}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3"
+                      />
+                      <input
+                        type="search"
+                        aria-label="Buscar UC"
+                        placeholder="Buscar UC…"
+                        value={buscaUc}
+                        onChange={(e) => setBuscaUc(e.target.value)}
+                        className="h-9 w-40 rounded-md border border-borda bg-surface-card pr-3 pl-9 text-corpo text-ink transition-colors placeholder:text-ink-3 hover:border-ink-3 focus-visible:border-teal focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foco sm:w-48"
+                      />
+                    </div>
+                    {ucFiltro && (
+                      <button
+                        type="button"
+                        onClick={limparBuscaUc}
+                        aria-label="Limpar busca de UC"
+                        title="Limpar busca de UC"
+                        className="grid size-8 place-items-center rounded-md text-ink-2 hover:bg-surface-alt hover:text-ink"
+                      >
+                        <X size={16} aria-hidden="true" />
+                      </button>
+                    )}
+                  </form>
+
+                  <Link to="/perdas/fila">
+                    <Button
+                      variante="secundario"
+                      tamanho="sm"
+                      icone={<Search size={14} aria-hidden="true" />}
+                    >
+                      Fila de inspeção
+                    </Button>
+                  </Link>
                 </div>
               </div>
 
-              {/* Área principal da listagem */}
-              <div className="bg-[#f4f6f7] p-5">
-                <ResultadoInspecoes
-                  filtros={{
-                    periodo_conclusao: periodoAtual,
-                    municipio,
-                    bairro,
-                    classe,
-                    alimentador,
-                  }}
-                  versao={contagem.CONCLUIDA}
-                  className="mb-5"
+              {carregandoInicial ? (
+                <div className="flex flex-col gap-2 p-5">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-md" />
+                  ))}
+                </div>
+              ) : !dados || dados.items.length === 0 ? (
+                <EmptyState
+                  titulo="Nenhuma ordem encontrada"
+                  descricao="Nenhuma ordem de inspeção respeita o status ou os filtros aplicados. Tente ajustar os parâmetros."
+                  icone={<FileText size={28} strokeWidth={1.5} />}
+                  acao={
+                    <Button
+                      variante="secundario"
+                      tamanho="sm"
+                      onClick={() => {
+                        limpar()
+                        limparBuscaUc()
+                        selecionarStatus(undefined)
+                      }}
+                    >
+                      Limpar filtros
+                    </Button>
+                  }
+                  className="min-h-[260px]"
                 />
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-[20px] font-medium text-[#2e2e2e]">
-                        Ordens de fiscalização
-                      </h2>
-                      <SeloFicticio metadados={dados?.metadados} />
-                    </div>
-                    <p className="text-[12px] text-[#68737b]">
-                      Acompanhe o status, despache equipes e registre laudos de vistoria
-                    </p>
-                    {dados?.metadados.gold_atualizada_em && (
-                      <p className="text-[12px] text-[#68737b]">
-                        Gold atualizada em {formatarAtualizacao(dados.metadados.gold_atualizada_em)}
-                      </p>
-                    )}
-                    {atualizando && (
-                      <p role="status" className="mt-1 text-[12px] text-teal-profundo">
-                        Atualizando ordens…
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Campo de busca por UC */}
-                    <form onSubmit={handleSubmeterBuscaUc} className="flex items-center gap-1.5">
-                      <div className="relative">
-                        <Search
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7d858d]"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Buscar UC..."
-                          value={buscaUc}
-                          onChange={(e) => setBuscaUc(e.target.value)}
-                          className="h-9 w-36 rounded-full border border-[#cfd9e0] bg-white pl-8 pr-3 text-xs text-[#242b32] outline-none focus:border-[#6aa5b4] sm:w-44"
-                        />
-                      </div>
-                      {ucFiltro && (
-                        <button
-                          type="button"
-                          onClick={limparBuscaUc}
-                          title="Limpar busca de UC"
-                          className="text-xs text-[#7d858d] hover:text-[#2d425a]"
-                        >
-                          ✕
-                        </button>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table
+                      aria-busy={atualizando}
+                      className={cx(
+                        'w-full min-w-[980px] border-collapse text-left text-legenda',
+                        atualizando && 'opacity-60',
                       )}
-                    </form>
-
-                    {/* Link de volta à Fila */}
-                    <Link to="/perdas/fila">
-                      <Button
-                        variante="secundario"
-                        tamanho="sm"
-                        icone={<Search size={14} aria-hidden="true" />}
-                      >
-                        Fila de inspeção
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Abas de Filtro por Status */}
-                <div className="mb-4 flex flex-wrap gap-2 border-b border-[#dfeaf0] pb-3">
-                  <button
-                    type="button"
-                    onClick={() => selecionarStatus(undefined)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
-                      statusFiltro === undefined
-                        ? 'bg-[#2d425a] text-white shadow-sm'
-                        : 'bg-white/80 text-[#59656d] hover:bg-white'
-                    }`}
-                  >
-                    Todas
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        statusFiltro === undefined
-                          ? 'bg-white/20 text-white'
-                          : 'bg-[#e2eaf0] text-[#59656d]'
-                      }`}
                     >
-                      {totalGeral}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => selecionarStatus('ABERTA')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
-                      statusFiltro === 'ABERTA'
-                        ? 'bg-[#2d425a] text-white shadow-sm'
-                        : 'bg-white/80 text-[#59656d] hover:bg-white'
-                    }`}
-                  >
-                    Aberta
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        statusFiltro === 'ABERTA'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-azul-50 text-teal-profundo'
-                      }`}
-                    >
-                      {contagem.ABERTA}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => selecionarStatus('EM_CAMPO')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
-                      statusFiltro === 'EM_CAMPO'
-                        ? 'bg-[#2d425a] text-white shadow-sm'
-                        : 'bg-white/80 text-[#59656d] hover:bg-white'
-                    }`}
-                  >
-                    Em campo
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        statusFiltro === 'EM_CAMPO'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-amber-100 text-amber-900'
-                      }`}
-                    >
-                      {contagem.EM_CAMPO}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => selecionarStatus('CONCLUIDA')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
-                      statusFiltro === 'CONCLUIDA'
-                        ? 'bg-[#2d425a] text-white shadow-sm'
-                        : 'bg-white/80 text-[#59656d] hover:bg-white'
-                    }`}
-                  >
-                    Concluída
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        statusFiltro === 'CONCLUIDA'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-emerald-100 text-emerald-900'
-                      }`}
-                    >
-                      {contagem.CONCLUIDA}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => selecionarStatus('CANCELADA')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
-                      statusFiltro === 'CANCELADA'
-                        ? 'bg-[#2d425a] text-white shadow-sm'
-                        : 'bg-white/80 text-[#59656d] hover:bg-white'
-                    }`}
-                  >
-                    Cancelada
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        statusFiltro === 'CANCELADA'
-                          ? 'bg-white/20 text-white'
-                          : 'bg-slate-200 text-slate-800'
-                      }`}
-                    >
-                      {contagem.CANCELADA}
-                    </span>
-                  </button>
-                </div>
-
-                {/* Conteúdo da Tabela */}
-                {carregandoInicial ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="h-14 w-full rounded-lg" />
-                    ))}
-                  </div>
-                ) : !dados || dados.items.length === 0 ? (
-                  <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[#dfeaf0] bg-white/50">
-                    <EmptyState
-                      titulo="Nenhuma ordem encontrada"
-                      descricao="Nenhuma ordem de inspeção respeita o status ou filtros aplicados. Tente ajustar os parâmetros."
-                      icone={<FileText size={28} strokeWidth={1.5} />}
-                      acao={
-                        <Button
-                          variante="secundario"
-                          tamanho="sm"
-                          onClick={() => {
-                            limpar()
-                            limparBuscaUc()
-                            selecionarStatus(undefined)
-                          }}
-                        >
-                          Limpar filtros
-                        </Button>
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="overflow-hidden rounded-xl border border-[#dfeaf0] bg-white shadow-xs">
-                    <div className="overflow-x-auto">
-                      <table
-                        aria-busy={atualizando}
-                        className={`w-full min-w-[960px] table-fixed border-collapse text-left text-[12px] ${
-                          atualizando ? 'opacity-60' : ''
-                        }`}
-                      >
-                        <colgroup>
-                          <col className="w-24" />
-                          <col className="w-36" />
-                          <col className="w-40" />
-                          <col className="w-28" />
-                          <col className="w-28" />
-                          <col className="w-40" />
-                        </colgroup>
-                        <thead className="bg-[#2d425a] text-white">
-                          <tr>
-                            <th className="px-3 py-3 text-center">Ordem</th>
-                            <th className="px-3 py-3">Unidade consumidora</th>
-                            <th className="px-3 py-3">Equipe</th>
-                            <th className="px-3 py-3">Data prevista</th>
-                            <th className="px-3 py-3">Status</th>
-                            <th className="px-3 py-3 text-center">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dados.items.map((ordem, index) => {
-                            const config = STATUS_CONFIG[ordem.status]
-                            return (
-                              <tr
-                                key={ordem.id_ordem}
-                                className={index % 2 === 0 ? 'bg-white' : 'bg-[#f8fafb]'}
-                              >
-                                <td className="border-b border-[#edf2f5] px-3 py-3 text-center font-bold text-[#2d425a]">
-                                  #{ordem.id_ordem}
-                                  <span className="block text-[10px] font-normal text-[#7d858d]">
+                      <caption className="sr-only">Ordens de inspeção</caption>
+                      <colgroup>
+                        <col className="w-[120px]" />
+                        <col className="w-[150px]" />
+                        <col className="w-[180px]" />
+                        <col className="w-[120px]" />
+                        <col className="w-[120px]" />
+                        <col className="w-[280px]" />
+                      </colgroup>
+                      <thead className="bg-surface-alt text-ink-2">
+                        <tr>
+                          <th scope="col" className="px-3 py-3">
+                            Ordem
+                          </th>
+                          <th scope="col" className="px-3 py-3">
+                            Unidade consumidora
+                          </th>
+                          <th scope="col" className="px-3 py-3">
+                            Equipe
+                          </th>
+                          <th scope="col" className="px-3 py-3">
+                            Data prevista
+                          </th>
+                          <th scope="col" className="px-3 py-3">
+                            Status
+                          </th>
+                          <th scope="col" className="px-3 py-3 text-right">
+                            Ações
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dados.items.map((ordem) => {
+                          const config = STATUS_CONFIG[ordem.status]
+                          const destacada = destacadas.has(ordem.id_ordem)
+                          return (
+                            <tr
+                              key={ordem.id_ordem}
+                              className={cx(
+                                'border-b border-borda-leve transition-colors last:border-b-0',
+                                destacada ? 'bg-lima-suave' : 'hover:bg-surface-sutil',
+                              )}
+                            >
+                              <td className="px-3 py-3">
+                                <div className="flex flex-col gap-1">
+                                  <span className="font-semibold text-ink">#{ordem.id_ordem}</span>
+                                  <span className="text-micro text-ink-3">
                                     {formatarData(ordem.data_criacao)}
                                   </span>
-                                </td>
+                                  {destacada && <Badge variante="info">Recém-criada</Badge>}
+                                </div>
+                              </td>
 
-                                <td className="border-b border-[#edf2f5] px-3 py-3">
-                                  <Link
-                                    to={`/unidades/${ordem.id_uc}`}
-                                    className="font-semibold text-[#2d6a80] hover:underline"
-                                    title="Ver visão 360 da UC"
-                                  >
-                                    {ordem.id_uc}
-                                  </Link>
-                                </td>
+                              <td className="px-3 py-3">
+                                <Link
+                                  to={`/unidades/${ordem.id_uc}`}
+                                  className="font-medium text-teal-escuro hover:underline"
+                                  title="Ver visão 360 da UC"
+                                >
+                                  {ordem.id_uc}
+                                </Link>
+                              </td>
 
-                                <td className="border-b border-[#edf2f5] px-3 py-3 font-medium text-[#2c2d2d]">
-                                  {ordem.equipe_responsavel}
-                                </td>
+                              <td className="px-3 py-3 font-medium text-ink">
+                                {ordem.equipe_responsavel}
+                              </td>
 
-                                <td className="border-b border-[#edf2f5] px-3 py-3 text-[#59656d]">
-                                  {formatarData(ordem.data_prevista)}
-                                </td>
+                              <td className="px-3 py-3 text-ink-2">
+                                {formatarData(ordem.data_prevista)}
+                              </td>
 
-                                <td className="border-b border-[#edf2f5] px-3 py-3">
-                                  <Badge variante={config.variante} ponto>
-                                    {config.label}
-                                  </Badge>
-                                </td>
+                              <td className="px-3 py-3">
+                                <Badge variante={config.variante} ponto>
+                                  {config.label}
+                                </Badge>
+                              </td>
 
-                                <td className="border-b border-[#edf2f5] px-3 py-3 text-center">
-                                  <AcoesOrdem
-                                    ordem={ordem}
-                                    aoIniciar={(ordem) => {
-                                      setOrdemSelecionada(ordem)
-                                      setModalIniciarAberto(true)
-                                    }}
-                                    aoConcluir={(ordem) => {
-                                      setOrdemSelecionada(ordem)
-                                      setModalConcluirAberto(true)
-                                    }}
-                                    aoCancelar={(ordem) => {
-                                      setOrdemSelecionada(ordem)
-                                      setModalCancelarAberto(true)
-                                    }}
-                                    aoVerDetalhes={(ordem) => {
-                                      setOrdemSelecionada(ordem)
-                                      setModalDetalhesAberto(true)
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {dados.total > LINHAS_POR_PAGINA && (
-                      <div className="border-t border-[#dfeaf0] p-4 bg-white">
-                        <Paginacao
-                          page={page}
-                          pageSize={LINHAS_POR_PAGINA}
-                          total={dados.total}
-                          aoMudar={mudarPagina}
-                        />
-                      </div>
-                    )}
+                              <td className="px-3 py-3">
+                                <AcoesOrdem
+                                  ordem={ordem}
+                                  aoIniciar={(selecionada) => {
+                                    setOrdemSelecionada(selecionada)
+                                    setModalIniciarAberto(true)
+                                  }}
+                                  aoConcluir={(selecionada) => {
+                                    setOrdemSelecionada(selecionada)
+                                    setModalConcluirAberto(true)
+                                  }}
+                                  aoCancelar={(selecionada) => {
+                                    setOrdemSelecionada(selecionada)
+                                    setModalCancelarAberto(true)
+                                  }}
+                                  aoVerDetalhes={(selecionada) => {
+                                    setOrdemSelecionada(selecionada)
+                                    setModalDetalhesAberto(true)
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+
+                  {dados.total > LINHAS_POR_PAGINA && (
+                    <div className="border-t border-borda-leve p-4">
+                      <Paginacao
+                        page={page}
+                        pageSize={LINHAS_POR_PAGINA}
+                        total={dados.total}
+                        aoMudar={mudarPagina}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          </div>
+        </>
+      )}
 
       {/* Modais da Gestão de Ordens */}
       <ModalIniciarCampo

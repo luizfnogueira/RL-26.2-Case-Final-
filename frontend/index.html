@@ -1,11 +1,25 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#a9e2f2" />
+    <meta name="theme-color" content="#f5f7f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a1216" media="(prefers-color-scheme: dark)" />
     <title>V-Energy Grid 360</title>
+    <script>
+      // Aplica o tema antes do primeiro paint para não piscar o claro em quem usa o escuro.
+      ;(() => {
+        try {
+          const salvo = localStorage.getItem('venergy:tema')
+          const escuro = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+          document.documentElement.dataset.tema =
+            salvo === 'claro' || salvo === 'escuro' ? salvo : escuro ? 'escuro' : 'claro'
+        } catch {
+          document.documentElement.dataset.tema = 'claro'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

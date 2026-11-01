@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Prancheta de campo — Painel executivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Saira:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14171A; --ink-2:#4A5055; --ink-3:#767D82;
+    --paper:#F1F2EF; --card:#FFFFFF; --rule:#D7D9D4; --rule-2:#E6E8E3;
+    --orange:#FF4D00; --cyan:#00A3B4; --yellow:#FFD400;
+    --neg:#C62828; --pos:#1B7A3E;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{width:1440px;height:900px;overflow:hidden;background:var(--paper);color:var(--ink);
+    font-family:Saira,system-ui,sans-serif;font-weight:400;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:236px 1fr;height:900px}
+
+  /* trilho */
+  .rail{background:var(--ink);color:#EDEEEA;display:flex;flex-direction:column;padding:22px 0 16px}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 20px 24px}
+  .mark{width:34px;height:34px;background:var(--orange);display:grid;place-items:center;flex:none}
+  .mark svg{width:19px;height:19px}
+  .brand b{font-family:'Saira Condensed';font-size:19px;letter-spacing:.16em;font-weight:600;display:block;line-height:1}
+  .brand span{font-size:10px;letter-spacing:.22em;color:#9AA1A6;display:block;margin-top:4px}
+  nav{display:flex;flex-direction:column;gap:2px;padding:0 12px}
+  nav a{display:flex;align-items:center;gap:12px;padding:10px 10px;color:#B9BFC3;text-decoration:none;
+    font-size:13.5px;letter-spacing:.01em;position:relative}
+  nav a svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.6;flex:none}
+  nav a.on{color:#fff;background:#20252A}
+  nav a.on .sq{position:absolute;left:-12px;width:5px;height:22px;background:var(--orange)}
+  .rail .spacer{flex:1}
+  .rail .who{border-top:1px solid #2A3035;margin:0 16px;padding:14px 4px 0;display:flex;gap:10px;align-items:center}
+  .avatar{width:30px;height:30px;background:#2A3035;color:#EDEEEA;display:grid;place-items:center;font-size:11px;font-weight:600}
+  .who b{font-size:12px;font-weight:500;display:block}
+  .who span{font-size:10.5px;color:#8D9499}
+
+  /* área */
+  main{padding:24px 30px 18px;display:flex;flex-direction:column;gap:18px;min-width:0}
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+  h1{font-family:'Saira Condensed';font-size:40px;line-height:.95;font-weight:600;letter-spacing:.005em}
+  .sub{font-size:12.5px;color:var(--ink-2);margin-top:7px;letter-spacing:.01em}
+  .filters{display:flex;gap:8px;align-items:center}
+  .tag{border:1px dashed #B9BDB6;background:transparent;padding:7px 11px;font-size:11.5px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-2);display:flex;gap:8px;align-items:center}
+  .tag b{font-weight:600;color:var(--ink);letter-spacing:.02em;text-transform:none;font-size:12.5px}
+  .tag.sel{border-style:solid;border-color:var(--ink);background:var(--card)}
+  .btn{background:var(--ink);color:#fff;border:0;padding:9px 14px;font-family:inherit;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase}
+
+  /* faixa de leitura */
+  .band{background:var(--orange);color:#14171A;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 22px;gap:24px}
+  .band .big{font-family:'Saira Condensed';font-size:30px;line-height:1;font-weight:600;letter-spacing:.005em}
+  .band .big em{font-style:normal;background:#14171A;color:var(--yellow);padding:0 6px}
+  .band .go{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;white-space:nowrap}
+  .band .go svg{width:22px;height:22px;stroke:#14171A;fill:none;stroke-width:1.8}
+
+  /* boletim */
+  .board{display:grid;grid-template-columns:repeat(3,1fr);border-top:2px solid var(--ink)}
+  .kpi{padding:16px 18px 14px;border-bottom:1px solid var(--rule);border-right:1px solid var(--rule);background:var(--card);position:relative}
+  .kpi:nth-child(3n){border-right:0}
+  .kpi .lbl{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between}
+  .kpi .lbl i{font-style:normal;color:var(--cyan);font-weight:600}
+  .kpi .val{font-family:'Saira Condensed';font-size:44px;line-height:1;font-weight:600;margin:9px 0 2px;letter-spacing:-.01em}
+  .kpi .val small{font-family:Saira;font-size:14px;font-weight:400;color:var(--ink-2);letter-spacing:0;margin-left:3px}
+  .kpi .base{font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .stamp{position:absolute;right:16px;bottom:14px;border:1.5px solid currentColor;padding:3px 7px;
+    font-size:11px;font-weight:600;letter-spacing:.1em;transform:rotate(-2.5deg);opacity:.9}
+  .up{color:var(--pos)} .down{color:var(--neg)} .good{color:var(--pos)} .bad{color:var(--neg)}
+
+  /* campo de histórico */
+  .field{flex:1;background:var(--card);border:1px solid var(--rule);padding:14px 18px 10px;display:flex;flex-direction:column;min-height:0}
+  .field .fh{display:flex;justify-content:space-between;align-items:baseline}
+  .field h2{font-family:'Saira Condensed';font-size:19px;font-weight:600;letter-spacing:.02em}
+  .legend{display:flex;gap:16px;font-size:11px;color:var(--ink-2);letter-spacing:.04em}
+  .legend i{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle}
+  .plot{flex:1;display:flex;align-items:stretch;gap:3px;padding-top:12px;position:relative}
+  .plot .col{flex:1;height:100%;background:#E3E5E0;position:relative}
+  .plot .col b{position:absolute;inset:auto 0 0 0;background:var(--orange);display:block}
+  .axis{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);letter-spacing:.08em;
+    border-top:1px solid var(--rule-2);padding-top:6px;margin-top:6px}
+
+  footer{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--ink-3);letter-spacing:.05em}
+  .seal{border:1px solid #B9BDB6;padding:3px 8px;text-transform:uppercase;letter-spacing:.14em;font-size:9.5px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 5 14h6l-1 8 9-13h-6l1-7Z" fill="#14171A"/></svg></div>
+      <div><b>V-ENERGY</b><span>GRID 360</span></div>
+    </div>
+    <nav>
+      <a class="on" href="#"><span class="sq"></span><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Painel executivo</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8"/><path d="M3 21h18"/></svg>Diagnóstico da receita</a>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Visão 360 da UC</a>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Fila de inspeção</a>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="17"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Ordens de inspeção</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Continuidade DEC / FEC</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/></svg>Assistente V-Energy</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="who"><div class="avatar">HD</div><div><b>Henrique Duarte</b><span>Diretor Comercial</span></div></div>
+  </aside>
+
+  <main>
+    <div class="head">
+      <div>
+        <h1>Painel executivo</h1>
+        <div class="sub">Saúde do negócio · 412.350 UCs · 14 municípios · Gold exportada em 28/10/2026</div>
+      </div>
+      <div class="filters">
+        <div class="tag sel"><span>P2</span><b>jul/2025 – jun/2026</b></div>
+        <div class="tag"><span>P1</span><b>jul/2022 – jun/2023</b></div>
+        <div class="tag"><span>Recorte</span><b>Todos os municípios</b></div>
+        <button class="btn">Comparar recortes</button>
+      </div>
+    </div>
+
+    <section class="band">
+      <div class="big">A receita cresceu <em>8,0%</em>. O volume caiu <em>3,9%</em>.</div>
+      <div class="go">Ler o diagnóstico
+        <svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+      </div>
+    </section>
+
+    <section class="board">
+      <div class="kpi"><div class="lbl">Receita faturada <i>com tributos</i></div><div class="val">R$ 284,7<small>mi</small></div><div class="base">P1 263,6 mi · diferença +21,1 mi</div><span class="stamp up">+8,0%</span></div>
+      <div class="kpi"><div class="lbl">Volume faturado</div><div class="val">394,4<small>GWh</small></div><div class="base">P1 410,4 GWh · diferença −16,0 GWh</div><span class="stamp down">−3,9%</span></div>
+      <div class="kpi"><div class="lbl">UCs ativas</div><div class="val">412.350</div><div class="base">P1 398.920 · diferença +13.430</div><span class="stamp up">+3,4%</span></div>
+      <div class="kpi"><div class="lbl">Valor em aberto</div><div class="val">R$ 12,8<small>mi</small></div><div class="base">P1 10,0 mi · diferença +2,8 mi</div><span class="stamp bad">+27,9%</span></div>
+      <div class="kpi"><div class="lbl">DEC médio</div><div class="val">11,46<small>h/UC</small></div><div class="base">P1 13,27 h/UC · diferença −1,81</div><span class="stamp good">−13,6%</span></div>
+      <div class="kpi"><div class="lbl">FEC médio</div><div class="val">6,00<small>int/UC</small></div><div class="base">P1 6,95 int/UC · diferença −0,95</div><span class="stamp good">−13,7%</span></div>
+    </section>
+
+    <section class="field">
+      <div class="fh">
+        <h2>48 meses de receita e volume</h2>
+        <div class="legend"><span><i style="background:var(--orange)"></i>Receita faturada</span><span><i style="background:var(--cyan)"></i>Volume faturado</span></div>
+      </div>
+      <div class="plot">
+        <div class="col"><b style="height:52%"></b></div><div class="col"><b style="height:58%"></b></div><div class="col"><b style="height:61%"></b></div><div class="col"><b style="height:66%"></b></div><div class="col"><b style="height:63%"></b></div><div class="col"><b style="height:69%"></b></div>
+        <div class="col"><b style="height:72%"></b></div><div class="col"><b style="height:76%"></b></div><div class="col"><b style="height:74%"></b></div><div class="col"><b style="height:70%"></b></div><div class="col"><b style="height:67%"></b></div><div class="col"><b style="height:71%"></b></div>
+        <div class="col"><b style="height:64%"></b></div><div class="col"><b style="height:60%"></b></div><div class="col"><b style="height:57%"></b></div><div class="col"><b style="height:62%"></b></div><div class="col"><b style="height:66%"></b></div><div class="col"><b style="height:68%"></b></div>
+        <div class="col"><b style="height:65%"></b></div><div class="col"><b style="height:61%"></b></div><div class="col"><b style="height:59%"></b></div><div class="col"><b style="height:63%"></b></div><div class="col"><b style="height:67%"></b></div><div class="col"><b style="height:71%"></b></div>
+        <div class="col"><b style="height:75%"></b></div><div class="col"><b style="height:79%"></b></div><div class="col"><b style="height:82%"></b></div><div class="col"><b style="height:85%"></b></div><div class="col"><b style="height:88%"></b></div><div class="col"><b style="height:86%"></b></div>
+        <div class="col"><b style="height:83%"></b></div><div class="col"><b style="height:80%"></b></div><div class="col"><b style="height:77%"></b></div><div class="col"><b style="height:73%"></b></div><div class="col"><b style="height:70%"></b></div><div class="col"><b style="height:74%"></b></div>
+        <div class="col"><b style="height:78%"></b></div><div class="col"><b style="height:81%"></b></div><div class="col"><b style="height:84%"></b></div><div class="col"><b style="height:87%"></b></div><div class="col"><b style="height:90%"></b></div><div class="col"><b style="height:92%"></b></div>
+        <div class="col"><b style="height:95%"></b></div><div class="col"><b style="height:97%"></b></div><div class="col"><b style="height:100%"></b></div><div class="col"><b style="height:96%"></b></div><div class="col"><b style="height:93%"></b></div><div class="col"><b style="height:98%"></b></div>
+      </div>
+      <div class="axis"><span>JUL 2022</span><span>JUL 2023</span><span>JUL 2024</span><span>JUL 2025</span><span>JUN 2026</span></div>
+    </section>
+
+    <footer>
+      <span class="seal">Dado fictício</span>
+      <span>Origem: gold.dashboard · manifesto de 28/10/2026 · filtros na URL</span>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

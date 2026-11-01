@@ -186,7 +186,7 @@ export default function ReceitaPage() {
                 : undefined
             }
           />
-          <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="grid items-stretch gap-4 md:gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
             <PonteDaReceita dashboard={dados} atualizando={atualizando} />
             <ExplicacaoDoResultado pontos={explicarResultado(dados)} atualizando={atualizando} />
           </div>
@@ -234,7 +234,7 @@ function CarregandoReceita() {
       className="flex flex-col gap-4 md:gap-6"
     >
       <Skeleton className="h-36 w-full rounded-card" />
-      <div className="grid gap-4 md:gap-6 xl:grid-cols-[3fr_2fr]">
+      <div className="grid gap-4 md:gap-5 xl:grid-cols-[1.65fr_1fr]">
         <Skeleton className="h-80 rounded-card" />
         <Skeleton className="h-80 rounded-card" />
       </div>

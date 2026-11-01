@@ -1,84 +1,204 @@
 @import 'tailwindcss';
 
 /*
- * Tokens da identidade visual FILO.
- * Espelham as variáveis e os estilos do arquivo Figma
- * "V-Energy Grid 360 — Protótipo de alta (identidade FILO)".
+ * Sistema visual do V-Energy Grid 360.
  *
- * Correspondência com o Figma:
- *   text/primario → ink · text/secundario → ink-2 · text/terciario → ink-3
- *   surface/*     → surface-* · border/* → borda · brand/sky-* → azul-*
- *   brand/lime-*  → lima-* · status/* → perigo, alerta, sucesso
+ * Base neutra e fria (cinza-azulado) para o canvas e as superfícies, com dois acentos vívidos:
+ *   · teal  → marca, ação primária, links e séries principais;
+ *   · lima  → seleção, destaque e sinalização.
+ * Estados usam vermelho, âmbar e verde semânticos. Os gráficos usam teal + laranja, um par
+ * distinguível em daltonismo.
+ *
+ * As variáveis ficam em :root (tema claro) e [data-tema='escuro'] (tema escuro). O @theme inline
+ * faz cada utilitário do Tailwind apontar para a variável, então trocar o atributo no <html>
+ * troca o tema inteiro em tempo de execução, sem recarregar a página.
  */
-@theme {
-  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
 
-  /* Fundo da página (degradê vertical) */
-  --color-fundo-topo: #f3f4fa;
-  --color-fundo-base: #a9e2f2;
+:root {
+  color-scheme: light;
+
+  /* Fundo da página */
+  --fundo-topo: #f5f7f9;
+  --fundo-base: #e8eef2;
 
   /* Superfícies e bordas */
-  --color-surface-card: #ffffff;
-  --color-surface-alt: #f4f4f4;
-  --color-surface-sutil: #f5f5f5;
-  --color-surface-escuro: #36465f;
-  --color-surface-tinta: #141b34;
-  --color-surface-esqueleto: #eceef2;
-  --color-borda: #d9d9d9;
-  --color-borda-leve: #f1f1f1;
+  --surface-card: #ffffff;
+  --surface-alt: #eff3f5;
+  --surface-sutil: #f6f8f9;
+  --surface-escuro: #123039;
+  --surface-tinta: #0b1a1f;
+  --surface-esqueleto: #e3e9ec;
+  --borda: #d5dee3;
+  --borda-leve: #e7edf0;
 
   /* Texto */
-  --color-ink: #404040;
-  --color-ink-2: #7b7d80;
-  --color-ink-3: #898c8f;
-  --color-ink-inverso: #ffffff;
+  --ink: #102027;
+  --ink-2: #4d616b;
+  --ink-3: #74868f;
+  --ink-inverso: #ffffff;
 
-  /* Marca */
-  --color-marca: #6a838b;
-  --color-teal: #4696ad;
-  --color-teal-escuro: #2e7a92;
-  --color-teal-profundo: #1b607a;
-  --color-azul-50: #eaf6fb;
-  --color-azul-100: #c9eaf6;
-  --color-azul-300: #a9e2f2;
-  --color-azul-400: #8fd3e8;
-  --color-lima: #d7fe65;
-  --color-lima-escuro: #b4d64e;
-  --color-lima-suave: #fbfff0;
+  /* Marca e acentos */
+  --marca: #0f766e;
+  --teal: #0d9488;
+  --teal-escuro: #0f766e;
+  --teal-profundo: #115e59;
+  --azul-50: #edfaf7;
+  --azul-100: #d1f2eb;
+  --azul-300: #5eead4;
+  --azul-400: #2dd4bf;
+  --lima: #c9f25b;
+  --lima-escuro: #84cc16;
+  --lima-suave: #f6fbe8;
+
+  /* Texto sobre superfícies de acento */
+  --sobre-acao: #042f2c;
+  --sobre-lima: #1a2e05;
+  --sobre-perigo: #ffffff;
+  --balao-usuario: #0f766e;
+  --balao-usuario-texto: #ffffff;
 
   /* Estados */
-  --color-perigo: #d75757;
-  --color-perigo-escuro: #b94343;
-  --color-perigo-suave: #fbeaea;
-  --color-alerta: #b9a065;
-  --color-alerta-escuro: #8a6f2a;
-  --color-alerta-suave: #f7f0dc;
-  --color-sucesso-texto: #4f7a12;
-  --color-sucesso-suave: #effbc8;
+  --perigo: #dc2626;
+  --perigo-escuro: #b91c1c;
+  --perigo-suave: #fde8e8;
+  --alerta: #d97706;
+  --alerta-escuro: #b45309;
+  --alerta-suave: #fdf0d5;
+  --sucesso-texto: #166534;
+  --sucesso-suave: #dcfce7;
 
-  /*
-   * Gráficos: par de séries "atual × anterior" (ex.: consumo do mês × mesmo mês do ano anterior).
-   * Teal-profundo e teal da marca, um pouco mais saturados, validados com o validador de paleta da
-   * diretriz de visualização (fundo #ffffff): luminosidade e saturação na faixa, separação ΔE 19,3 em
-   * daltonismo (deuteranopia/protanopia/tritanopia) e 19,1 em visão normal (mínimos 8 e 15), contraste
-   * ≥ 3:1. Os tons originais (#1b607a e #4696ad) reprovam no piso de saturação. Um tema escuro
-   * precisa de passos próprios, revalidados contra a superfície escura.
-   */
-  --color-grafico-atual: #005e90;
-  --color-grafico-anterior: #3a9cc0;
+  /* Gráficos: teal (atual) × laranja (comparação) */
+  --grafico-atual: #0f766e;
+  --grafico-anterior: #ea580c;
+
+  /* Foco e seleção de texto */
+  --foco: #0f766e;
+  --selecao: #d9f99d;
+}
+
+[data-tema='escuro'] {
+  color-scheme: dark;
+
+  --fundo-topo: #0a1216;
+  --fundo-base: #0d1a20;
+
+  --surface-card: #12232a;
+  --surface-alt: #1a3038;
+  --surface-sutil: #162a31;
+  --surface-escuro: #0a1216;
+  --surface-tinta: #050d10;
+  --surface-esqueleto: #213840;
+  --borda: #2b444d;
+  --borda-leve: #20373f;
+
+  --ink: #e6f1f2;
+  --ink-2: #a6bcc1;
+  --ink-3: #7d979d;
+  --ink-inverso: #ffffff;
+
+  --marca: #5eead4;
+  --teal: #2dd4bf;
+  --teal-escuro: #5eead4;
+  --teal-profundo: #99f6e4;
+  --azul-50: #11302f;
+  --azul-100: #164039;
+  --azul-300: #2dd4bf;
+  --azul-400: #5eead4;
+  --lima: #d9f99d;
+  --lima-escuro: #a3e635;
+  --lima-suave: #22331a;
+
+  --sobre-acao: #042f2c;
+  --sobre-lima: #1a2e05;
+  --sobre-perigo: #3b0a0a;
+  --balao-usuario: #164039;
+  --balao-usuario-texto: #e6f1f2;
+
+  --perigo: #f87171;
+  --perigo-escuro: #fca5a5;
+  --perigo-suave: #3b1d1f;
+  --alerta: #fbbf24;
+  --alerta-escuro: #fcd34d;
+  --alerta-suave: #3a2d16;
+  --sucesso-texto: #86efac;
+  --sucesso-suave: #163322;
+
+  --grafico-atual: #2dd4bf;
+  --grafico-anterior: #fb923c;
+
+  --foco: #5eead4;
+  --selecao: #3f6212;
+}
+
+@theme inline {
+  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+
+  /* Fundo da página */
+  --color-fundo-topo: var(--fundo-topo);
+  --color-fundo-base: var(--fundo-base);
+
+  /* Superfícies e bordas */
+  --color-surface-card: var(--surface-card);
+  --color-surface-alt: var(--surface-alt);
+  --color-surface-sutil: var(--surface-sutil);
+  --color-surface-escuro: var(--surface-escuro);
+  --color-surface-tinta: var(--surface-tinta);
+  --color-surface-esqueleto: var(--surface-esqueleto);
+  --color-borda: var(--borda);
+  --color-borda-leve: var(--borda-leve);
+
+  /* Texto */
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-inverso: var(--ink-inverso);
+
+  /* Marca e acentos */
+  --color-marca: var(--marca);
+  --color-teal: var(--teal);
+  --color-teal-escuro: var(--teal-escuro);
+  --color-teal-profundo: var(--teal-profundo);
+  --color-azul-50: var(--azul-50);
+  --color-azul-100: var(--azul-100);
+  --color-azul-300: var(--azul-300);
+  --color-azul-400: var(--azul-400);
+  --color-lima: var(--lima);
+  --color-lima-escuro: var(--lima-escuro);
+  --color-lima-suave: var(--lima-suave);
+
+  /* Texto sobre superfícies de acento */
+  --color-sobre-acao: var(--sobre-acao);
+  --color-sobre-lima: var(--sobre-lima);
+  --color-sobre-perigo: var(--sobre-perigo);
+  --color-balao-usuario: var(--balao-usuario);
+  --color-balao-usuario-texto: var(--balao-usuario-texto);
+
+  /* Estados */
+  --color-perigo: var(--perigo);
+  --color-perigo-escuro: var(--perigo-escuro);
+  --color-perigo-suave: var(--perigo-suave);
+  --color-alerta: var(--alerta);
+  --color-alerta-escuro: var(--alerta-escuro);
+  --color-alerta-suave: var(--alerta-suave);
+  --color-sucesso-texto: var(--sucesso-texto);
+  --color-sucesso-suave: var(--sucesso-suave);
+
+  /* Gráficos */
+  --color-grafico-atual: var(--grafico-atual);
+  --color-grafico-anterior: var(--grafico-anterior);
 
   /* Raios */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-card: 24px;
+  --radius-card: 16px;
 
   /* Sombras */
-  --shadow-card: 0 4px 5px rgb(0 0 0 / 0.05);
-  --shadow-flutuante: 0 4px 20px rgb(0 0 0 / 0.12);
-  --shadow-modal: 0 8px 32px rgb(0 0 0 / 0.18);
+  --shadow-card: 0 1px 2px rgb(16 32 39 / 0.04), 0 10px 24px -18px rgb(16 32 39 / 0.35);
+  --shadow-flutuante: 0 8px 28px -12px rgb(16 32 39 / 0.4);
+  --shadow-modal: 0 24px 64px -24px rgb(6 20 26 / 0.55);
 
-  /* Escala tipográfica (estilos de texto do Figma) */
+  /* Escala tipográfica */
   --text-display: 30px;
   --text-display--line-height: 38px;
   --text-numero: 24px;
@@ -98,31 +218,68 @@
 }
 
 @utility bg-filo {
-  background-image: linear-gradient(to bottom, var(--color-fundo-topo), var(--color-fundo-base));
+  background-image: linear-gradient(to bottom, var(--fundo-topo), var(--fundo-base));
   background-attachment: fixed;
 }
 
 @layer base {
   html {
     font-family: var(--font-sans);
-    color: var(--color-ink);
+    color: var(--ink);
+    background-color: var(--fundo-base);
   }
 
   body {
     margin: 0;
     min-height: 100dvh;
-    background-color: var(--color-fundo-base);
-    font-weight: 300;
+    background-color: var(--fundo-base);
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--ink);
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-teal-escuro);
+    outline: 2px solid var(--foco);
     outline-offset: 2px;
   }
 
   ::selection {
-    background-color: var(--color-lima);
-    color: var(--color-ink);
+    background-color: var(--selecao);
+    color: var(--sobre-lima);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--borda);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ink-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }
