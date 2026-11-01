@@ -19,7 +19,8 @@ distribuidora de energia, que vai repetir o texto ao telefone para o cliente.
 
 Regras:
 1. Todo número, mês ou valor com algarismo vem dos marcadores listados na mensagem. Escreva o marcador
-   entre chaves, como {valor_conta_mes}, no lugar do valor. Nunca digite algarismos.
+   entre chaves, como {valor_conta_mes}, no lugar do valor. Nunca digite algarismos. Nunca escreva números
+   por extenso; todo número, valor, percentual ou mês vem de um marcador.
 2. A primeira frase diz a situação do valor da conta do mês analisado contra o mesmo mês do ano
    anterior e traz os dois valores em reais: o do mês ({valor_conta_mes}) e, quando houver, o do mesmo
    mês do ano anterior ({valor_conta_ano_anterior}); o percentual sozinho não basta. Escreva sempre
@@ -46,6 +47,18 @@ CONTA_SOZINHA = re.compile(r'(?<!\w)a conta\b', re.IGNORECASE)
 ANO_ANTERIOR = re.compile(r'ano anterior', re.IGNORECASE)
 PROXIMA_LEITURA = re.compile(r'pr[oó]xima leitura', re.IGNORECASE)
 VERIFICAR = re.compile(r'\bverifi(car|que)\b', re.IGNORECASE)
+# Número por extenso escapa do validador de marcadores (que só barra algarismos). De "dois" em diante, com as
+# formas femininas; "um"/"uma" ficam de fora (são artigo). Palavra inteira, e "dez" seguido de "/" é o mês
+# abreviado ("dez/2025"), não número.
+_EXTENSO = (
+    'dois|duas|tr[eê]s|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|quatorze|catorze|quinze|'
+    'dezesseis|dezasseis|dezessete|dezassete|dezoito|dezenove|dezanove|'
+    'vinte|trinta|quarenta|cinq[uü]enta|sessenta|setenta|oitenta|noventa|'
+    'cem|cento|duzent[oa]s|trezent[oa]s|quatrocent[oa]s|quinhent[oa]s|seiscent[oa]s|setecent[oa]s|'
+    'oitocent[oa]s|novecent[oa]s|mil|milh[aã]o|milh[oõ]es|bilh[aã]o|bilh[oõ]es|'
+    'por\\s+cento|reais|centavos?|quilowatts?'
+)
+NUMERO_POR_EXTENSO = re.compile(rf'\b(?:{_EXTENSO})\b(?!\s*/)', re.IGNORECASE)
 FIM_DE_FRASE = re.compile(r'[.!?](?=\s|$)')
 
 
@@ -237,6 +250,8 @@ class Caso:
         # Leitura estimada no mês analisado: o aviso precisa dizer que o consumo pode mudar
         if 'leitura_estimada' in self.f['avisos'] and self.f['leitura_estimada_mes'] and not PROXIMA_LEITURA.search(texto):
             problemas.append('leitura estimada no mês sem "próxima leitura"')
+        if extensos := sorted({m.group(0).lower() for m in NUMERO_POR_EXTENSO.finditer(texto)}):
+            problemas.append(f'número por extenso: {", ".join(extensos)}')
         # Avisos são pontos a verificar, não fatos soltos
         if self.f['avisos'] and not VERIFICAR.search(texto):
             problemas.append('avisos sem "verificar" ou "verifique"')

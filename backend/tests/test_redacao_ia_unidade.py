@@ -21,7 +21,7 @@ from app.services.insight_service import PREFIXO_TEXTO_ALTERNATIVO, GeradorIA
 from app.services.insight_unidade import (
     OBSERVACAO_CONFERENCIA, OBSERVACAO_FALHA, OBSERVACAO_SEM_IA, OBSERVACAO_SEM_SITUACAO,
 )
-from app.services.redacao_ia_unidade import INSTRUCOES_UNIDADE, Caso, aparece, frases
+from app.services.redacao_ia_unidade import INSTRUCOES_UNIDADE, NUMERO_POR_EXTENSO, Caso, aparece, frases
 from app.services.texto_unidade import texto_por_regra_unidade
 from tests.test_diagnostico_conta import JANELA, _mes, historico
 from tests.test_fatos_unidade import ESTAVEL, MES, RepositorioComContas, contas, gd, por_preco
@@ -403,6 +403,83 @@ def test_sem_avisos_verificar_nao_e_exigido(ia):
     repo.faturas_abertas = lambda id_uc: []
     ia(ok(texto=TEXTO_IA.replace(' Vale verificar a fatura em aberto de {faturas_em_aberto_valor}.', '')), repo=repo)
     assert alternativo(pedir()) == []
+
+
+# ---------- número por extenso ----------
+
+# O padrão da UC100021 na validação final, com os números fictícios do caso base: tudo por extenso, fora dos
+# marcadores, então o validador do agente (que só barra algarismos) deixa passar
+TEXTO_TODO_POR_EXTENSO = (
+    'O valor da conta de jun/dois mil e vinte e seis, de R$ trezentos e cinquenta reais e vinte centavos, ficou '
+    'quarenta e sete por cento acima do valor da conta de jun/dois mil e vinte e cinco, de R$ duzentos e trinta e '
+    'oito reais e quarenta centavos. O consumo subiu trinta e oito por cento, de duzentos e noventa e oito '
+    'quilowatts hora para quatrocentos e doze. Pontos a verificar: há uma fatura em aberto de R$ quatrocentos e '
+    'oitenta e seis reais.')
+
+
+def test_texto_todo_por_extenso_reprova(ia):
+    ia(ok(texto=TEXTO_TODO_POR_EXTENSO))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+    assert 'número por extenso' in ' '.join(Caso(fatos_base()).conferir(TEXTO_TODO_POR_EXTENSO))
+
+
+@pytest.mark.parametrize('acrescimo', [
+    ' Isso se repete há três meses.',        # número inventado junto com todos os números certos
+    ' O aumento foi de vinte por cento.',
+    ' São dois mil kWh no ano.',
+    ' A diferença passa de cem reais.',
+], ids=['tres-meses', 'vinte-por-cento', 'dois-mil', 'cem-reais'])
+def test_numero_inventado_por_extenso_com_os_numeros_certos_reprova(ia, acrescimo):
+    ia(ok(texto=TEXTO_IA + acrescimo))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+
+
+def test_duas_faturas_por_extenso_reprova(ia):
+    texto = TEXTO_IA.replace('Vale verificar a fatura em aberto de', 'Vale verificar as duas faturas em aberto, somando')
+    ia(ok(texto=texto))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+
+
+@pytest.mark.parametrize('palavra', [
+    'dois', 'duas', 'três', 'tres', 'dezenove', 'vinte', 'cinquenta', 'noventa', 'cem', 'cento', 'duzentos',
+    'duzentas', 'quinhentas', 'novecentos', 'mil', 'milhão', 'milhões', 'por cento', 'reais', 'centavos',
+    'quilowatt', 'Dez', 'dez faturas',
+])
+def test_cada_palavra_numerica_e_recusada(palavra):
+    assert NUMERO_POR_EXTENSO.search(f'O valor foi de {palavra} no mês.')
+
+
+@pytest.mark.parametrize('trecho', [
+    'houve troca de medidor em dez/2025',     # mês abreviado seguido de "/" não é número
+    'houve troca de medidor em dez / 2025',
+    'há uma fatura em aberto',                # "um"/"uma" são artigo
+    'um aumento dentro do normal',
+    'o percentual ficou estável',             # só palavra inteira: "cento" dentro de "percentual" não conta
+    'a milhagem e o cemitério',
+    'o consumo dos 12 meses anteriores',
+])
+def test_sem_falso_positivo(trecho):
+    assert not NUMERO_POR_EXTENSO.search(trecho)
+
+
+def test_texto_aceito_com_dez_barra_ano_passa(ia):
+    # Como os textos aceitos da UC100011 na validação final: troca de medidor em dez/2025
+    repo = repo_base()
+    repo._meses = [replace(m, troca_medidor=True) if m.mes == '2025-12' else m for m in historico()]
+    texto = TEXTO_IA.replace('Vale verificar a fatura em aberto de {faturas_em_aberto_valor}.',
+                             'Pontos a verificar: houve troca de medidor em {mes_troca_medidor}; há uma fatura em '
+                             'aberto, de {faturas_em_aberto_valor}.')
+    ia(ok(texto=texto), repo=repo)
+    corpo = pedir()
+    assert alternativo(corpo) == []
+    assert 'dez/2025' in corpo['texto']
+
+
+def test_instrucoes_proibem_numero_por_extenso():
+    assert 'Nunca escreva números\n   por extenso; todo número, valor, percentual ou mês vem de um marcador.' in INSTRUCOES_UNIDADE
 
 
 def test_valor_do_ano_anterior_omitido_reprova(ia):
