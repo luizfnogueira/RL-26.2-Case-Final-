@@ -39,13 +39,18 @@ class TextoInsightIA(BaseModel):
     texto: str = Field(max_length=1500, description="2 a 4 frases; todo número como marcador {nome}")
 
 
-def construir_agente_insight(modelo: Model | None = None) -> Agent[dict[str, str], TextoInsightIA]:
-    """Agente pequeno, sem ferramentas, com raciocínio mínimo (perfil 'insight' do GENAI-1)."""
+def construir_agente_insight(modelo: Model | None = None,
+                             instrucoes: str | None = None) -> Agent[dict[str, str], TextoInsightIA]:
+    """Agente pequeno, sem ferramentas, com raciocínio mínimo (perfil 'insight' do GENAI-1).
+
+    `instrucoes` troca só o prompt de sistema; sem ele, vale o INSTRUCOES da receita, lido na chamada.
+    Marcadores e validação não mudam.
+    """
     agente = Agent(
         modelo or criar_modelo("insight"),
         deps_type=dict,
         output_type=TextoInsightIA,
-        instructions=INSTRUCOES,
+        instructions=instrucoes if instrucoes is not None else INSTRUCOES,
         model_settings=obter_model_settings("insight"),
         retries=1,
     )
@@ -63,10 +68,14 @@ def construir_agente_insight(modelo: Model | None = None) -> Agent[dict[str, str
     return agente
 
 
-def escrever_insight(valores: dict[str, str], modelo: Model | None = None) -> dict[str, str]:
-    """Recebe {marcador: valor já formatado} e devolve {titulo, texto} com os marcadores preenchidos."""
+def escrever_insight(valores: dict[str, str], modelo: Model | None = None,
+                     instrucoes: str | None = None) -> dict[str, str]:
+    """Recebe {marcador: valor já formatado} e devolve {titulo, texto} com os marcadores preenchidos.
+
+    `instrucoes` é opcional (V1c: resumo da unidade); sem ele, vale o prompt da receita, como sempre.
+    """
     lista = "\n".join(f"{{{nome}}} = {valor}" for nome, valor in valores.items())
-    saida = construir_agente_insight(modelo).run_sync(
+    saida = construir_agente_insight(modelo, instrucoes).run_sync(
         f"Marcadores disponíveis:\n{lista}",
         deps=valores,
         usage_limits=UsageLimits(request_limit=3),

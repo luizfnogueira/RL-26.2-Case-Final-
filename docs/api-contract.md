@@ -64,7 +64,7 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
 | 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
-| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` |
+| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` e no `POST /ia/insight` de unidade com `GOLD_SOURCE=real` |
 
 `AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
 
@@ -160,11 +160,11 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 
     | Ano anterior | Média acima | Média em linha | Média abaixo |
     | --- | --- | --- | --- |
-    | subiu | Consumo subiu | Consumo subindo ao longo do ano | Consumo caindo nos últimos meses |
+    | subiu | Consumo subiu | Consumo subindo ao longo do ano | Consumo maior que no mesmo mês do ano anterior |
     | em linha | Alta sazonal | **Consumo estável** | **Consumo caiu** |
-    | caiu | Consumo voltou a subir | **Consumo caiu** | **Consumo caiu** |
+    | caiu | Consumo menor que no mesmo mês do ano anterior | **Consumo caiu** | **Consumo caiu** |
 
-    Orientação: quando o consumo subiu contra as duas bases ou só contra uma com a outra em linha, o aumento do consumo explica a conta; nos casos em negrito (queda ou estabilidade), uma conta maior vem de tarifa, bandeira ou tributos, não do consumo; nos sinais opostos, diz contra qual base o consumo explica a conta. Sem ano anterior, usa só a média (Consumo acima da média, em linha com a média ou abaixo da média). Mês sem consumo válido ("Sem consumo válido") e mês sem ano anterior nem meses anteriores com consumo ("Sem base de comparação") não são avaliados e têm `orientacao` null. No veredito e no alerta o mês vem por extenso (`jun/2026`); nos indicadores segue `YYYY-MM`.
+    Orientação: quando o consumo subiu contra as duas bases ou só contra uma com a outra em linha, o aumento do consumo explica a conta; nos casos em negrito (queda ou estabilidade), uma conta maior vem do preço da energia (tarifa ou bandeira tarifária), não do consumo; os tributos ficam de fora porque são uma fração fixa do valor na Gold (25%). Nos sinais opostos, vale o mesmo mês do ano anterior, e a orientação explica por quê: a média dos 12 meses mistura meses de consumo alto e baixo, enquanto o mesmo mês do ano anterior desconta a época do ano. Subiu no ano e abaixo da média: o consumo subiu e pode explicar uma conta mais alta. Caiu no ano e acima da média: o consumo não explica uma conta mais alta; se o valor subiu, a causa é o preço da energia (tarifa ou bandeira tarifária). Sem ano anterior, usa só a média (Consumo acima da média, em linha com a média ou abaixo da média). Mês sem consumo válido ("Sem consumo válido") e mês sem ano anterior nem meses anteriores com consumo ("Sem base de comparação") não são avaliados e têm `orientacao` null. No veredito e no alerta o mês vem por extenso (`jun/2026`); nos indicadores segue `YYYY-MM`.
   - **Alerta** (`leitura_estimada`, `alerta`): o alerta não muda o veredito, só diz quanto confiar nele. `leitura_estimada` é true quando o mês analisado **ou** o mesmo mês do ano anterior tem leitura `ESTIMADA`. `alerta` junta uma frase para cada caso: leitura estimada no mês analisado, leitura estimada no ano anterior (comparação fraca) e **primeira leitura após troca de medidor** (`fato_uc_mes.flag_primeira_leitura_pos_troca`) em qualquer dos dois meses. Sem nenhum caso, null.
 - `faturas_abertas`: **todas** as faturas `EM ABERTO` da UC, de qualquer mês. São o estado atual do cliente, não um recorte de período. `faturas_pagas`: as `PAGA` com `mes_referencia` dentro da janela. `status` e `bandeira_tarifaria` seguem os domínios da Gold (`PAGA`/`EM ABERTO`; `VERDE`, `AMARELA`, `VERMELHA P1`, `VERMELHA P2`).
 - `interrupcoes_recentes`: até 10, as mais recentes da janela. `total_interrupcoes`: todas as da janela, em `interrupcoes`. Ambas seguem as regras do DEC/FEC (`gold_dec_fec`), para a Visão 360 bater com a Operação: sem oscilação (`flag_sem_interrupcao`: a energia não falta), sem ocorrências anteriores à ligação (`flag_antes_ligacao`), só com 3 minutos ou mais (PRODIST) e só com duração efetiva > 0 (a interrupção inteira dentro de outra da mesma UC é o mesmo apagão). `duracao_min` é a `duracao_efetiva_min` da Gold, a mesma que o DEC soma: desconta o trecho sobreposto, então pode ser menor que encerramento − abertura. Contagens são inteiros no JSON: `total_interrupcoes.valor` (ex.: `3`, nunca `3.0`) e `duracao_min` (minutos inteiros, como na Gold). O mês da ocorrência é o da hora registrada. As flags da Gold não aparecem cruas na resposta.
@@ -554,7 +554,9 @@ Para UC360:
 {"contexto":"unidade","id_uc":"UC-DEMO-001","filtros":{"periodo_atual":"2025-07/2026-06"},"indicadores":[]}
 ```
 
-**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
+O comportamento depende de `GOLD_SOURCE`, como no GET /unidades/{id}.
+
+**Com `GOLD_SOURCE=seed` (stub).** **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
 
 Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos nomes e valores de `diagnostico_conta` em GET /unidades/{id}:
 
@@ -566,6 +568,46 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 | variacao_percentual | Variação sobre o ano anterior | % | mês analisado |
 
 `indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
+
+**Com `GOLD_SOURCE=real` (V1c).** O resumo explica se o valor da conta do mês analisado está alto, normal ou baixo contra o mesmo mês do ano anterior, e por quê. Os números saem do mesmo diagnóstico e dos mesmos dados do GET /unidades/{id} (`backend/app/services/fatos_unidade.py`), mais o valor total e a bandeira das duas faturas (`fato_uc_mes`). O código decide os motivos (consumo, preço médio por kWh, os dois juntos ou GD conectada no período) e os avisos (leitura estimada, troca de medidor, faturas em aberto, preço por kWh fora do padrão; com a leitura do mês analisado estimada, o aviso diz que o consumo pode ser ajustado na próxima leitura real); o texto só redige a partir deles (`backend/app/services/texto_unidade.py`): até 4 frases, números sem sinal e direção em palavras. Nome, CPF, endereço, coordenadas e identificadores nunca entram nos fatos.
+
+- `filtros.periodo_atual` é a janela da Visão 360 e precisa ter 12 meses (como no GET); `periodo_comparacao` e os filtros de região são ignorados. Fora de 12 meses: 422 `DADOS_INVALIDOS`.
+- `indicadores` é **ignorado**: a resposta não usa nada do navegador, então enviá-los não muda nada.
+- `IA_MODO=real`: o modelo redige pelo mesmo agente de insight da receita (`escrever_insight`, com as instruções da unidade em `backend/app/services/redacao_ia_unidade.py`), no prazo de 20 s (ou `IA_TIMEOUT_S` − 5 s, se for menor): o texto por regra está pronto na hora, então o atendente não espera mais que isso pela IA. O chat e a receita seguem com `IA_TIMEOUT_S` − 5 s. Ele recebe o caso já decidido (situação, motivos, contexto e avisos, em palavras) e os valores como marcadores formatados; todo número do texto sai de marcador. O título é sempre o do código ("Valor da conta subiu", "… caiu", "… estável", "Sem base de comparação"). Depois, uma conferência de cobertura recusa o texto da IA se faltar o valor da conta do mês, o do mesmo mês do ano anterior e os dois meses no formato da tela, como "jun/2026" (quando houver ano anterior), ou o número-chave de algum motivo ou aviso, se houver avisos e o texto não disser "verificar" ou "verifique", se tiver número por extenso (de "dois" em diante, com as formas femininas, "por cento", "reais", "centavos" ou "quilowatt"; "um"/"uma" e o mês abreviado como "dez/2025" não contam), se repetir a unidade que o marcador já traz ("R$ R$", "kWh kWh", "% %"), se citar a geração própria conectada antes do período sem citar o ano anterior na mesma frase (para não sugerir que ela explica a mudança), se a leitura do mês analisado for estimada e o texto não disser que o consumo pode ser ajustado na "próxima leitura", se passar de 4 frases, se tiver sinal ou hífen, identificador interno ou chave sobrando, "bandeira" sem bandeira no caso (ou o contrário: bandeira no caso sem a palavra "bandeira"), geração própria/solar/painel sem GD no caso, média e geração própria na mesma frase, ou "a conta" sem "o valor da". As instruções pedem os dois valores em reais (o do mês e o do mesmo mês do ano anterior) na primeira frase, e o caso traz a frase de avisos inteira como molde ("Pontos a verificar: …"), com os itens separados por ponto e vírgula. Texto aceito: sem observação extra (selo "Gerado por IA"), e `numeros_utilizados` traz os números do caso que aparecem no texto da IA.
+- Qualquer falha vira o texto por regra, com uma observação começando por `Texto alternativo:` (o front usa o prefixo para o selo, como na receita): `o módulo de IA não respondeu; …` (prazo, erro do provedor, validador do agente insistindo no erro), `o texto da IA não passou na conferência; …` ou `sem valor da conta no mês para a IA redigir; …`. Nunca 503.
+- `IA_MODO=mock`: sempre o texto por regra, com `Texto alternativo: IA_MODO=mock; resumo montado por regra sobre os números da Gold.`
+- Erros iguais aos do GET /unidades/{id}: UC inexistente, 404 `UC_INEXISTENTE`; Gold não carregada, 503 `GOLD_NAO_CARREGADA`.
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade_real.json)** (fictício: UC-DEMO-001, com o valor de jun/2025 inventado, em `IA_MODO=mock`, ou seja, o texto por regra; abaixo, um trecho)
+
+```json
+{
+  "titulo": "Valor da conta subiu",
+  "texto": "O valor da conta de jun/2026 foi de R$ 486,00, 42% acima de jun/2025 (R$ 342,70). O consumo subiu 38%, de 298 kWh para 412 kWh. A unidade tem geração própria desde fev/2025, já presente no mesmo mês do ano anterior. Pontos a verificar: a leitura de jun/2026 foi estimada (o consumo pode ser ajustado na próxima leitura real) e há 1 fatura em aberto, de R$ 486,00.",
+  "numeros_utilizados": [
+    {"nome": "valor_conta_mes", "rotulo": "Valor da conta", "valor": 486.0, "unidade": "BRL", "periodo_referencia": "2026-06"},
+    {"nome": "variacao_valor_conta", "rotulo": "Aumento do valor da conta", "valor": 41.81, "unidade": "%", "periodo_referencia": "2026-06"},
+    "…"
+  ]
+}
+```
+
+`numeros_utilizados` traz **só os números que aparecem no texto, na ordem do texto**, então a lista varia por caso. Todo valor vem sem sinal; a direção está no rótulo (ex.: "Aumento do valor da conta", "Queda do consumo", "Consumo abaixo da média"). Nomes possíveis:
+
+| nome | rótulo | unidade | período de referência |
+| --- | --- | --- | --- |
+| valor_conta_mes | Valor da conta | BRL | mês analisado |
+| variacao_valor_conta | Aumento / Queda do valor da conta | % | mês analisado |
+| valor_conta_ano_anterior | Valor da conta no mesmo mês do ano anterior | BRL | mesmo mês, ano anterior |
+| variacao_consumo_ano_anterior | Aumento / Queda do consumo | % | mês analisado |
+| consumo_ano_anterior | Consumo no mesmo mês do ano anterior | kWh | mesmo mês, ano anterior |
+| consumo_mes | Consumo do mês | kWh | mês analisado |
+| variacao_preco_kwh | Aumento / Queda do preço médio por kWh | % | mês analisado |
+| preco_kwh_ano_anterior | Preço médio por kWh no mesmo mês do ano anterior | BRL | mesmo mês, ano anterior |
+| preco_kwh_mes | Preço médio por kWh | BRL | mês analisado |
+| desvio_consumo_media | Consumo acima / abaixo da média | % | mês analisado |
+| media_consumo | Média de consumo | kWh | 12 meses anteriores ao mês analisado |
+| faturas_em_aberto_valor | Faturas em aberto (valor somado) | BRL | mês analisado (referência; as faturas podem ser de qualquer mês) |
 
 ## 10.1 GET /filtros — opções dos filtros de região
 
