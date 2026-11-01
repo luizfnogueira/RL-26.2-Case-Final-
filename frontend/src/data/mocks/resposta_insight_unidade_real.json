@@ -1,6 +1,6 @@
 {
   "titulo": "Valor da conta subiu",
-  "texto": "O valor da conta de jun/2026 foi de R$ 486,00, 42% acima de jun/2025 (R$ 342,70). O consumo subiu 38%, de 298 kWh para 412 kWh. A unidade tem geração própria desde fev/2025, já presente no mesmo mês do ano anterior. Pontos a verificar: a leitura de jun/2026 foi estimada e há 1 fatura em aberto, de R$ 486,00.",
+  "texto": "O valor da conta de jun/2026 foi de R$ 486,00, 42% acima de jun/2025 (R$ 342,70). O consumo subiu 38%, de 298 kWh para 412 kWh. A unidade tem geração própria desde fev/2025, já presente no mesmo mês do ano anterior. Pontos a verificar: a leitura de jun/2026 foi estimada (o consumo pode ser ajustado na próxima leitura real) e há 1 fatura em aberto, de R$ 486,00.",
   "numeros_utilizados": [
     {
       "nome": "valor_conta_mes",

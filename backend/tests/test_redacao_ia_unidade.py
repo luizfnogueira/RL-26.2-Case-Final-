@@ -2,6 +2,7 @@
 import json
 import re
 import time
+from dataclasses import replace
 from datetime import date
 from functools import partial
 
@@ -116,7 +117,8 @@ def test_o_modelo_recebe_as_instrucoes_da_unidade_com_o_caso(ia):
     pedir()
     assert vistas[0].startswith(INSTRUCOES_UNIDADE)
     assert '- o consumo subiu {variacao_consumo_ano_anterior}, de {consumo_ano_anterior} para {consumo_mes}.' in vistas[0]
-    assert '- há {faturas_em_aberto_qtd} fatura em aberto, de {faturas_em_aberto_valor}.' in vistas[0]
+    assert ('Avisos (a última frase do texto, exatamente neste molde, com os marcadores):\n'
+            'Pontos a verificar: há {faturas_em_aberto_qtd} fatura em aberto, de {faturas_em_aberto_valor}.') in vistas[0]
     assert '(s)' not in vistas[0]
     sem_marcadores = re.sub(r'\{[a-z_]+\}', '', vistas[0])
     assert not [nome for nome in (*MOTIVOS, *AVISOS) if nome in sem_marcadores]   # categorias em palavras, sem ids
@@ -126,7 +128,7 @@ def test_aviso_de_faturas_no_caso_concorda_com_a_quantidade():
     duas = RepositorioComContas(conta=por_preco(412, 298, 0.85), meses=historico())
     duas.faturas_abertas = lambda id_uc: [_fatura('2024-11', 'EM ABERTO'), _fatura('2025-01', 'EM ABERTO')]
     caso = Caso(carregar_fatos_unidade(duas, 'UC-1')).instrucoes()
-    assert '- há {faturas_em_aberto_qtd} faturas em aberto, somando {faturas_em_aberto_valor}.' in caso
+    assert 'Pontos a verificar: há {faturas_em_aberto_qtd} faturas em aberto, somando {faturas_em_aberto_valor}.' in caso
     assert '(s)' not in caso
 
 
@@ -235,8 +237,7 @@ def test_geracao_propria_sem_gd_no_caso_reprova(ia, palavra):
 
 def test_geracao_propria_com_gd_no_caso_passa(ia):
     ia(ok(texto=TEXTO_IA.replace(' Vale verificar', ' A unidade tem geração própria desde {mes_conexao_gd}, já '
-                                                    'presente no mesmo mês do ano anterior. Vale verificar')
-          .replace('Em {mes_analisado}, o', 'O')))
+                                                    'presente no mesmo mês do ano anterior. Vale verificar')))
     corpo = pedir()
     assert alternativo(corpo) == []
     assert 'geração própria desde fev/2025' in corpo['texto']
@@ -252,7 +253,7 @@ GD_SEM_ANO_ANTERIOR = ' A unidade tem geração própria desde {mes_conexao_gd}.
     ' A unidade já tinha painel solar em {mes_ano_anterior}, desde {mes_conexao_gd}.',
 ], ids=['ano-anterior-por-extenso', 'mes-do-ano-anterior'])
 def test_gd_de_antes_do_periodo_citando_o_ano_anterior_passa(ia, frase_gd):
-    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', frase_gd + ' Vale verificar').replace('Em {mes_analisado}, o', 'O')))
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', frase_gd + ' Vale verificar')))
     assert alternativo(pedir()) == []
 
 
@@ -261,7 +262,7 @@ def test_gd_de_antes_do_periodo_citando_o_ano_anterior_passa(ia, frase_gd):
     ' A unidade possui painel solar desde {mes_conexao_gd}.',
 ], ids=['geracao-propria', 'painel-solar'])
 def test_gd_de_antes_do_periodo_sem_citar_o_ano_anterior_reprova(ia, frase_gd):
-    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', frase_gd + ' Vale verificar').replace('Em {mes_analisado}, o', 'O')))
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar', frase_gd + ' Vale verificar')))
     corpo = pedir()
     assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
 
@@ -272,7 +273,7 @@ def test_gd_conectada_no_periodo_sem_ser_motivo_nao_exige_o_ano_anterior(ia):
     caso = Caso(carregar_fatos_unidade(repo, 'UC-1'))
     assert caso.com_gd and not caso.gd_antes_do_periodo
     ia(ok(texto=TEXTO_IA.replace(' Vale verificar', ' A unidade passou a ter geração própria em {mes_conexao_gd}.'
-                                                    ' Vale verificar').replace('Em {mes_analisado}, o', 'O')), repo=repo)
+                                                    ' Vale verificar')), repo=repo)
     assert alternativo(pedir()) == []
 
 
@@ -287,6 +288,121 @@ def test_contexto_pede_frases_proprias_na_ordem_media_e_gd_com_o_molde_da_gd():
     assert bloco.index('da {base_media}') < bloco.index('geração própria desde {mes_conexao_gd}')
     assert ('Molde da frase: "A unidade tem geração própria desde {mes_conexao_gd}, já presente no mesmo mês do '
             'ano anterior."') in bloco
+
+
+# ---------- leitura estimada no mês analisado ----------
+
+def repo_estimada(**tipos):
+    return RepositorioComContas(conta=por_preco(412, 298, 0.85), meses=historico(**tipos))
+
+
+AVISO_ESTIMADA = (' Vale verificar que a leitura de {mes_analisado} foi estimada e o consumo pode ser ajustado na '
+                  'próxima leitura real.')
+
+
+def test_caso_traz_a_consequencia_da_leitura_estimada_no_mes():
+    caso = Caso(carregar_fatos_unidade(repo_estimada(tipo='ESTIMADA'), 'UC-1')).instrucoes()
+    assert ('Pontos a verificar: a leitura de {mes_analisado} foi estimada e o consumo pode ser ajustado na '
+            'próxima leitura real; há {faturas_em_aberto_qtd} fatura em aberto, de {faturas_em_aberto_valor}.') in caso
+
+
+def test_caso_com_os_dois_meses_estimados_concorda_no_plural():
+    caso = Caso(carregar_fatos_unidade(repo_estimada(tipo='ESTIMADA', tipo_anterior='ESTIMADA'), 'UC-1')).instrucoes()
+    assert ('Pontos a verificar: as leituras de {mes_analisado} e de {mes_ano_anterior} foram estimadas e o '
+            'consumo de {mes_analisado} pode ser ajustado na próxima leitura real;') in caso
+
+
+def test_caso_sem_consequencia_quando_so_o_ano_anterior_foi_estimado():
+    caso = Caso(carregar_fatos_unidade(repo_estimada(tipo_anterior='ESTIMADA'), 'UC-1')).instrucoes()
+    assert 'Pontos a verificar: a leitura de {mes_ano_anterior} foi estimada;' in caso
+    assert 'próxima leitura' not in caso
+
+
+def test_leitura_estimada_no_mes_com_a_consequencia_passa(ia):
+    ia(ok(texto=TEXTO_IA + AVISO_ESTIMADA), repo=repo_estimada(tipo='ESTIMADA'))
+    assert alternativo(pedir()) == []
+
+
+def test_leitura_estimada_no_mes_sem_a_consequencia_reprova(ia):
+    # Como a IA fez na UC100046: "Verifique que a leitura de jun/2026 foi estimada", sem dizer o que isso muda
+    sem = TEXTO_IA + ' Vale verificar que a leitura de {mes_analisado} foi estimada.'
+    repo = repo_estimada(tipo='ESTIMADA')
+    ia(ok(texto=sem), repo=repo)
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra(repo)['texto'], [OBSERVACAO_CONFERENCIA])
+    assert 'próxima leitura real' in corpo['texto']                         # o texto por regra traz
+
+
+def test_so_o_ano_anterior_estimado_nao_exige_a_consequencia(ia):
+    ia(ok(texto=TEXTO_IA + ' A leitura de {mes_ano_anterior} foi estimada.'), repo=repo_estimada(tipo_anterior='ESTIMADA'))
+    assert alternativo(pedir()) == []
+
+
+# ---------- os dois meses no formato da tela ----------
+
+@pytest.mark.parametrize('texto', [
+    # Como na UC100015: "4% acima de R$ 40,68", sem o mês da comparação
+    TEXTO_IA.replace('{mes_ano_anterior} ({valor_conta_ano_anterior})', '{valor_conta_ano_anterior}'),
+    # Como na UC100021: o ano por extenso, fora do marcador
+    TEXTO_IA.replace('Em {mes_analisado}', 'Em jun/dois mil vinte e seis'),
+], ids=['sem-o-mes-do-ano-anterior', 'ano-por-extenso'])
+def test_mes_fora_do_formato_da_tela_reprova(ia, texto):
+    ia(ok(texto=texto))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+
+
+def test_os_dois_meses_entram_nos_numeros_chave_com_ano_anterior():
+    chaves = Caso(fatos_base()).numeros_chave()
+    assert 'jun/2026' in chaves and 'jun/2025' in chaves
+
+
+def test_sem_ano_anterior_os_meses_nao_sao_exigidos(ia):
+    meses = [_mes(m, 200) for m in JANELA[6:-1]] + [_mes(MES, 300)]
+    repo = RepositorioComContas(conta=contas(valor_anterior=None), meses=meses, ficha=SEM_GD)
+    ia(ok(texto='O valor da conta deste mês foi de {valor_conta_mes}; não há o mesmo mês do ano anterior para '
+                'comparar. Vale verificar a fatura em aberto de {faturas_em_aberto_valor}.'), repo=repo)
+    assert alternativo(pedir()) == []
+
+
+# ---------- molde da frase de avisos e "verificar" ----------
+
+def test_caso_traz_a_frase_de_avisos_inteira_como_molde():
+    # Como a UC100011: troca de medidor e faturas em aberto
+    repo = repo_base()
+    repo._meses = [replace(m, troca_medidor=True) if m.mes == '2025-12' else m for m in historico()]
+    repo.faturas_abertas = lambda id_uc: [_fatura('2024-11', 'EM ABERTO'), _fatura('2025-01', 'EM ABERTO')]
+    caso = Caso(carregar_fatos_unidade(repo, 'UC-1')).instrucoes()
+    assert caso.endswith('Avisos (a última frase do texto, exatamente neste molde, com os marcadores):\n'
+                         'Pontos a verificar: houve troca de medidor em {mes_troca_medidor}; há '
+                         '{faturas_em_aberto_qtd} faturas em aberto, somando {faturas_em_aberto_valor}.')
+
+
+def test_caso_sem_avisos_nao_traz_molde():
+    repo = RepositorioComContas(conta=por_preco(412, 298, 0.85), meses=historico())
+    repo.faturas_abertas = lambda id_uc: []
+    caso = Caso(carregar_fatos_unidade(repo, 'UC-1'))
+    assert caso.molde_avisos() is None and caso.instrucoes().endswith('Avisos:\n- nenhum')
+
+
+def test_avisos_como_fatos_soltos_sem_verificar_reprova(ia):
+    # Como a UC100011: "Há 2 faturas em aberto, somando…", sem dizer que é ponto a verificar
+    ia(ok(texto=TEXTO_IA.replace('Vale verificar a fatura em aberto de', 'Há uma fatura em aberto de')))
+    corpo = pedir()
+    assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_CONFERENCIA])
+
+
+@pytest.mark.parametrize('frase', ['Verifique a fatura em aberto de', 'Pontos a verificar: há uma fatura em aberto de'])
+def test_avisos_com_verifique_ou_pontos_a_verificar_passam(ia, frase):
+    ia(ok(texto=TEXTO_IA.replace('Vale verificar a fatura em aberto de', frase)))
+    assert alternativo(pedir()) == []
+
+
+def test_sem_avisos_verificar_nao_e_exigido(ia):
+    repo = RepositorioComContas(conta=por_preco(412, 298, 0.85), meses=historico(), ficha=SEM_GD)
+    repo.faturas_abertas = lambda id_uc: []
+    ia(ok(texto=TEXTO_IA.replace(' Vale verificar a fatura em aberto de {faturas_em_aberto_valor}.', '')), repo=repo)
+    assert alternativo(pedir()) == []
 
 
 def test_valor_do_ano_anterior_omitido_reprova(ia):

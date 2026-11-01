@@ -186,8 +186,13 @@ class _Redacao:
             meses = [mes_texto(m) for m, estimada in ((f['mes_analisado'], f['leitura_estimada_mes']),
                                                        (f['mes_ano_anterior'], f['leitura_estimada_ano_anterior']))
                      if estimada]
-            itens.append(f'a leitura de {meses[0]} foi estimada' if len(meses) == 1
-                         else f'as leituras de {_juntar(meses)} foram estimadas')
+            item = (f'a leitura de {meses[0]} foi estimada' if len(meses) == 1
+                    else f'as leituras de {_juntar(meses)} foram estimadas')
+            # Estimada no mês analisado: o próprio consumo do mês pode mudar (como no alerta do veredito)
+            if f['leitura_estimada_mes']:
+                mes = '' if len(meses) == 1 else f" de {mes_texto(f['mes_analisado'])}"
+                item += f' (o consumo{mes} pode ser ajustado na próxima leitura real)'
+            itens.append(item)
         if 'troca_medidor' in f['avisos']:
             itens.append(f"houve troca de medidor em {mes_texto(f['mes_troca_medidor'])}")
         if 'faturas_em_aberto' in f['avisos']:

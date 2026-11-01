@@ -44,6 +44,8 @@ GD = re.compile(r'gera[cç][aã]o pr[oó]pria|gerar a pr[oó]pria|solar|painel|p
 BANDEIRA = re.compile(r'bandeira', re.IGNORECASE)
 CONTA_SOZINHA = re.compile(r'(?<!\w)a conta\b', re.IGNORECASE)
 ANO_ANTERIOR = re.compile(r'ano anterior', re.IGNORECASE)
+PROXIMA_LEITURA = re.compile(r'pr[oó]xima leitura', re.IGNORECASE)
+VERIFICAR = re.compile(r'\bverifi(car|que)\b', re.IGNORECASE)
 FIM_DE_FRASE = re.compile(r'[.!?](?=\s|$)')
 
 
@@ -158,22 +160,35 @@ class Caso:
         return itens
 
     def avisos(self) -> list[str]:
+        """Itens de aviso, já com concordância e consequência decididas aqui (o modelo copia o que recebe)."""
         f, itens = self.f, []
         if 'leitura_estimada' in f['avisos']:
             meses = [nome for nome, estimada in (('{mes_analisado}', f['leitura_estimada_mes']),
                                                   ('{mes_ano_anterior}', f['leitura_estimada_ano_anterior']))
                      if estimada]
-            itens.append(f"a leitura de {' e de '.join(meses)} foi estimada.")
+            if len(meses) == 2:
+                itens.append('as leituras de {mes_analisado} e de {mes_ano_anterior} foram estimadas e o consumo '
+                             'de {mes_analisado} pode ser ajustado na próxima leitura real')
+            elif f['leitura_estimada_mes']:
+                itens.append('a leitura de {mes_analisado} foi estimada e o consumo pode ser ajustado na próxima '
+                             'leitura real')
+            else:
+                itens.append(f'a leitura de {meses[0]} foi estimada')
         if 'troca_medidor' in f['avisos']:
-            itens.append('houve troca de medidor em {mes_troca_medidor}.')
+            itens.append('houve troca de medidor em {mes_troca_medidor}')
         if 'faturas_em_aberto' in f['avisos']:
-            # Plural decidido aqui: o modelo copia "fatura(s)" ou erra a concordância
-            itens.append('há {faturas_em_aberto_qtd} fatura em aberto, de {faturas_em_aberto_valor}.'
+            itens.append('há {faturas_em_aberto_qtd} fatura em aberto, de {faturas_em_aberto_valor}'
                          if f['faturas_em_aberto_qtd'] == 1
-                         else 'há {faturas_em_aberto_qtd} faturas em aberto, somando {faturas_em_aberto_valor}.')
+                         else 'há {faturas_em_aberto_qtd} faturas em aberto, somando {faturas_em_aberto_valor}')
         if 'preco_kwh_fora_do_padrao' in f['avisos']:
-            itens.append('o preço por kWh deste mês está fora do padrão; vale conferir a fatura.')
+            itens.append('o preço por kWh deste mês está fora do padrão; vale conferir a fatura')
         return itens
+
+    def molde_avisos(self) -> str | None:
+        """A frase de avisos inteira, como a do texto por regra. Itens separados por ';', porque o da
+        leitura estimada já tem um "e" e a vírgula com "e" no fim ficaria "… leitura real e há …"."""
+        itens = self.avisos()
+        return f"Pontos a verificar: {'; '.join(itens)}." if itens else None
 
     def instrucoes(self) -> str:
         def lista(itens: list[str]) -> str:
@@ -184,7 +199,8 @@ class Caso:
                 'Contexto (opcional; cada item numa frase própria, nunca junto de outro item nem da frase de '
                 'um motivo, nesta ordem: primeiro a média, depois a geração própria; sem palavra de causa):\n'
                 f'{lista(self.contexto())}\n'
-                f'Avisos (pontos a verificar, numa frase curta no fim):\n{lista(self.avisos())}')
+                + (f'Avisos (a última frase do texto, exatamente neste molde, com os marcadores):\n'
+                   f'{self.molde_avisos()}' if self.molde_avisos() else 'Avisos:\n- nenhum'))
 
     # ---------- depois da IA ----------
 
@@ -193,7 +209,8 @@ class Caso:
         f, m = self.f, self.marcadores
         chaves = [m['valor_conta_mes']]
         if 'valor_conta_ano_anterior' in m:                # sem base de comparação, não há
-            chaves.append(m['valor_conta_ano_anterior'])
+            # Os dois valores e os dois meses como na tela ("jun/2026"): pega ano por extenso e mês omitido
+            chaves += [m['valor_conta_ano_anterior'], m['mes_analisado'], m['mes_ano_anterior']]
         for motivo in f['motivos']:
             if motivo in ('consumo_subiu', 'consumo_caiu'):
                 chaves.append(m['variacao_consumo_ano_anterior'])
@@ -217,6 +234,12 @@ class Caso:
         problemas = [f'falta {chave}' for chave in self.numeros_chave() if not aparece(chave, texto)]
         if 'preco_kwh_fora_do_padrao' in self.f['avisos'] and 'padrão' not in texto:
             problemas.append('falta o aviso de preço fora do padrão')
+        # Leitura estimada no mês analisado: o aviso precisa dizer que o consumo pode mudar
+        if 'leitura_estimada' in self.f['avisos'] and self.f['leitura_estimada_mes'] and not PROXIMA_LEITURA.search(texto):
+            problemas.append('leitura estimada no mês sem "próxima leitura"')
+        # Avisos são pontos a verificar, não fatos soltos
+        if self.f['avisos'] and not VERIFICAR.search(texto):
+            problemas.append('avisos sem "verificar" ou "verifique"')
         if len(FIM_DE_FRASE.findall(texto)) > MAXIMO_FRASES:
             problemas.append('mais de 4 frases')
         if '−' in texto or '-' in texto:

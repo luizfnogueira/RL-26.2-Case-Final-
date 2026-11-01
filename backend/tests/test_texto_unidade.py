@@ -226,10 +226,24 @@ def test_so_avisos():
     meses = [replace(m, troca_medidor=True) if m.mes == '2025-10' else m
              for m in historico(**ESTAVEL, tipo='ESTIMADA', tipo_anterior='ESTIMADA')]
     r = resumo(meses=meses, abertas=DUAS_ABERTAS)
-    assert r['texto'].endswith('Pontos a verificar: as leituras de jun/2026 e jun/2025 foram estimadas, houve '
-                               'troca de medidor em out/2025 e há 2 faturas em aberto, somando R$ 972,00.')
+    assert r['texto'].endswith('Pontos a verificar: as leituras de jun/2026 e jun/2025 foram estimadas (o consumo '
+                               'de jun/2026 pode ser ajustado na próxima leitura real), houve troca de medidor em '
+                               'out/2025 e há 2 faturas em aberto, somando R$ 972,00.')
     assert r['texto'].startswith('O valor da conta de jun/2026 foi de R$ 200,00, igual a jun/2025 (R$ 200,00). '
                                  'Pontos a verificar:')
+
+
+@pytest.mark.parametrize('kwargs, aviso', [
+    ({'tipo': 'ESTIMADA'},
+     'Pontos a verificar: a leitura de jun/2026 foi estimada (o consumo pode ser ajustado na próxima leitura real).'),
+    ({'tipo': 'ESTIMADA', 'tipo_anterior': 'ESTIMADA'},
+     'Pontos a verificar: as leituras de jun/2026 e jun/2025 foram estimadas (o consumo de jun/2026 pode ser '
+     'ajustado na próxima leitura real).'),
+    ({'tipo_anterior': 'ESTIMADA'},
+     'Pontos a verificar: a leitura de jun/2025 foi estimada.'),
+], ids=['so-o-mes-analisado', 'os-dois-meses', 'so-o-ano-anterior'])
+def test_leitura_estimada_no_mes_analisado_traz_a_consequencia(kwargs, aviso):
+    assert do_tipo(frases(meses=historico(**ESTAVEL, **kwargs)), 'aviso') == [aviso]
 
 
 def test_uma_fatura_em_aberto_no_singular():
