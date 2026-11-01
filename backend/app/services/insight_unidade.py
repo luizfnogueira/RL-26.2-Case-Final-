@@ -32,6 +32,9 @@ OBSERVACAO_FALHA = (f'{PREFIXO_TEXTO_ALTERNATIVO} o módulo de IA não respondeu
                     'sobre os mesmos números.')
 OBSERVACAO_CONFERENCIA = (f'{PREFIXO_TEXTO_ALTERNATIVO} o texto da IA não passou na conferência; resumo '
                           'montado por regra sobre os mesmos números.')
+# O texto por regra está pronto na hora: o atendente não espera mais que isto pela IA. O chat e a receita
+# seguem com o prazo_ia_s() (IA_TIMEOUT_S − 5 s); o IA_TIMEOUT_S continua sendo o teto.
+PRAZO_RESUMO_S = 20
 OBSERVACAO_SEM_SITUACAO = (f'{PREFIXO_TEXTO_ALTERNATIVO} sem valor da conta no mês para a IA redigir; resumo '
                            'montado por regra.')
 
@@ -74,7 +77,8 @@ def gerar_insight_unidade(db: Session, dados: PedidoInsight) -> dict:
     caso = Caso(fatos)
     try:
         escrever = escritor()
-        saida = executar_com_prazo(lambda: escrever(caso.marcadores, instrucoes=caso.instrucoes()), prazo_ia_s())
+        saida = executar_com_prazo(lambda: escrever(caso.marcadores, instrucoes=caso.instrucoes()),
+                                   min(PRAZO_RESUMO_S, prazo_ia_s()))
         texto = saida['texto'].strip()
     except Exception as erro:
         # Só o tipo vai para o log: mensagens do provedor podem trazer URL ou cabeçalhos

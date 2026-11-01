@@ -185,6 +185,27 @@ def test_timeout_vira_texto_por_regra(ia, monkeypatch):
     assert (corpo['texto'], alternativo(corpo)) == (regra()['texto'], [OBSERVACAO_FALHA])
 
 
+@pytest.mark.parametrize('ia_timeout_s, prazo_esperado', [(90, 20), (30, 20), (15, 10)])
+def test_resumo_usa_prazo_proprio_com_o_ia_timeout_como_teto(ia, monkeypatch, ia_timeout_s, prazo_esperado):
+    prazos = []
+
+    def executar_gravando(funcao, prazo_s):
+        prazos.append(prazo_s)
+        return funcao()
+    ia(ok())
+    monkeypatch.setattr(config, 'IA_TIMEOUT_S', ia_timeout_s)
+    monkeypatch.setattr(insight_unidade, 'executar_com_prazo', executar_gravando)
+    assert alternativo(pedir()) == []
+    assert prazos == [prazo_esperado]
+
+
+def test_chat_e_receita_seguem_com_o_prazo_da_ponte(monkeypatch):
+    from app.services import ia_service
+    monkeypatch.setattr(config, 'IA_TIMEOUT_S', 90)
+    assert ia_service.prazo_ia_s() == 85                                       # o prazo compartilhado não mudou
+    assert insight_unidade.PRAZO_RESUMO_S == 20
+
+
 # ---------- conferência de cobertura ----------
 
 @pytest.mark.parametrize('texto', [
