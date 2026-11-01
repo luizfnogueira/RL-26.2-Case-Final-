@@ -107,43 +107,41 @@ def test_escrever_insight_falha_quando_o_modelo_insiste_no_erro():
 
 
 
-def test_receita_liquida_pede_nova_tentativa_ou_vira_alternativo():
+def test_receita_liquida_e_corrigida_para_receita_de_energia():
     com_liquida = {
         "titulo": "Receita líquida subiu",
         "texto": "{recorte}, a receita líquida foi de {receita_energia_base} para {receita_energia_atual}.",
     }
-    usar(gerador(com_liquida, BOM))
-    dados = pedir().json()
-    assert "líquida" not in dados["texto"].lower() and not alternativo(dados)
-
     usar(gerador(com_liquida))
-    dados_fallback = pedir().json()
-    assert alternativo(dados_fallback)
+    dados = pedir().json()
+    assert not alternativo(dados)
+    assert "líquida" not in dados["titulo"].lower()
+    assert "líquida" not in dados["texto"].lower()
+    assert "receita de energia" in dados["texto"].lower()
 
 
-def test_sinal_duplo_e_marcador_sem_rotulo_pedem_nova_tentativa():
-    sinal_duplo = {
+def test_sinal_duplo_e_marcador_sem_rotulo_sao_corrigidos():
+    com_defeitos = {
         "titulo": "Preço sustentou a receita",
-        "texto": "{recorte}, houve retração de {efeito_volume} no volume.",
+        "texto": "{recorte}, a alta foi impulsionada pelo {efeito_preco}, com retração de {efeito_volume}.",
     }
-    sem_rotulo = {
-        "titulo": "Preço sustentou a receita",
-        "texto": "{recorte}, a alta foi impulsionada pelo {efeito_preco}.",
-    }
-    usar(gerador(sinal_duplo, BOM))
-    assert not alternativo(pedir().json())
-
-    usar(gerador(sem_rotulo, BOM))
-    assert not alternativo(pedir().json())
+    usar(gerador(com_defeitos))
+    dados = pedir().json()
+    assert not alternativo(dados)
+    assert "efeito-preço de R$ 17,0 milhões" in dados["texto"]
+    assert "retração de R$ 5,0 milhões" in dados["texto"]
+    assert "retração de −" not in dados["texto"]
 
 
-def test_periodos_invertidos_pedem_nova_tentativa():
+def test_periodos_invertidos_sao_corrigidos():
     invertido = {
         "titulo": "Evolução da receita",
         "texto": "{recorte}, a receita de energia passou de {receita_energia_atual} para {receita_energia_base}.",
     }
-    usar(gerador(invertido, BOM))
-    assert not alternativo(pedir().json())
+    usar(gerador(invertido))
+    dados = pedir().json()
+    assert not alternativo(dados)
+    assert "de R$ 150,0 milhões para R$ 162,0 milhões" in dados["texto"]
 
 
 def test_escrever_insight_aceita_instrucoes_customizadas_para_v1c():
