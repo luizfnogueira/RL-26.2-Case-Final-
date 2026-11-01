@@ -26,3 +26,6 @@ _manifesto.csv
 *.backup
 *.bak
 backups/
+
+# Saída detalhada da avaliação do assistente: traz respostas com dados reais
+ai-agent/avaliacao/saida/
