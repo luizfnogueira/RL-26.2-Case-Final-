@@ -167,9 +167,9 @@ describe('Tela 1 — Painel executivo', () => {
     const abaVisaoGeral = screen.getByRole('tab', { name: 'Visão geral' })
     expect(abaVisaoGeral.getAttribute('aria-selected')).toBe('false')
 
-    expect(await screen.findByRole('tabpanel', { name: 'Aba de comparação' })).toBeTruthy()
-    expect(await screen.findByText('Recife')).toBeTruthy()
-    expect(await screen.findByText('Olinda')).toBeTruthy()
+    expect(await screen.findByRole('tabpanel', { name: 'Comparar' })).toBeTruthy()
+    expect(await screen.findByRole('columnheader', { name: 'Recife' })).toBeTruthy()
+    expect(await screen.findByRole('columnheader', { name: 'Olinda' })).toBeTruthy()
     expect(screen.getByText('2 recortes comparados')).toBeTruthy()
 
     fireEvent.click(abaVisaoGeral)
