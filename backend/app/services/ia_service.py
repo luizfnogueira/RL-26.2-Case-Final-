@@ -22,10 +22,14 @@ from app.services import cache_respostas, esclarecimento_ia, grafico_ia, stub_ia
 from app.ai.consulta import descrever_tabela, valores_distintos
 from app.ai.entidades import resolver_entidades
 from app.ai.guardrails import resposta_da_triagem, triar
+from app.ai.roteador import e_pergunta_da_plataforma
+from app.services.guia_plataforma import carregar_guia, secoes_para
 
 logger = logging.getLogger(__name__)
 
 OBSERVACAO_SEED = "Dados fictícios do seed, com as regras da Gold."
+MENSAGEM_GUIA_SEM_SECAO = "Não encontrei isso no guia da plataforma."
+
 # Chave interna da ponte (e do cache de respostas) com todas as linhas; sai antes de validar o contrato
 CHAVE_LINHAS_COMPLETAS = "_linhas_completas"
 # A rota desiste no prazo; a thread termina sozinha quando o provedor responde ou estoura o LLM_TIMEOUT_S.
@@ -171,9 +175,12 @@ class AgenteReal:
     ainda não entregue) vira AGENTE_INDISPONIVEL, que a rota devolve como 503.
     """
 
+    # Adicionado o responder_guia
     def __init__(self, responder: Callable[..., dict] | None = None, executar_sql: Callable | None = None,
-                 sessao: Callable = SessionLocal, prazo_s: float | None = None) -> None:
+                 sessao: Callable = SessionLocal, prazo_s: float | None = None,
+                 responder_guia: Callable | None = None) -> None:
         self.responder = responder
+        self.responder_guia = responder_guia
         self.executar_sql = executar_sql
         self.sessao = sessao
         self.prazo_s = prazo_s
@@ -190,8 +197,6 @@ class AgenteReal:
             if self.executar_sql is None:
                 from app.ai.consulta import descrever_tabela, valores_distintos
                 extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
-                if segue:
-                    extras["entidades_resolvidas"] = resolver_entidades(triagem.pergunta)
             
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
@@ -199,18 +204,25 @@ class AgenteReal:
                 resumo = (interacao_repository.carregar_resumo(db, dados.conversa_id)
                           if len(historico) >= interacao_repository.MAX_TROCAS else [])
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
+                # Pergunta sobre o uso da plataforma (L3) desvia para o guia e nunca encosta no banco
+                plataforma = segue and (e_pergunta_da_plataforma(triagem.pergunta, carregar_guia())
+                                        or continua_o_guia(triagem.pergunta, historico))
                 # Nomes da Gold (uma consulta por versão): esclarecimento e assinatura do cache
                 nomes = vocabulario_gold.nomes(db, gold["gold_atualizada_em"])
                 # Pergunta ambígua volta com opções antes de gastar tokens
-                esclarecer = segue and esclarecimento_ia.detectar(
+                esclarecer = segue and not plataforma and esclarecimento_ia.detectar(
                     dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
                 sem_o_comeco = segue and not esclarecer and (
                     pede_o_comeco_da_conversa(dados.pergunta)
                     and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico) + len(resumo))
                 # Respostas pré-calculadas: pergunta igual ou parecida a uma já respondida, sem histórico
-                usa_cache = cache_ligado() and segue and not historico and not esclarecer and not sem_o_comeco
+                # O cache é por versão da Gold: resposta do guia fica de fora (o guia tem versão própria)
+                usa_cache = (cache_ligado() and segue and not plataforma and not historico and not esclarecer
+                             and not sem_o_comeco)
                 reaproveitada = (cache_respostas.buscar(db, dados.pergunta, gold["gold_atualizada_em"], nomes)
                                  if usa_cache else None)
+            if self.executar_sql is None and segue and not plataforma:
+                extras["entidades_resolvidas"] = resolver_entidades(triagem.pergunta)
             para_o_cache = None
             # Cada consulta do agente, completa: a resposta só leva 50 linhas e o gráfico precisa de todas
             resultados: list = []
@@ -229,6 +241,12 @@ class AgenteReal:
                 resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
             elif sem_o_comeco:
                 resposta = resposta_sem_o_comeco_da_conversa(historico, resumo, gold["gold_atualizada_em"])
+            elif plataforma:
+                responder_guia = self.responder_guia or _responder_pelo_guia()
+                secoes = secoes_para(triagem.pergunta)
+                saida = executar_com_prazo(lambda: responder_guia(triagem.pergunta, secoes, historico),
+                                           self.prazo_s or prazo_ia_s())
+                resposta = resposta_do_guia(saida, secoes, gold["gold_atualizada_em"])
             elif reaproveitada is not None:
                 resposta = reaproveitada
             else:
@@ -255,7 +273,9 @@ class AgenteReal:
             metadados["dados_ficticios"] = gold["dados_ficticios"]
             if gold["dados_ficticios"]:
                 metadados["observacoes"] = [*gold["observacoes"], *metadados.get("observacoes", [])]
-            acrescentar_grafico(dados.pergunta, resposta, resposta.pop(CHAVE_LINHAS_COMPLETAS, None))
+            # Resposta do guia não tem dados para desenhar (o contrato proíbe gráfico nela)
+            if not plataforma:
+                acrescentar_grafico(dados.pergunta, resposta, resposta.pop(CHAVE_LINHAS_COMPLETAS, None))
             RespostaIA.model_validate(resposta)
         except AgenteIndisponivelException:
             raise
@@ -321,3 +341,39 @@ def apagar_conversas_antigas() -> None:
         logger.info("ia.interacao: %d trocas com mais de 30 dias apagadas", apagadas)
     except SQLAlchemyError:
         logger.warning("Não foi possível limpar ia.interacao", exc_info=True)
+
+def _responder_pelo_guia() -> Callable:
+    from app.ai.agente_guia import responder_pelo_guia  # o PydanticAI só é importado no modo real
+    return responder_pelo_guia
+
+
+def continua_o_guia(pergunta: str, historico: list[dict]) -> bool:
+    """Follow-up de uma resposta do guia ("E como eu exporto?"): decide lendo junto com a pergunta anterior.
+
+    "E qual a receita de Olinda?" continua indo para os dados: o detector manda pergunta mista para dados.
+    """
+    if not historico or (historico[-1].get("filtros") or {}).get("fonte") != "guia":
+        return False
+    anterior = historico[-1].get("pergunta_interpretada") or ""
+    return e_pergunta_da_plataforma(f"{anterior} {pergunta}", carregar_guia())
+
+
+def resposta_do_guia(saida: Any, secoes: list, gold_atualizada_em: Any) -> dict:
+    """RespostaIA da pergunta sobre a plataforma (L3): sem SQL nem dados, com as seções citadas.
+
+    Só valem as seções que o leitor entregou ao agente; resposta "ok" sem nenhuma delas vira "não sei".
+    """
+    titulos = {s.id: s.titulo for s in secoes}
+    citadas = [{"id": i, "titulo": titulos[i]} for i in dict.fromkeys(saida.secoes_usadas) if i in titulos]
+    ok = saida.status == "ok" and bool(citadas)
+    resposta = {
+        "resposta": saida.texto if ok or saida.status == "nao_sei" else MENSAGEM_GUIA_SEM_SECAO,
+        "sql": None, "tabelas": [], "dados": {"colunas": [], "linhas": []},
+        "status": "ok" if ok else "nao_sei",
+        "gerado_em": datetime.now(timezone.utc).isoformat(), "apresentacao": "texto",
+        "metadados": {"dados_ficticios": False, "gold_atualizada_em": gold_atualizada_em, "observacoes": [],
+                      "fonte": "guia", "secoes_guia": citadas if ok else []},
+    }
+    if saida.detalhes_tecnicos:
+        resposta["detalhes_tecnicos"] = saida.detalhes_tecnicos
+    return resposta

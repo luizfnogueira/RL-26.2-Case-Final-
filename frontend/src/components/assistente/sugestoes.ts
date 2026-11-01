@@ -43,6 +43,10 @@ export const SUGESTOES_POR_CATEGORIA = [
       'Quantas UCs estão na fila de perdas por ação recomendada?',
     ],
   },
+  {
+    categoria: 'Como usar a plataforma',
+    perguntas: ['O que é a aba Assistente V-Energy?', 'Como gero uma ordem de inspeção?'],
+  },
 ]
 
 /** Destaques da conversa vazia, com "conta de luz" e "falta de luz"; o mock do front responde todas. */

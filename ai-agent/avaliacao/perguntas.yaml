@@ -648,9 +648,9 @@ perguntas:
 - id: G57
   categoria: plataforma
   pergunta: Como gero uma ordem de inspeção?
-  status_esperado: nao_sei
+  status_esperado: ok
   secoes_esperadas: [ordens]
-  observacao: Sugestão da Tela 7. A seção ordens ainda está com [COMPLETAR]; quando for escrita, o item passa a ok.
+  observacao: Sugestão da Tela 7 (categoria "Como usar a plataforma").
 
 - id: G58
   categoria: plataforma

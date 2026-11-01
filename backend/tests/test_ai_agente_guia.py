@@ -77,7 +77,8 @@ def test_t2_como_agente_funciona_retorna_ok_e_cita_assistente_como_funciona():
 
 def test_t2_ordem_de_inspecao_com_completar_retorna_nao_sei_sem_inventar():
     pergunta = "Como gero uma ordem de inspeção?"
-    secoes = secoes_para(pergunta)
+    secoes = [SecaoGuia(id="ordens", titulo="Ordens de inspeção", nivel="publico", rota="/perdas/ordens",
+                        palavras=("ordens", "ordem de inspecao"), texto="[COMPLETAR: os status de uma ordem.]")]
     assert all(secao_incompleta(s) for s in secoes)
 
     # Mesmo se o modelo tentasse devolver "ok" inventando passos, seções [COMPLETAR] viram "nao_sei"

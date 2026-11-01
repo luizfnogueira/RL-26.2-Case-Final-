@@ -42,6 +42,7 @@ def registrar(db: Session, conversa_id: uuid.UUID, pergunta: str, resposta: dict
     consulta = detalhes.get("consulta") or {}
     tokens = detalhes.get("tokens_tempo") or {}
     texto = mascarar(resposta.get("resposta") or "")
+    metadados = resposta.get("metadados") or {}
     # Num bloqueio o agente não devolve SQL; o log guarda o que ele tentou executar.
     tentado = next(((a.get("argumentos") or {}).get("sql") for a in reversed(detalhes.get("acoes") or [])
                     if a.get("ferramenta") == "consultar_gold"), None)
@@ -52,7 +53,9 @@ def registrar(db: Session, conversa_id: uuid.UUID, pergunta: str, resposta: dict
         status=resposta["status"],
         motivo=None if resposta["status"] == "ok" else texto[:RESUMO_MAX],
         resposta_resumo=texto[:RESUMO_MAX],
-        filtros={"filtros": plano.get("filtros", []), "periodo": plano.get("periodo")} if plano else None,
+        filtros=({"fonte": "guia", "secoes_guia": [s.get("id") for s in metadados.get("secoes_guia", [])]}
+                 if metadados.get("fonte") == "guia"
+                 else {"filtros": plano.get("filtros", []), "periodo": plano.get("periodo")} if plano else None),
         sql_executado=consulta.get("sql_executado") or resposta.get("sql") or tentado,
         tabelas=resposta.get("tabelas") or [],
         linhas=consulta.get("linhas", len(resposta["dados"]["linhas"])),
