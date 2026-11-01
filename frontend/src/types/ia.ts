@@ -169,7 +169,10 @@ export const PREFIXO_TEXTO_ALTERNATIVO = 'Texto alternativo:'
 export interface RespostaInsight {
   titulo: string
   texto: string
-  /** Receita: 6 números. Unidade: 4 números do diagnóstico da conta. */
+  /**
+   * Receita: 6 números. Unidade: no stub (seed), os 4 do diagnóstico da conta; com a Gold real, só os
+   * que aparecem no texto, na ordem do texto, sem sinal e com a direção no rótulo (contrato, seção 10).
+   */
   numeros_utilizados: IndicadorNomeado[]
   gerado_em: string
   metadados: Metadados
