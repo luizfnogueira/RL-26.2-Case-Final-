@@ -1,23 +1,27 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../erro-api'
 import {
   atualizarInspecao,
   buscarCandidatos,
+  buscarComparacao,
   buscarDashboard,
   buscarFiltros,
+  buscarIndicadoresOrdens,
   buscarOperacao,
   buscarUnidade,
   buscarUnidades,
   cancelarInspecao,
   concluirInspecao,
   criarInspecao,
+  criarInspecoesEmLote,
+  falhasDoLote,
   gerarInsight,
   iniciarCampo,
   listarInspecoes,
   perguntarIA,
 } from '..'
 import { atenderMock, reiniciarOrdens } from '.'
-import type { Comparacao } from '@/types/dashboard'
+import type { ParamsComparacao } from '@/types/dashboard'
 
 const ATUAL = '2025-07/2026-06'
 const COMPARACAO = '2022-07/2023-06'
@@ -63,10 +67,10 @@ describe('GET /dashboard', () => {
     expect(d.metadados.dados_ficticios).toBe(true)
   })
 
-  it('ordena o drill-down pela maior queda de volume', async () => {
+  it('ordena o drill-down pela maior perda de receita por volume (efeito-volume)', async () => {
     const d = await buscarDashboard(DASH)
-    const quedas = d.drill_down.items.map((l) => l.queda_kwh.valor ?? 0)
-    expect(quedas).toEqual([...quedas].sort((a, b) => b - a))
+    const efeitos = d.drill_down.items.map((l) => l.efeito_volume.valor ?? 0)
+    expect(efeitos).toEqual([...efeitos].sort((a, b) => a - b))
     expect(d.drill_down.nivel).toBe('municipio')
     expect(d.drill_down.breadcrumb.map((b) => b.nivel)).toEqual(['consolidado'])
   })
@@ -108,12 +112,21 @@ describe('GET /dashboard', () => {
     ).toBe('CENARIO_STUB_INDISPONIVEL')
     const mesmo = await erroDe(buscarDashboard({ ...DASH, periodo_comparacao: ATUAL }))
     expect([mesmo.status, mesmo.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
-    expect(
-      (await erroDe(buscarDashboard({ ...DASH, nivel: 'classe', municipio: 'Recife' }))).status,
-    ).toBe(422)
+    expect((await erroDe(buscarDashboard({ ...DASH, nivel: 'bairro' }))).status).toBe(422)
     expect((await erroDe(buscarDashboard({ ...DASH, page_size: 500 }))).codigo).toBe(
       'DADOS_INVALIDOS',
     )
+  })
+
+  it('lista as classes de toda a área ou de um município, sem escolher bairro', async () => {
+    const area = await buscarDashboard({ ...DASH, nivel: 'classe' })
+    expect(area.drill_down.nivel).toBe('classe')
+    expect(area.drill_down.breadcrumb.map((b) => b.nivel)).toEqual(['consolidado'])
+    const ponte = (await buscarDashboard(DASH)).ponte_receita
+    const soma = area.drill_down.items.reduce((s, l) => s + (l.efeito_volume.valor ?? 0), 0)
+    expect(soma).toBeCloseTo(ponte.efeito_volume.valor ?? 0, 1)
+    const recife = await buscarDashboard({ ...DASH, nivel: 'classe', municipio: 'Recife' })
+    expect(recife.drill_down.breadcrumb.map((b) => b.nivel)).toEqual(['consolidado', 'municipio'])
   })
 
   it('devolve cópias independentes: alterar o resultado não afeta a próxima chamada', async () => {
@@ -141,9 +154,27 @@ describe('GET /filtros', () => {
 
 describe('GET /dashboard/comparacao', () => {
   const comparar = (params: Record<string, unknown>) =>
-    atenderMock('GET', '/dashboard/comparacao', {
-      params: { ...DASH, ...params },
-    }) as Promise<Comparacao>
+    buscarComparacao({ ...DASH, ...params } as unknown as ParamsComparacao)
+
+  it('funciona via buscarComparacao com VITE_USE_MOCKS=true e bate com o painel', async () => {
+    const { municipios } = await buscarFiltros()
+    const itens = municipios.slice(0, 2)
+    const resposta = await buscarComparacao({
+      periodo_atual: ATUAL,
+      periodo_comparacao: COMPARACAO,
+      nivel: 'municipio',
+      itens,
+    })
+    expect(resposta.itens.map((i) => i.nome)).toEqual(itens)
+    for (const item of resposta.itens) {
+      const painel = (await buscarDashboard({ ...DASH, municipio: item.nome })).indicadores
+      expect(item.ucs_ativas).toEqual(painel.ucs_ativas)
+      const esperado = painel.receita_faturada.atual.valor! / painel.ucs_ativas.atual.valor! / 12
+      expect(item.receita_media_uc.atual.valor).toBeCloseTo(esperado, 2)
+      expect(item.valor_em_aberto_pct.diferenca.unidade).toBe('p.p.')
+    }
+    expect(resposta.metadados.dados_ficticios).toBe(true)
+  })
 
   it('cada item bate com o painel filtrado por ele, por UC e por mês', async () => {
     const { municipios } = await buscarFiltros()
@@ -172,6 +203,8 @@ describe('GET /dashboard/comparacao', () => {
 
   it.each([
     { nivel: 'municipio', itens: ['RECIFE'] },
+    // Como a API: vírgula não separa itens, então "RECIFE,OLINDA" é um item só
+    { nivel: 'municipio', itens: 'RECIFE,OLINDA' },
     { nivel: 'municipio', itens: ['A', 'B', 'C', 'D', 'E'] },
     { nivel: 'municipio', itens: ['RECIFE', 'RECIFE'] },
     { nivel: 'municipio', itens: ['RECIFE', 'OLINDA'], municipio: 'RECIFE' },
@@ -249,6 +282,25 @@ describe('GET /unidades', () => {
 })
 
 describe('GET /inspecoes/candidatos', () => {
+  // A UC-DEMO-003 tem ordem concluída em 25/09/2026: relógio fixo para a janela de 6 meses não depender do dia
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-30T12:00:00-03:00'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('tira da fila a UC com inspeção concluída nos últimos 6 meses', async () => {
+    const ids = (await buscarCandidatos({ periodo_atual: ATUAL, page_size: 200 })).items.map(
+      (i) => i.id_uc,
+    )
+    expect(ids).not.toContain('UC-DEMO-003')
+    vi.setSystemTime(new Date('2027-04-01T12:00:00-03:00'))
+    const depois = await buscarCandidatos({ periodo_atual: ATUAL, page_size: 200 })
+    expect(depois.items.map((i) => i.id_uc)).toContain('UC-DEMO-003')
+  })
+
   it('ordena por score, numera a posição e marca ordem ativa', async () => {
     const c = await buscarCandidatos({ periodo_atual: ATUAL })
     const scores = c.items.map((i) => i.score)
@@ -257,6 +309,26 @@ describe('GET /inspecoes/candidatos', () => {
     const ativa = c.items.find((i) => i.id_uc === 'UC-DEMO-002')
     expect(ativa).toMatchObject({ ordem_ativa: true, id_ordem_ativa: 1 })
     expect(c.resumo.ordens_ativas.valor).toBe(c.items.filter((i) => i.ordem_ativa).length)
+    expect(c.items.map((i) => i.acao_recomendada)).toContain('VALIDACAO_DOCUMENTAL')
+  })
+
+  it('filtra ordens ativas antes de paginar e recalcula o resumo', async () => {
+    const c = await buscarCandidatos({
+      periodo_atual: ATUAL,
+      sem_ordem_ativa: true,
+      page_size: 200,
+    })
+    expect(c.page_size).toBe(200)
+    expect(c.total).toBe(5)
+    expect(c.items.every((i) => !i.ordem_ativa)).toBe(true)
+    expect(c.items.map((i) => i.posicao)).toEqual(c.items.map((_, i) => i + 1))
+    expect(c.resumo.ucs_priorizadas.valor).toBe(5)
+    expect(c.resumo.ordens_ativas.valor).toBe(0)
+  })
+
+  it('rejeita page_size acima de 200 na fila', async () => {
+    const erro = await erroDe(buscarCandidatos({ periodo_atual: ATUAL, page_size: 201 }))
+    expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
   })
 
   it('segue a regra da Gold: desempate por kWh estimado e resumo sem corte de score', async () => {
@@ -282,7 +354,7 @@ describe('GET /inspecoes/candidatos', () => {
   it('pagina e filtra por região sem diferenciar caixa', async () => {
     const pagina = await buscarCandidatos({ periodo_atual: ATUAL, page: 2, page_size: 3 })
     expect(pagina.items).toHaveLength(3)
-    expect(pagina.total).toBe(8)
+    expect(pagina.total).toBe(7)
     const recife = await buscarCandidatos({ periodo_atual: ATUAL, municipio: 'Recife' })
     expect(recife.items.every((i) => i.municipio === 'Recife')).toBe(true)
     // O valor pode vir do GET /filtros da Gold real, em maiúsculas.
@@ -329,11 +401,76 @@ describe('ordens de inspeção', () => {
     expect([nenhuma.status, nenhuma.codigo]).toEqual([404, 'UC_INEXISTENTE'])
   })
 
+  it('bloqueia ordem de campo para UC com validação documental', async () => {
+    const erro = await erroDe(criarInspecao({ ...NOVA, id_uc: 'UC-DEMO-003' }))
+    expect([erro.status, erro.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
+  })
+
   it('valida os campos obrigatórios da criação (422)', async () => {
     expect((await erroDe(criarInspecao({ ...NOVA, equipe_responsavel: ' ' }))).status).toBe(422)
     expect((await erroDe(criarInspecao({ ...NOVA, data_prevista: '22/10/2026' }))).codigo).toBe(
       'DADOS_INVALIDOS',
     )
+  })
+
+  it('GET /inspecoes/indicadores calcula o acerto das concluídas e acompanha novas conclusões', async () => {
+    // Snapshot: uma concluída (UC-DEMO-003) com irregularidade: 310 kWh/mês em campo; a fila estimava
+    // 280 kWh em 3 meses, ou seja 93,33 kWh/mês
+    const antes = await buscarIndicadoresOrdens()
+    expect(antes).toMatchObject({
+      concluidas: 1,
+      com_irregularidade: 1,
+      taxa_acerto_pct: 100,
+      ordens_comparadas: 1,
+      kwh_mes_campo: 310,
+      kwh_mes_fila: 93.33,
+    })
+    expect(antes.por_motivo.map((m) => m.motivo)).toEqual(['Consumo abaixo da média do bairro.'])
+
+    // Conclui a ordem #2 (EM_CAMPO) sem irregularidade: a taxa cai para 50%
+    await concluirInspecao(2, {
+      irregularidade_detectada: false,
+      observacoes: 'Instalação regular.',
+    })
+    const depois = await buscarIndicadoresOrdens()
+    expect([depois.concluidas, depois.com_irregularidade, depois.taxa_acerto_pct]).toEqual([
+      2, 1, 50,
+    ])
+
+    const antigo = await buscarIndicadoresOrdens({ periodo_conclusao: '2022-07/2023-06' })
+    expect([antigo.concluidas, antigo.taxa_acerto_pct, antigo.por_motivo]).toEqual([0, null, []])
+  })
+
+  it('POST /inspecoes/lote cria todas as ordens, cada uma com histórico', async () => {
+    const criadas = await criarInspecoesEmLote([NOVA, { ...NOVA, id_uc: 'UC-DEMO-006' }])
+    expect(criadas.total).toBe(2)
+    expect(criadas.items.map((o) => [o.id_uc, o.status, o.historico.length])).toEqual([
+      ['UC-DEMO-001', 'ABERTA', 1],
+      ['UC-DEMO-006', 'ABERTA', 1],
+    ])
+    expect((await listarInspecoes()).total).toBe(6)
+  })
+
+  it('POST /inspecoes/lote recusa o lote inteiro e lista cada UC com problema', async () => {
+    const erro = await erroDe(
+      criarInspecoesEmLote([
+        NOVA,
+        { ...NOVA, id_uc: 'UC-DEMO-002' }, // já tem ordem ativa
+        { ...NOVA, id_uc: 'UC-DEMO-003' }, // validação documental
+        { ...NOVA, id_uc: 'UC-XXX' },
+        NOVA, // repetida no lote
+      ]),
+    )
+    expect([erro.status, erro.codigo]).toEqual([422, 'LOTE_REJEITADO'])
+    expect(falhasDoLote(erro).map((f) => [f.id_uc, f.codigo])).toEqual([
+      ['UC-DEMO-002', 'ORDEM_ATIVA_EXISTENTE'],
+      ['UC-DEMO-003', 'DADOS_INVALIDOS'],
+      ['UC-XXX', 'UC_INEXISTENTE'],
+      ['UC-DEMO-001', 'ORDEM_ATIVA_EXISTENTE'],
+    ])
+    expect((await listarInspecoes()).total).toBe(4) // nada gravado
+    const vazio = await erroDe(criarInspecoesEmLote([]))
+    expect([vazio.status, vazio.codigo]).toEqual([422, 'DADOS_INVALIDOS'])
   })
 
   it('segue o fluxo ABERTA → EM_CAMPO → CONCLUIDA com resultado e histórico', async () => {
@@ -482,14 +619,23 @@ describe('POST /ia', () => {
     )
   })
 
-  it('recusa campo além da pergunta, como a API', async () => {
+  it('recusa campo além da pergunta e do conversa_id, como a API', async () => {
     const extra = atenderMock('POST', '/ia', { corpo: { pergunta: 'Oi', contexto: {} } })
     expect((await erroDe(extra)).codigo).toBe('DADOS_INVALIDOS')
+    const idRuim = atenderMock('POST', '/ia', { corpo: { pergunta: 'Oi', conversa_id: 'abc' } })
+    expect((await erroDe(idRuim)).codigo).toBe('DADOS_INVALIDOS')
+  })
+
+  it('cria o conversa_id na primeira pergunta e devolve o mesmo nas seguintes', async () => {
+    const primeira = await perguntarIA('Qual foi a receita no período?')
+    expect(primeira.conversa_id).toMatch(/^[0-9a-f-]{36}$/)
+    const seguinte = await perguntarIA('DROP TABLE clientes', undefined, primeira.conversa_id)
+    expect(seguinte.conversa_id).toBe(primeira.conversa_id)
   })
 
   it('responde as perguntas sugeridas da tela do assistente com dados consistentes', async () => {
     for (const pergunta of [
-      'Quais bairros tiveram mais falta de luz este ano?',
+      'Quais bairros tiveram mais falta de luz em P2?',
       'Quais UCs têm maior risco de perda?',
       'Por que a conta de luz aumentou?',
     ]) {

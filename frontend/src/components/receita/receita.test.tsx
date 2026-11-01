@@ -243,12 +243,13 @@ describe('sem decomposição na Gold (fora de P1 × P2 ou com alimentador)', () 
 })
 
 describe('nomes em maiúsculas vindos do banco', () => {
+  const indicador = (valor: number, unidade: string) => ({
+    valor,
+    unidade,
+    periodo_referencia: ATUAL,
+  })
+
   it('a tabela e o breadcrumb mostram "Boa Vista", mas a URL leva o valor do banco', () => {
-    const indicador = (valor: number, unidade: string) => ({
-      valor,
-      unidade,
-      periodo_referencia: ATUAL,
-    })
     const linha = {
       nivel: 'bairro' as const,
       nome: 'BOA VISTA',
@@ -265,27 +266,93 @@ describe('nomes em maiúsculas vindos do banco', () => {
     const vazio = { municipio: null, bairro: null, classe: null }
     const selecionadas: unknown[] = []
     render(
-      <DrillDownReceita
-        drill={{
-          nivel: 'bairro',
-          page: 1,
-          page_size: 10,
-          total: 1,
-          items: [linha],
-          breadcrumb: [
-            { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
-            { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
-          ],
-        }}
-        aoSelecionar={(l) => selecionadas.push(l.filtros)}
-        aoNavegar={() => undefined}
-        aoMudarPagina={() => undefined}
-      />,
+      <MemoryRouter>
+        <DrillDownReceita
+          drill={{
+            nivel: 'bairro',
+            page: 1,
+            page_size: 10,
+            total: 1,
+            items: [linha],
+            breadcrumb: [
+              { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
+              { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
+            ],
+          }}
+          aoSelecionar={(l) => selecionadas.push(l.filtros)}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+        />
+      </MemoryRouter>,
     )
     expect(screen.getByRole('cell', { name: 'Boa Vista' })).toBeTruthy()
     expect(screen.getByText('Recife')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
     fireEvent.click(screen.getByRole('cell', { name: 'Boa Vista' }))
     expect(selecionadas).toEqual([{ municipio: 'RECIFE', bairro: 'BOA VISTA', classe: null }])
+  })
+
+  it('botão "Comparar" no drill-down leva os itens visíveis para a aba de comparação', () => {
+    function Rastreador() {
+      const loc = useLocation()
+      return <output aria-label="Endereço">{loc.pathname + loc.search}</output>
+    }
+
+    const linha1 = {
+      nivel: 'bairro' as const,
+      nome: 'BOA VISTA',
+      receita_energia_atual: indicador(10, 'BRL'),
+      receita_energia_comparacao: indicador(9, 'BRL'),
+      energia_atual: indicador(90, 'kWh'),
+      energia_comparacao: indicador(100, 'kWh'),
+      variacao_energia_percentual: indicador(-10, '%'),
+      queda_kwh: indicador(10, 'kWh'),
+      efeito_preco: indicador(2, 'BRL'),
+      efeito_volume: indicador(-1, 'BRL'),
+      filtros: { municipio: 'RECIFE', bairro: 'BOA VISTA', classe: null },
+    }
+    const linha2 = {
+      ...linha1,
+      nome: 'BOA VIAGEM',
+      filtros: { municipio: 'RECIFE', bairro: 'BOA VIAGEM', classe: null },
+    }
+    const vazio = { municipio: null, bairro: null, classe: null }
+
+    render(
+      <MemoryRouter initialEntries={['/receita']}>
+        <DrillDownReceita
+          drill={{
+            nivel: 'bairro',
+            page: 1,
+            page_size: 10,
+            total: 2,
+            items: [linha1, linha2],
+            breadcrumb: [
+              { nivel: 'consolidado', rotulo: 'Todos os municípios', filtros: vazio },
+              { nivel: 'municipio', rotulo: 'RECIFE', filtros: { ...vazio, municipio: 'RECIFE' } },
+            ],
+          }}
+          periodoAtual="2025-07/2026-06"
+          periodoComparacao="2022-07/2023-06"
+          aoSelecionar={() => undefined}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+        />
+        <Rastreador />
+      </MemoryRouter>,
+    )
+
+    const botao = screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement
+    expect(botao.disabled).toBe(false)
+    fireEvent.click(botao)
+    const endereco = screen.getByLabelText('Endereço').textContent ?? ''
+    expect(endereco).toContain('/painel?aba=comparar')
+    expect(endereco).toContain('nivel=bairro')
+    expect(endereco).toContain('municipio=RECIFE')
+    expect(endereco).toContain('itens=BOA+VISTA')
+    expect(endereco).toContain('itens=BOA+VIAGEM')
   })
 })
 
@@ -350,6 +417,76 @@ describe('ReceitaPage (com mocks)', () => {
     fireEvent.click(within(caminho).getByRole('button', { name: 'Todos os municípios' }))
     expect(await screen.findByRole('columnheader', { name: 'Município' })).toBeTruthy()
     expect(busca()).toBe('')
+  })
+
+  it('"Ver por: Classes" lista as classes sem escolher bairro; clicar numa classe filtra por ela', async () => {
+    const { busca } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Classes' }))
+    expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
+    expect(busca()).toBe('?ver=classe')
+    expect(screen.getByRole('button', { name: 'Classes' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+
+    const primeira = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0]
+    fireEvent.click(primeira)
+    expect(await screen.findByRole('columnheader', { name: 'Município' })).toBeTruthy()
+    expect(busca()).toMatch(/^\?classe=[^&]+$/)
+  })
+
+  it('destaca em barras as maiores perdas de receita por volume', async () => {
+    abrir()
+    const titulo = await screen.findByRole('heading', {
+      name: 'Maiores perdas de receita por volume',
+    })
+    const barras = within(titulo.closest('section') as HTMLElement).getAllByRole('listitem')
+    expect(barras.length).toBeGreaterThan(0)
+    expect(barras.length).toBeLessThanOrEqual(5)
+    expect(screen.getByText('Ordenado pela perda de receita por volume')).toBeTruthy()
+  })
+
+  it('com classe ativa, "Comparar" fica desabilitado e explica que a comparação não aplica a classe', async () => {
+    abrir('/receita?classe=Residencial')
+    expect(await screen.findByRole('columnheader', { name: 'Município' })).toBeTruthy()
+    const comparar = screen.getByRole('button', { name: 'Comparar' }) as HTMLButtonElement
+    expect(comparar.disabled).toBe(true)
+    expect(comparar.title).toMatch(/não aplica o filtro de classe/)
+    // O aviso também aparece como texto, para quem não consegue passar o mouse no botão
+    expect(screen.getByText('Comparar não aplica o filtro de classe')).toBeTruthy()
+  })
+
+  it('escolher um bairro tira o "ver" da URL: voltar pelo breadcrumb mostra os bairros', async () => {
+    const { busca } = abrir('/receita?municipio=Recife&bairro=Boa+Viagem&ver=classe')
+    expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
+    await waitFor(() => expect(busca()).not.toContain('ver='))
+    const caminho = screen.getByRole('navigation', { name: 'Caminho do drill-down' })
+    fireEvent.click(within(caminho).getByRole('button', { name: 'Recife' }))
+    expect(await screen.findByRole('columnheader', { name: 'Bairro' })).toBeTruthy()
+  })
+
+  it('sem perda por volume no recorte, o bloco das maiores perdas diz isso', async () => {
+    const dados = await consolidado()
+    const semPerda = dados.drill_down.items.map((l) => ({
+      ...l,
+      efeito_volume: { ...l.efeito_volume, valor: Math.abs(l.efeito_volume.valor ?? 0) },
+    }))
+    render(
+      <MemoryRouter>
+        <DrillDownReceita
+          drill={{ ...dados.drill_down, items: semPerda }}
+          aoSelecionar={() => undefined}
+          aoNavegar={() => undefined}
+          aoMudarPagina={() => undefined}
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Nenhuma perda por volume neste recorte.')).toBeTruthy()
+  })
+
+  it('com bairro escolhido, o seletor "Ver por" some: já é o ranking de classes do bairro', async () => {
+    abrir('/receita?municipio=OLINDA&bairro=RIO+DOCE')
+    expect(await screen.findByRole('columnheader', { name: 'Classe' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Ver por' })).toBeNull()
   })
 
   it('abre já filtrada quando a URL traz município e bairro (recarregar mantém)', async () => {

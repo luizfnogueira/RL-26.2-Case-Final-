@@ -1,3 +1,3 @@
-from app.models import gold, portal
+from app.models import gold, ia, portal
 
-__all__ = ["gold", "portal"]
+__all__ = ["gold", "ia", "portal"]

@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,8 +10,17 @@ from app.core.exceptions import AppException
 from app.core.auth import proteger_rotas
 
 from app.routers import auth, dashboard, filtros, ia, inspecoes, operacao, unidades
+from app.services.ia_service import apagar_conversas_antigas
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    apagar_conversas_antigas()   # retenção de 30 dias do log do assistente; só em IA_MODO=real
+    yield
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="V-Energy Grid 360 API",
     version="0.2.0",
     description=(

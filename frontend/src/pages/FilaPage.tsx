@@ -14,7 +14,7 @@ import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
 import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
-import { buscarCandidatos, criarInspecao, normalizarErro } from '@/services'
+import { buscarCandidatos, criarInspecoesEmLote, falhasDoLote, normalizarErro } from '@/services'
 import type { Candidato, ConfiancaEvidencia } from '@/types/inspecoes'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
 import { formatarAtualizacao } from '@/utils/datas'
@@ -32,7 +32,11 @@ const CAMPOS: readonly CampoFiltro[] = [
 const PADROES: FiltrosUrl = {
   periodo_atual: PERIODO_ATUAL_PADRAO,
 }
-const LINHAS_POR_PAGINA = 20
+const LINHAS_POR_PAGINA = 50
+const ACAO_RECOMENDADA = {
+  INSPECAO_PRIORITARIA: { rotulo: 'Inspeção prioritária', variante: 'sucesso' as const },
+  VALIDACAO_DOCUMENTAL: { rotulo: 'Validação documental', variante: 'alerta' as const },
+}
 
 const CONFIANCA: Record<ConfiancaEvidencia, { rotulo: string; variante: VarianteBadge }> = {
   ALTA: { rotulo: 'Alta', variante: 'sucesso' },
@@ -58,6 +62,7 @@ export default function FilaPage() {
   const { filtros, limpar } = useFiltrosUrl(CAMPOS, PADROES)
   const [params, setParams] = useSearchParams()
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '', 10) || 1)
+  const semOrdemAtiva = params.get('sem_ordem_ativa') === 'true'
 
   const periodoAtual = filtros.periodo_atual ?? PERIODO_ATUAL_PADRAO
   const { municipio, bairro, classe, alimentador } = filtros
@@ -83,12 +88,13 @@ export default function FilaPage() {
           bairro,
           classe,
           alimentador,
+          sem_ordem_ativa: semOrdemAtiva,
           page,
           page_size: LINHAS_POR_PAGINA,
         },
         sinal,
       ),
-    [periodoAtual, municipio, bairro, classe, alimentador, page],
+    [periodoAtual, municipio, bairro, classe, alimentador, semOrdemAtiva, page],
   )
 
   useEffect(() => {
@@ -99,12 +105,14 @@ export default function FilaPage() {
 
   // A seleção vale para as UCs do recorte atual: mudar filtro, período ou a própria fila
   // (ordem criada em outra aba) não pode manter selecionada uma UC que saiu do resultado.
-  const chaveRecorte = [periodoAtual, municipio, bairro, classe, alimentador].join('|')
+  const chaveRecorte = [periodoAtual, municipio, bairro, classe, alimentador, semOrdemAtiva].join(
+    '|',
+  )
   const selecionadas = selecao.chave === chaveRecorte ? selecao.itens : {}
   const quantidadeSelecionada = Object.keys(selecionadas).length
   const dados = candidatos.dados
   const alternarSelecao = (candidato: Candidato) => {
-    if (candidato.ordem_ativa) return
+    if (candidato.ordem_ativa || candidato.acao_recomendada !== 'INSPECAO_PRIORITARIA') return
     setSelecao((atual) => {
       const base = atual.chave === chaveRecorte ? atual.itens : {}
       const proximo = { ...base }
@@ -133,18 +141,32 @@ export default function FilaPage() {
     )
   }
 
+  const mudarFiltroSemOrdem = (marcado: boolean) => {
+    setParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual)
+        if (marcado) proximo.set('sem_ordem_ativa', 'true')
+        else proximo.delete('sem_ordem_ativa')
+        proximo.delete('page')
+        return proximo
+      },
+      { replace: true },
+    )
+  }
+
   const exportarFila = async () => {
     if (!dados || dados.total === 0 || exportando || atualizando) return
 
     setExportando(true)
     try {
-      const pageSize = 100
+      const pageSize = 200
       const primeiraPagina = await buscarCandidatos({
         periodo_atual: periodoAtual,
         municipio,
         bairro,
         classe,
         alimentador,
+        sem_ordem_ativa: semOrdemAtiva,
         page: 1,
         page_size: pageSize,
       })
@@ -158,6 +180,7 @@ export default function FilaPage() {
           bairro,
           classe,
           alimentador,
+          sem_ordem_ativa: semOrdemAtiva,
           page: pagina,
           page_size: pageSize,
         })
@@ -217,25 +240,31 @@ export default function FilaPage() {
     setErroCriacao(null)
 
     try {
-      // Cada ordem nasce com o contexto da Gold: motivos da fila e kWh estimado do candidato.
-      for (const candidato of Object.values(selecionadas)) {
-        await criarInspecao({
+      // Um lote, tudo ou nada. Cada ordem nasce com o contexto da Gold: motivos e kWh estimado da fila.
+      const criadas = await criarInspecoesEmLote(
+        Object.values(selecionadas).map((candidato) => ({
           id_uc: candidato.id_uc,
           equipe_responsavel: equipe.trim(),
           data_prevista: dataPrevista || null,
           motivo: candidato.motivos.join(' · ') || null,
           kwh_estimado: candidato.energia_estimada.valor ?? null,
-        })
-      }
-      setToast({ tipo: 'sucesso', texto: `${quantidadeSelecionada} ordens geradas` })
+        })),
+      )
+      setToast({ tipo: 'sucesso', texto: `${criadas.total} ordens geradas` })
       setSelecao({ chave: chaveRecorte, itens: {} })
       setModalAberto(false)
       navigate('/perdas/ordens')
     } catch (erro: unknown) {
-      const mensagem = normalizarErro(erro).mensagem
+      const falhas = falhasDoLote(erro)
+      const mensagem =
+        falhas.length > 0
+          ? `Nenhuma ordem foi criada. Revise: ${falhas
+              .map((falha) => `${falha.id_uc} (${falha.mensagem})`)
+              .join('; ')}`
+          : normalizarErro(erro).mensagem
       setErroCriacao(mensagem)
       setToast({ tipo: 'erro', texto: mensagem })
-      // Uma criação anterior no lote pode ter sido gravada: recarrega os bloqueios da fila.
+      // Outra pessoa pode ter criado ordem para uma UC da seleção: atualiza os bloqueios da fila.
       candidatos.recarregar()
     } finally {
       setCriando(false)
@@ -267,7 +296,7 @@ export default function FilaPage() {
   ]
 
   return (
-    <Pagina titulo="Fila de inspeção priorizada" subtitulo="UCs com maior potencial de recuperação">
+    <Pagina titulo="Fila de perdas" subtitulo="UCs elegíveis e ação recomendada">
       <div className="relative">
         {toast && (
           <div
@@ -365,6 +394,16 @@ export default function FilaPage() {
                     >
                       Exportar CSV
                     </Button>
+                    <label className="flex items-center gap-2 whitespace-nowrap text-[12px] text-[#48555d]">
+                      <input
+                        type="checkbox"
+                        checked={semOrdemAtiva}
+                        onChange={(evento) => mudarFiltroSemOrdem(evento.target.checked)}
+                        aria-label="Ocultar UCs com ordem ativa"
+                        className="h-4 w-4 rounded border-[#c5d0d8] accent-[#2d6a80]"
+                      />
+                      Ocultar UCs com ordem ativa
+                    </label>
                     <Button
                       icone={<ClipboardPlus size={18} aria-hidden="true" />}
                       onClick={abrirModal}
@@ -399,12 +438,13 @@ export default function FilaPage() {
                     <div className="overflow-x-auto">
                       <table
                         aria-busy={atualizando}
-                        className={`w-full min-w-[1080px] table-fixed border-collapse text-left text-[12px] ${atualizando ? 'opacity-60' : ''}`}
+                        className={`w-full min-w-[1220px] table-fixed border-collapse text-left text-[12px] ${atualizando ? 'opacity-60' : ''}`}
                       >
                         <colgroup>
                           <col className="w-10" />
                           <col className="w-10" />
                           <col className="w-[108px]" />
+                          <col className="w-[146px]" />
                           <col className="w-[112px]" />
                           <col className="w-[88px]" />
                           <col className="w-[118px]" />
@@ -418,6 +458,7 @@ export default function FilaPage() {
                             <th className="px-2 py-3 text-center" aria-label="Seleção" />
                             <th className="px-2 py-3 text-center">#</th>
                             <th className="px-3 py-3">UC</th>
+                            <th className="px-3 py-3">Ação recomendada</th>
                             <th className="px-3 py-3">Localização</th>
                             <th className="px-3 py-3">Classe</th>
                             <th className="px-3 py-3">Alimentador</th>
@@ -444,7 +485,10 @@ export default function FilaPage() {
                                   <input
                                     type="checkbox"
                                     checked={Boolean(selecionadas[linha.id_uc])}
-                                    disabled={atualizando}
+                                    disabled={
+                                      atualizando ||
+                                      linha.acao_recomendada !== 'INSPECAO_PRIORITARIA'
+                                    }
                                     aria-label={`Selecionar ${linha.id_uc}`}
                                     onChange={() => alternarSelecao(linha)}
                                     className="h-4 w-4 rounded border-[#c5d0d8] text-[#2d6a80] accent-[#2d6a80]"
@@ -465,6 +509,11 @@ export default function FilaPage() {
                                     </span>
                                   )}
                                 </div>
+                              </td>
+                              <td className="border-b border-[#edf2f5] px-3 py-3">
+                                <Badge variante={ACAO_RECOMENDADA[linha.acao_recomendada].variante}>
+                                  {ACAO_RECOMENDADA[linha.acao_recomendada].rotulo}
+                                </Badge>
                               </td>
                               <td className="border-b border-[#edf2f5] px-3 py-3">
                                 <div className="flex flex-col">

@@ -6,12 +6,15 @@ import type {
   Candidato,
   Candidatos,
   Historico,
+  IndicadoresOrdens,
   Ordem,
   Ordens,
+  OrdensCriadas,
   Resultado,
   StatusOrdem,
 } from '@/types/inspecoes'
 import { STATUS_ATIVOS } from '@/types/inspecoes'
+import { ApiError } from '../erro-api'
 import { mesNoPeriodo } from '@/utils/periodos'
 import { fixtures } from './fixtures'
 import {
@@ -26,7 +29,16 @@ import {
   verificarCenario,
   type Registro,
 } from './util'
-import { compararPeriodos, invalido, paginacao, periodo, regiao, texto } from './validacao'
+import {
+  booleano,
+  compararPeriodos,
+  invalido,
+  paginacao,
+  paginacaoCandidatos,
+  periodo,
+  regiao,
+  texto,
+} from './validacao'
 
 const STATUS: StatusOrdem[] = ['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 
@@ -60,6 +72,15 @@ export function reiniciarOrdens(): void {
 
 const ehAtiva = (ordem: Ordem) => STATUS_ATIVOS.includes(ordem.status)
 
+/** Como a API: UC com inspeção concluída nos últimos 6 meses sai da fila. */
+const MESES_SEM_REINSPECAO = 6
+function inspecionadaRecentemente(ordem: Ordem): boolean {
+  if (ordem.status !== 'CONCLUIDA' || !ordem.data_conclusao) return false
+  const limite = new Date()
+  limite.setMonth(limite.getMonth() - MESES_SEM_REINSPECAO)
+  return new Date(ordem.data_conclusao) >= limite
+}
+
 function novoHistorico(
   e: Estado,
   ordem: Ordem,
@@ -87,8 +108,9 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
   const atual = periodo(params, 'periodo_atual', true)
   const comparacao = periodo(params, 'periodo_comparacao', false)
   compararPeriodos(atual, comparacao)
-  const { page, pageSize } = paginacao(params)
+  const { page, pageSize } = paginacaoCandidatos(params)
   const filtros = regiao(params)
+  const semOrdemAtiva = booleano(params, 'sem_ordem_ativa')
   verificarCenario(atual, comparacao)
 
   const [base, cadastro, e] = await Promise.all([
@@ -98,23 +120,30 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
   ])
   const ativas = new Map(e.ordens.filter(ehAtiva).map((o) => [o.id_uc, o.id_ordem]))
   // Mesma ordem de gold.tb_fila_perdas: score, kWh estimado e id_uc (contrato Gold, regra 4.10).
-  const candidatos = filtrarRegiao(base.items, filtros).sort(
+  const inspecionadas = new Set(e.ordens.filter(inspecionadaRecentemente).map((o) => o.id_uc))
+  const candidatos = filtrarRegiao(
+    base.items.filter((c) => !inspecionadas.has(c.id_uc)),
+    filtros,
+  ).sort(
     (a, b) =>
       b.score - a.score ||
       (b.energia_estimada.valor ?? 0) - (a.energia_estimada.valor ?? 0) ||
       (a.id_uc < b.id_uc ? -1 : 1),
   )
-  candidatos.forEach((c: Candidato, i) => {
-    c.posicao = i + 1
+  candidatos.forEach((c: Candidato) => {
     c.ordem_ativa = ativas.has(c.id_uc)
     c.id_ordem_ativa = ativas.get(c.id_uc) ?? null
+  })
+  const fila = candidatos.filter((c) => !semOrdemAtiva || !c.ordem_ativa)
+  fila.forEach((c, i) => {
+    c.posicao = i + 1
   })
   // Como na Gold: analisadas = UCs do cadastro (universo da auditoria); priorizadas = UCs na fila
   // (todas elegíveis, sem corte de score); potencial = Σ kwh_estimado, um proxy, não energia comprovada.
   const analisadas = filtrarRegiao(cadastro.items, filtros)
-  const priorizados = candidatos
+  const priorizados = fila
   return {
-    ...paginar(candidatos, page, pageSize),
+    ...paginar(fila, page, pageSize),
     periodo_referencia: PERIODO_ATUAL,
     resumo: {
       ucs_analisadas: indicador(analisadas.length, 'UCs', PERIODO_ATUAL),
@@ -124,12 +153,74 @@ export async function listarCandidatos(params: Registro): Promise<Candidatos> {
         'kWh',
         PERIODO_ATUAL,
       ),
-      ordens_ativas: indicador(
-        candidatos.filter((c) => c.ordem_ativa).length,
-        'ordens',
-        PERIODO_ATUAL,
-      ),
+      ordens_ativas: indicador(fila.filter((c) => c.ordem_ativa).length, 'ordens', PERIODO_ATUAL),
     },
+    metadados: base.metadados,
+  }
+}
+
+// ---------- Indicadores ----------
+
+/** Como a API: os motivos da fila vêm no campo motivo da ordem, unidos por " · ". */
+const SEPARADOR_MOTIVOS = ' · '
+/** Como a API: o kwh_estimado da fila cobre 3 meses; o kWh do resultado de campo é por mês. */
+const MESES_ESTIMATIVA_FILA = 3
+const pct = (parte: number, todo: number) => (todo ? Math.round((1000 * parte) / todo) / 10 : null)
+
+export async function indicadoresDasOrdens(params: Registro): Promise<IndicadoresOrdens> {
+  const janela = periodo(params, 'periodo_conclusao', false)
+  const filtros = regiao(params)
+  const e = await obterEstado()
+  const base = await fixtures.inspecoes()
+  const concluidas = filtrarRegiao(e.ordens, filtros, e.cadastro).filter(
+    (o) =>
+      o.status === 'CONCLUIDA' &&
+      o.resultado !== null &&
+      (!janela ||
+        (o.data_conclusao !== null && mesNoPeriodo(o.data_conclusao.slice(0, 7), janela))),
+  )
+  const certas = concluidas.filter((o) => o.resultado?.irregularidade_detectada)
+  // Sem estimativa da fila, a ordem fica fora das duas somas de kWh
+  const comparaveis = concluidas.filter((o) => o.kwh_estimado !== null)
+  const motivos = new Map<string, { concluidas: number; certas: number }>()
+  for (const ordem of concluidas) {
+    const daOrdem = new Set(
+      (ordem.motivo ?? '')
+        .split(SEPARADOR_MOTIVOS)
+        .map((m) => m.trim())
+        .filter(Boolean),
+    )
+    for (const motivo of daOrdem) {
+      const contagem = motivos.get(motivo) ?? { concluidas: 0, certas: 0 }
+      contagem.concluidas += 1
+      if (ordem.resultado?.irregularidade_detectada) contagem.certas += 1
+      motivos.set(motivo, contagem)
+    }
+  }
+  const porMotivo = [...motivos].map(([motivo, c]) => ({
+    motivo,
+    concluidas: c.concluidas,
+    com_irregularidade: c.certas,
+    taxa_acerto_pct: pct(c.certas, c.concluidas) as number,
+  }))
+  porMotivo.sort(
+    (a, b) =>
+      b.concluidas - a.concluidas ||
+      b.taxa_acerto_pct - a.taxa_acerto_pct ||
+      a.motivo.localeCompare(b.motivo),
+  )
+  return {
+    concluidas: concluidas.length,
+    com_irregularidade: certas.length,
+    taxa_acerto_pct: pct(certas.length, concluidas.length),
+    ordens_comparadas: comparaveis.length,
+    kwh_mes_campo: arredondar(
+      comparaveis.reduce((s, o) => s + (o.resultado?.kwh_recuperado ?? 0), 0),
+    ),
+    kwh_mes_fila: arredondar(
+      comparaveis.reduce((s, o) => s + (o.kwh_estimado ?? 0), 0) / MESES_ESTIMATIVA_FILA,
+    ),
+    por_motivo: porMotivo,
     metadados: base.metadados,
   }
 }
@@ -186,7 +277,10 @@ function dataOpcional(corpo: Registro, campo: string): string | null {
   return valor
 }
 
-export async function criarOrdem(corpo: Registro): Promise<Ordem> {
+const MAX_ORDENS_LOTE = 200
+
+/** As validações do POST /inspecoes, sem gravar: devolve os campos já limpos ou lança o erro da API. */
+async function validarCriacao(corpo: Registro, e: Estado) {
   const idUc = typeof corpo.id_uc === 'string' ? corpo.id_uc.trim() : ''
   const equipe = typeof corpo.equipe_responsavel === 'string' ? corpo.equipe_responsavel.trim() : ''
   if (!idUc) throw invalido('id_uc é obrigatório.')
@@ -201,13 +295,17 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
       throw invalido('kwh_estimado deve ser maior ou igual a zero.')
   }
 
-  const e = await obterEstado()
   if (!(idUc in e.cadastro)) {
     throw erroApi(
       404,
       'UC_INEXISTENTE',
       `Unidade Consumidora '${idUc}' não encontrada no cadastro.`,
     )
+  }
+  const candidatos = await fixtures.candidatos()
+  const candidato = candidatos.items.find((item) => item.id_uc === idUc)
+  if (candidato?.acao_recomendada === 'VALIDACAO_DOCUMENTAL') {
+    throw erroApi(422, 'DADOS_INVALIDOS', 'UC requer validação documental antes de gerar inspeção.')
   }
   const ativa = e.ordens.find((o) => o.id_uc === idUc && ehAtiva(o))
   if (ativa) {
@@ -217,7 +315,11 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
       `A Unidade Consumidora '${idUc}' já possui a ordem ativa #${ativa.id_ordem} com status '${ativa.status}'.`,
     )
   }
+  return { idUc, equipe, dataPrevista, motivo, observacoes, kwh }
+}
 
+function gravarOrdem(e: Estado, campos: Awaited<ReturnType<typeof validarCriacao>>): Ordem {
+  const { idUc, equipe, dataPrevista, motivo, observacoes, kwh } = campos
   const ordem: Ordem = {
     id_ordem: e.proximoIdOrdem++,
     id_uc: idUc,
@@ -242,6 +344,47 @@ export async function criarOrdem(corpo: Registro): Promise<Ordem> {
   })
   e.ordens.push(ordem)
   return clonar(ordem)
+}
+
+export async function criarOrdem(corpo: Registro): Promise<Ordem> {
+  const e = await obterEstado()
+  return gravarOrdem(e, await validarCriacao(corpo, e))
+}
+
+/** Como o POST /inspecoes/lote: valida todas antes de gravar; uma falha rejeita o lote inteiro. */
+export async function criarOrdensEmLote(corpo: Registro): Promise<OrdensCriadas> {
+  const lista = corpo.ordens
+  if (!Array.isArray(lista) || lista.length < 1 || lista.length > MAX_ORDENS_LOTE)
+    throw invalido(`ordens deve ter de 1 a ${MAX_ORDENS_LOTE} itens.`)
+  const e = await obterEstado()
+  const validas: Awaited<ReturnType<typeof validarCriacao>>[] = []
+  const falhas: { id_uc: string; codigo: string; mensagem: string }[] = []
+  const vistas = new Set<string>()
+  for (const item of lista as Registro[]) {
+    const idUc = typeof item.id_uc === 'string' ? item.id_uc.trim() : ''
+    try {
+      if (vistas.has(idUc))
+        throw erroApi(
+          409,
+          'ORDEM_ATIVA_EXISTENTE',
+          `A Unidade Consumidora '${idUc}' aparece mais de uma vez no lote.`,
+        )
+      vistas.add(idUc)
+      validas.push(await validarCriacao(item, e))
+    } catch (erro) {
+      if (!(erro instanceof ApiError)) throw erro
+      falhas.push({ id_uc: idUc, codigo: erro.codigo, mensagem: erro.mensagem })
+    }
+  }
+  if (falhas.length > 0)
+    throw erroApi(
+      422,
+      'LOTE_REJEITADO',
+      'Nenhuma ordem do lote foi criada: corrija as UCs listadas em detalhes.falhas.',
+      { falhas },
+    )
+  const items = validas.map((campos) => gravarOrdem(e, campos))
+  return { items, total: items.length }
 }
 
 // ---------- Atualização ----------

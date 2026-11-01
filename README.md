@@ -2,7 +2,7 @@
 
 ## Backend
 
-Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold` e as ordens do portal no schema `portal`; a recarga da Gold nunca toca no `portal`.
+Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold`, as ordens do portal no schema `portal` e as conversas do assistente de IA no schema `ia`; a recarga da Gold nunca toca no `portal` nem no `ia`.
 
 O fluxo de carga real é CSV → PostgreSQL, sem banco intermediário; use `GOLD_SOURCE=real`. O seed permanece somente para desenvolvimento em banco separado. A documentação técnica e o guia operacional são distribuídos separadamente pela equipe no Drive, junto das orientações de acesso aos dados privados.
 
@@ -165,7 +165,7 @@ Com `VITE_USE_MOCKS=false`, o cliente HTTP (`services/http.ts`) é o único luga
 
 ### Tela 2: diagnóstico da receita (`/receita`)
 
-Filtros na URL (`periodo_atual`, `periodo_comparacao`, `municipio`, `bairro`, `classe`, `page`). O nível do drill-down segue os filtros (sem município lista municípios; com município, bairros; com bairro, classes) e o breadcrumb remove os filtros descendentes. A ponte decompõe a **receita de energia, sem tributos** (base → efeito-preço → efeito-volume → atual), por isso não coincide com a receita faturada do painel. O bloco "Análise da IA" chama `POST /ia/insight` com os seis números da ponte; se a IA falhar, só esse bloco mostra o erro. Fora de P1 × P2 ou com filtro de alimentador, a API devolve a ponte com valores `null` e o drill-down vazio, com o motivo em `metadados.observacoes`; a tela mostra o motivo no lugar do gráfico. Os nomes de município e bairro seguem como estão no banco (a Gold usa maiúsculas, ex.: `BOA VISTA`) ao montar a URL e a consulta; só o rótulo exibido é ajustado (`formatarNome`). Na integração (F-int), as listas de `data/filtros.mock.ts` precisam trazer esses mesmos valores. O gráfico (`components/graficos/Cascata.tsx`) é SVG próprio, sem biblioteca, com tooltip por barra, legenda e visão em tabela.
+Filtros na URL (`periodo_atual`, `periodo_comparacao`, `municipio`, `bairro`, `classe`, `ver`, `page`). Na visão **Região** (padrão), o nível do drill-down segue os filtros (sem município lista municípios; com município, bairros; com bairro, classes) e o breadcrumb remove os filtros descendentes. O seletor **"Ver por: Região | Classes"** (`ver=classe`) lista as classes de toda a área ou do município sem descer até o bairro; clicar numa classe aplica o filtro `classe` e volta para a visão Região. Com bairro escolhido o seletor some e o `ver` sai da URL. O ranking é ordenado pelo efeito-volume em R$ (a maior perda de receita por volume primeiro), com as 5 maiores perdas em barras acima da tabela. Com filtro de classe ativo, o botão "Comparar" fica desabilitado, porque `GET /dashboard/comparacao` não aplica esse filtro. A ponte decompõe a **receita de energia, sem tributos** (base → efeito-preço → efeito-volume → atual), por isso não coincide com a receita faturada do painel. O bloco "Análise da IA" chama `POST /ia/insight` com os seis números da ponte; se a IA falhar, só esse bloco mostra o erro. Fora de P1 × P2 ou com filtro de alimentador, a API devolve a ponte com valores `null` e o drill-down vazio, com o motivo em `metadados.observacoes`; a tela mostra o motivo no lugar do gráfico. Os nomes de município e bairro seguem como estão no banco (a Gold usa maiúsculas, ex.: `BOA VISTA`) ao montar a URL e a consulta; só o rótulo exibido é ajustado (`formatarNome`). Na integração (F-int), as listas de `data/filtros.mock.ts` precisam trazer esses mesmos valores. O gráfico (`components/graficos/Cascata.tsx`) é SVG próprio, sem biblioteca, com tooltip por barra, legenda e visão em tabela.
 
 ### Componentes comuns e filtros
 
@@ -187,3 +187,20 @@ const { dados, erro, carregando, recarregar } = useConsulta(
 ```
 
 `bairro` só habilita depois do município, e trocar o município limpa `bairro` e `alimentador`. As telas de fila e ordens leem os domínios de `GET /filtros` com `useOpcoesFiltros` e `paraOpcoesBarra` — os valores são os da Gold (maiúsculas) e só o rótulo exibido é ajustado. A tela de receita ainda usa `src/data/filtros.mock.ts`.
+
+## Assistente de IA
+
+Agente Text-to-SQL do portal (Tela 7 e painel flutuante, `POST /ia`) e insight da receita gerado por IA (Tela 2, `POST /ia/insight`). Arquitetura, segurança, como rodar e como avaliar: [ai-agent/README.md](ai-agent/README.md). Regras para agentes de código: [ai-agent/AGENTS.md](ai-agent/AGENTS.md).
+
+Decisões do módulo:
+
+- **PydanticAI dentro do backend**, sem serviço HTTP separado. O modelo vem de uma API gratuita de provedor arbitrário; trocar de provedor é mudar o `.env` (`LLM_PROVIDER`, `LLM_MODELO`, `LLM_API_KEY`).
+- **CHESS simplificado**: recuperação de valores e seleção de schema (skills) em código, um único agente gerador com três ferramentas, e o golden set no lugar dos testes gerados por LLM.
+- **Números nunca saem do modelo**: o texto usa marcadores (`{v1}`, `{efeito_preco}`) preenchidos pelo código com os valores do banco. Um validador de saída pede nova tentativa; se o erro se repetir, o chat responde "não sei" e o insight usa o texto por regra.
+- **Somente leitura em camadas**: usuário do banco só para o agente, validador de SQL, regras nas instruções, pré-filtro e front sem HTML vindo da resposta.
+- **Memória no servidor**: tabela `ia.interacao` com `conversa_id`. O front reenvia só o id. A mesma tabela serve de log de auditoria, com retenção de 30 dias e CPF, CNPJ e e-mail mascarados.
+- **Detalhes técnicos auditáveis**: o painel separa o que foi registrado (plano, ferramentas, SQL, tokens, tempo) do que o modelo declarou (justificativa), e as métricas do golden set das verificações da resposta.
+
+Suposições: o agente não vê nome, documento nem endereço do titular ("quem é o titular" fica para a Tela 3); o agente não lê o schema `portal`, que tem texto livre digitado por usuários; a conversa expira após 2 h sem perguntas; e "último ano" sem período explícito é tratado como premissa declarada na resposta.
+
+Resultados da avaliação (acurácia, taxa de invenção, bloqueio de ataques e configuração escolhida): a preencher com o primeiro run do `ai-agent/avaliacao/avaliar.py` (GENAI-27).

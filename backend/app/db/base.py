@@ -2,13 +2,15 @@
 
 Convenção (B2): a recarga da Gold só cria, apaga ou reescreve tabelas do schema `gold`.
 As tabelas do portal (ordens de inspeção e histórico, O1b) ficam no schema `portal`
-e nunca são tocadas pela recarga.
+e nunca são tocadas pela recarga. A memória e o log do assistente (GENAI-11) ficam no
+schema `ia`, também preservado, e o usuário somente leitura do agente não o enxerga.
 """
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 GOLD_SCHEMA = "gold"
 PORTAL_SCHEMA = "portal"
+IA_SCHEMA = "ia"
 
 NOMES = {
     "ix": "ix_%(column_0_label)s",
@@ -29,3 +31,9 @@ class PortalBase(DeclarativeBase):
     """Tabelas escritas pelo portal. Preservadas em toda recarga da Gold."""
 
     metadata = MetaData(schema=PORTAL_SCHEMA, naming_convention=NOMES)
+
+
+class IABase(DeclarativeBase):
+    """Conversas do assistente de IA. Preservadas em toda recarga da Gold."""
+
+    metadata = MetaData(schema=IA_SCHEMA, naming_convention=NOMES)

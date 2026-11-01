@@ -1,4 +1,4 @@
-import type { Dashboard } from '@/types/dashboard'
+import type { Comparacao, Dashboard } from '@/types/dashboard'
 import type { PerguntaIA, RespostaIA, RespostaInsight } from '@/types/ia'
 import type { Candidatos, Ordens } from '@/types/inspecoes'
 import type { Operacao } from '@/types/operacao'
@@ -29,6 +29,7 @@ async function carregar<T>(modulo: Promise<{ default: unknown }>): Promise<T> {
 /** Cada chamada devolve uma cópia independente: alterar o resultado não afeta os mocks. */
 export const fixtures = {
   dashboard: () => carregar<Dashboard>(import('@/data/mocks/dashboard.json')),
+  comparacao: () => carregar<Comparacao>(import('@/data/mocks/comparacao.json')),
   recortes: () => carregar<{ recortes: Recorte[] }>(import('@/data/mocks/dashboard_recortes.json')),
   unidades: () => carregar<Unidades>(import('@/data/mocks/unidades.json')),
   unidade: () => carregar<Unidade360>(import('@/data/mocks/unidade.json')),
@@ -41,6 +42,15 @@ export const fixtures = {
   respostaIaNaoSei: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_nao_sei.json')),
   respostaIaBloqueado: () =>
     carregar<RespostaIA>(import('@/data/mocks/resposta_ia_bloqueado.json')),
+  respostaIaEsclarecer: () =>
+    carregar<RespostaIA>(import('@/data/mocks/resposta_ia_esclarecer.json')),
+  respostaIaEsclarecerAno: () =>
+    carregar<RespostaIA>(import('@/data/mocks/resposta_ia_esclarecer_ano.json')),
+  respostaIaGrafico: {
+    barras: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_grafico_barras.json')),
+    pizza: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_grafico_pizza.json')),
+    linhas: () => carregar<RespostaIA>(import('@/data/mocks/resposta_ia_grafico_linhas.json')),
+  },
   respostaInsight: () => carregar<RespostaInsight>(import('@/data/mocks/resposta_insight.json')),
   respostaInsightUnidade: () =>
     carregar<RespostaInsight>(import('@/data/mocks/resposta_insight_unidade.json')),

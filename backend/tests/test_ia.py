@@ -82,7 +82,8 @@ def test_agente_fora_do_ar_vira_503(agente):
 
 def test_resposta_valida_do_agente_passa_sem_alteracao(agente):
     agente(AgenteFixo(exemplo("resposta_ia")))
-    assert client.post("/ia", json={"pergunta": "Qual foi a receita?"}).json() == exemplo("resposta_ia")
+    pergunta = {"pergunta": "Qual foi a receita?", "conversa_id": exemplo("resposta_ia")["conversa_id"]}
+    assert client.post("/ia", json=pergunta).json() == exemplo("resposta_ia")
 
 
 def test_chave_de_ia_nunca_vai_na_resposta(monkeypatch):
@@ -91,10 +92,9 @@ def test_chave_de_ia_nunca_vai_na_resposta(monkeypatch):
         assert "chave-secreta-de-teste" not in client.post("/ia", json=pergunta).text
 
 
-def test_modo_real_sem_agente_integrado_vira_503(monkeypatch):
+def test_modo_real_usa_o_agente_real(monkeypatch):
     monkeypatch.setattr(config, "IA_MODO", "real")
-    with pytest.raises(AgenteIndisponivelException):
-        ia_service.obter_agente()
+    assert isinstance(ia_service.obter_agente(), ia_service.AgenteReal)
 
 
 def test_ia_modo_invalido_impede_a_api_de_subir(monkeypatch):
@@ -108,10 +108,48 @@ def test_ia_modo_invalido_impede_a_api_de_subir(monkeypatch):
 
 
 def test_entrada_e_so_a_pergunta():
-    # Arquitetura V1: entra só {"pergunta"}; campo a mais é recusado
+    # Entra só {"pergunta", "conversa_id"}; campo a mais é recusado
     response = client.post("/ia", json={"pergunta": "Qual foi a receita no período?", "contexto": {}})
     assert response.status_code == 422
     assert response.json()["codigo"] == "DADOS_INVALIDOS"
+
+
+# ---------- GENAI-3: campos novos, todos opcionais ----------
+
+def test_conversa_id_e_aceito_na_pergunta():
+    response = client.post("/ia", json={"pergunta": "Qual a previsão de lucro em 2030?",
+                                        "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d"})
+    assert response.status_code == 200
+
+
+def test_conversa_id_que_nao_e_uuid_e_dados_invalidos():
+    response = client.post("/ia", json={"pergunta": "Qual foi a receita?", "conversa_id": "abc"})
+    assert response.status_code == 422
+    assert response.json()["codigo"] == "DADOS_INVALIDOS"
+
+
+def test_resposta_sem_os_campos_novos_continua_valida(agente):
+    antiga = {k: v for k, v in exemplo("resposta_ia").items()
+              if k not in ("conversa_id", "apresentacao", "detalhes_tecnicos")}
+    agente(AgenteFixo(antiga))
+    assert client.post("/ia", json={"pergunta": "Qual foi a receita?"}).status_code == 200
+
+
+def test_campo_novo_da_telemetria_nao_derruba_a_resposta(agente):
+    resposta = exemplo("resposta_ia")
+    resposta["detalhes_tecnicos"]["verificacoes"]["self_consistency_votos"] = "2/3"
+    resposta["detalhes_tecnicos"]["tokens_tempo"]["origem"] = "resposta do cache"
+    agente(AgenteFixo(resposta))
+    assert client.post("/ia", json={"pergunta": "Qual foi a receita?"}).status_code == 200
+
+
+@pytest.mark.parametrize("campo, valor", [
+    ("apresentacao", "grafico"),
+    ("detalhes_tecnicos", {"acoes": []}),          # sem os blocos obrigatórios
+])
+def test_campo_novo_fora_do_contrato_vira_503(agente, campo, valor):
+    agente(AgenteFixo({**exemplo("resposta_ia"), campo: valor}))
+    assert client.post("/ia", json={"pergunta": "Qual foi a receita?"}).status_code == 503
 
 
 def test_pergunta_vazia_e_dados_invalidos():

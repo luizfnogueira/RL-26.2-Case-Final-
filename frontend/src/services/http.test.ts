@@ -12,6 +12,15 @@ describe('construirQuery', () => {
     expect(construirQuery()).toBe('')
     expect(construirQuery({})).toBe('')
   })
+
+  it('repete parâmetros para valores em array', () => {
+    expect(construirQuery({ nivel: 'municipio', itens: ['RECIFE', 'OLINDA'] })).toBe(
+      '?nivel=municipio&itens=RECIFE&itens=OLINDA',
+    )
+    expect(construirQuery({ itens: ['A', '', undefined, 'B'] as unknown as string[] })).toBe(
+      '?itens=A&itens=B',
+    )
+  })
 })
 
 describe('requisitar com a API real (VITE_USE_MOCKS=false)', () => {

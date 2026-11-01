@@ -1,6 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import candidatosFixture from '@/data/mocks/candidatos.json'
-import { buscarCandidatos, buscarFiltros, criarInspecao, normalizarErro } from '@/services'
+import {
+  buscarCandidatos,
+  buscarFiltros,
+  criarInspecoesEmLote,
+  falhasDoLote,
+  normalizarErro,
+} from '@/services'
 import { ApiError } from '@/services/erro-api'
 import type { OpcoesFiltrosApi } from '@/types/filtros'
 import type { Candidatos, ParamsCandidatos } from '@/types/inspecoes'
@@ -12,7 +18,8 @@ import FilaPage from './FilaPage'
 const mocks = vi.hoisted(() => ({
   buscarCandidatos: vi.fn(),
   buscarFiltros: vi.fn(),
-  criarInspecao: vi.fn(),
+  criarInspecoesEmLote: vi.fn(),
+  falhasDoLote: vi.fn(),
   normalizarErro: vi.fn(),
 }))
 
@@ -45,7 +52,8 @@ function opcoesDoFixture(): OpcoesFiltrosApi {
 
 beforeEach(() => {
   vi.mocked(buscarFiltros).mockResolvedValue(opcoesDoFixture())
-  vi.mocked(criarInspecao).mockResolvedValue({} as never)
+  vi.mocked(criarInspecoesEmLote).mockResolvedValue({ items: [], total: 1 })
+  vi.mocked(falhasDoLote).mockReturnValue([])
   vi.mocked(normalizarErro).mockImplementation(
     (erro: unknown) => new ApiError(0, 'ERRO', erro instanceof Error ? erro.message : String(erro)),
   )
@@ -59,7 +67,7 @@ afterEach(() => {
 describe('FilaPage', () => {
   it('exporta todos os candidatos filtrados em páginas e identifica os dados mockados', async () => {
     const todos = candidatosFixture as Candidatos
-    const exportacao = Array.from({ length: 101 }, (_, index) => ({
+    const exportacao = Array.from({ length: 201 }, (_, index) => ({
       ...todos.items[index % todos.items.length],
       id_uc: `UC-EXPORT-${String(index + 1).padStart(3, '0')}`,
       posicao: index + 1,
@@ -67,12 +75,12 @@ describe('FilaPage', () => {
     const chamadas = vi.mocked(buscarCandidatos)
     chamadas.mockImplementation((params: ParamsCandidatos) =>
       Promise.resolve(
-        params.page_size === 100
+        params.page_size === 200
           ? {
               ...todos,
-              items: exportacao.slice(((params.page ?? 1) - 1) * 100, (params.page ?? 1) * 100),
+              items: exportacao.slice(((params.page ?? 1) - 1) * 200, (params.page ?? 1) * 200),
               page: params.page ?? 1,
-              page_size: 100,
+              page_size: 200,
               total: exportacao.length,
             }
           : todos,
@@ -105,12 +113,13 @@ describe('FilaPage', () => {
       expect(screen.getAllByText('ALM-DEMO-001').length).toBeGreaterThan(0)
       fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
 
-      await screen.findByText('Dados fictícios: 101 candidatos exportados')
+      await screen.findByText('Dados fictícios: 201 candidatos exportados')
       expect(arquivoBaixado).toBe('fila-inspecao-mock.csv')
       const chamadasExportacao = chamadas.mock.calls
         .map(([params]) => params)
-        .filter((params) => params.page_size === 100)
+        .filter((params) => params.page_size === 200)
       expect(chamadasExportacao.map((params) => params.page)).toEqual([1, 2])
+      expect(chamadasExportacao.every((params) => params.sem_ordem_ativa === false)).toBe(true)
     } finally {
       HTMLAnchorElement.prototype.click = clickOriginal
       if (createObjectUrlOriginal) {
@@ -119,6 +128,45 @@ describe('FilaPage', () => {
         Reflect.deleteProperty(URL, 'createObjectURL')
       }
     }
+  })
+
+  it('representa ação recomendada e desabilita seleção para validação documental', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-003')
+    expect(screen.getAllByText('Validação documental').length).toBeGreaterThan(0)
+    expect(
+      screen.getByRole('checkbox', { name: 'Selecionar UC-DEMO-003' }).hasAttribute('disabled'),
+    ).toBe(true)
+    expect(
+      screen.getByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }).hasAttribute('disabled'),
+    ).toBe(false)
+  })
+
+  it('persiste sem_ordem_ativa na URL e reinicia a paginação', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila?page=2']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-001')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ocultar UCs com ordem ativa' }))
+
+    await waitFor(() => {
+      expect(buscarCandidatos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, sem_ordem_ativa: true }),
+        expect.anything(),
+      )
+    })
   })
 
   it('indica quando mantém resultados antigos enquanto os novos filtros carregam', async () => {
@@ -178,15 +226,43 @@ describe('FilaPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
 
     await waitFor(() =>
-      expect(mocks.criarInspecao).toHaveBeenCalledWith(
+      expect(mocks.criarInspecoesEmLote).toHaveBeenCalledWith([
         expect.objectContaining({
           id_uc: 'UC-DEMO-001',
           equipe_responsavel: 'Equipe Norte 02',
           motivo: candidato.motivos.join(' · '),
           kwh_estimado: candidato.energia_estimada.valor,
         }),
-      ),
+      ]),
     )
+  })
+
+  it('lote recusado: avisa que nenhuma ordem foi criada e lista as UCs com problema', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+    const recusa = new ApiError(422, 'LOTE_REJEITADO', 'Nenhuma ordem do lote foi criada.')
+    vi.mocked(criarInspecoesEmLote).mockRejectedValue(recusa)
+    vi.mocked(falhasDoLote).mockReturnValue([
+      { id_uc: 'UC-DEMO-001', codigo: 'ORDEM_ATIVA_EXISTENTE', mensagem: 'já possui ordem ativa' },
+    ])
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem de inspeção' }))
+    fireEvent.change(screen.getByLabelText('Equipe responsável *'), {
+      target: { value: 'Equipe Norte 02' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
+
+    const avisos = await screen.findAllByText(
+      'Nenhuma ordem foi criada. Revise: UC-DEMO-001 (já possui ordem ativa)',
+    )
+    expect(avisos.length).toBeGreaterThan(0)
+    expect(falhasDoLote).toHaveBeenCalledWith(recusa)
   })
 
   it('mostra o domínio de filtros vindo de /filtros, sem lista fixa no front', async () => {
@@ -218,6 +294,8 @@ describe('gerarCsvCandidatos', () => {
     const csv = gerarCsvCandidatos([candidato])
 
     expect(csv).toContain('"Score (pontos)"')
+    expect(csv).toContain('"Ação recomendada"')
+    expect(csv).toContain('"INSPECAO_PRIORITARIA"')
     expect(csv).toContain('"66,0 pts"')
   })
 

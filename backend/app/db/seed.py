@@ -14,8 +14,8 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import Engine, insert, text
 
-from app.db.base import GOLD_SCHEMA, PORTAL_SCHEMA, GoldBase, PortalBase
-from app.models import gold, portal  # noqa: F401
+from app.db.base import GOLD_SCHEMA, IA_SCHEMA, PORTAL_SCHEMA, GoldBase, IABase, PortalBase
+from app.models import gold, ia, portal  # noqa: F401
 
 FUSO = timezone(timedelta(hours=-3))  # Recife, sem horário de verão
 PRIMEIRO_MES = date(2022, 7, 1)
@@ -72,6 +72,7 @@ MOTIVOS_FILA = [
     "Consumo abaixo da média da classe",
 ]
 STATUS_TRIAGEM = {"ELEGIVEL": 0.90, "EM_ANALISE": 0.06, "DESCLASSIFICADO": 0.04}
+ACOES_FILA = {"INSPECAO_PRIORITARIA": 0.55, "VALIDACAO_DOCUMENTAL": 0.45}
 CONFIANCA_EVIDENCIA = {"ALTA": 0.35, "MEDIA": 0.40, "BAIXA": 0.20, "INDETERMINADA": 0.05}
 PERIODOS_PRECO_VOLUME = {"P1": ("2022-07", "2023-06"), "P2": ("2025-07", "2026-06")}   # dim_mes.periodo
 
@@ -161,10 +162,14 @@ def _gerar_fila_perdas(rng: random.Random, ucs: list[dict], dados: dict) -> None
 
     escolhidas = rng.sample(ucs, k=max(1, round(len(ucs) * 0.30)))
     for uc in escolhidas:
+        status_triagem = _escolher(rng, STATUS_TRIAGEM)
         dados[gold.FilaPerdas].append({
             "id_uc": uc["id_uc"],
             "posicao_fila": None,
-            "status_triagem": _escolher(rng, STATUS_TRIAGEM),
+            "status_triagem": status_triagem,
+            "acao_recomendada": (
+                _escolher(rng, ACOES_FILA) if status_triagem == "ELEGIVEL" else "NAO_APLICAVEL"
+            ),
             "score": _brl(rng.uniform(10, 99.9)),
             "kwh_estimado": _brl(rng.uniform(80, 2_500)),
             "motivos_json": json.dumps(rng.sample(MOTIVOS_FILA, k=rng.randint(1, 3)), ensure_ascii=False),
@@ -367,11 +372,13 @@ def _gerar_preco_volume(ucs: list[dict], dados: dict) -> None:
 
 
 def preparar_schemas(engine: Engine) -> None:
-    """Cria os schemas e as tabelas do portal que faltarem. Nunca apaga nada do portal."""
+    """Cria os schemas e as tabelas do portal e do assistente que faltarem. Nunca apaga nada deles."""
     with engine.begin() as conn:
-        for schema in (GOLD_SCHEMA, PORTAL_SCHEMA):
+        for schema in (GOLD_SCHEMA, PORTAL_SCHEMA, IA_SCHEMA):
             conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         PortalBase.metadata.create_all(conn)
+        IABase.metadata.create_all(conn)
+        ia.atualizar_restricoes(conn)
 
 
 def recarregar_gold(engine: Engine, dados: dict[type, list[dict]]) -> dict[str, int]:

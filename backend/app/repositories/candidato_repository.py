@@ -9,9 +9,12 @@ from sqlalchemy.orm import Session
 from app.models.gold_source import FilaPerdas, FilaPerdasAuditoria, UnidadeConsumidora
 from app.core.config import GOLD_SOURCE
 from app.models.portal import OrdemInspecao
-from app.schemas.inspecao import STATUS_ATIVOS
+from app.schemas.inspecao import STATUS_ATIVOS, StatusOrdem
 
 STATUS_ELEGIVEL = "ELEGIVEL"
+# UC com inspeção concluída há menos que isso sai da fila: o resultado já está no portal e a Gold só
+# reflete a visita na próxima carga. Passada a janela, ela volta se a Gold ainda a priorizar.
+MESES_SEM_REINSPECAO = 6
 
 
 @dataclass(frozen=True)
@@ -23,6 +26,7 @@ class CandidatoFila:
     alimentador: str
     posicao: int
     motivos: list[str]
+    acao_recomendada: str
     kwh_estimado: Decimal
     score: Decimal
     confianca_evidencia: str
@@ -45,8 +49,9 @@ class CandidatoRepositoryInterface(Protocol):
         bairro: Optional[str] = None,
         classe: Optional[str] = None,
         alimentador: Optional[str] = None,
+        sem_ordem_ativa: bool = False,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 50,
     ) -> tuple[list[CandidatoFila], int, ResumoFila]:
         ...
 
@@ -105,6 +110,16 @@ def _subconsulta_ordens_ativas():
     )
 
 
+def _subconsulta_inspecionadas_recentes():
+    return (
+        select(OrdemInspecao.id_uc)
+        .where(
+            OrdemInspecao.status == StatusOrdem.CONCLUIDA.value,
+            OrdemInspecao.data_conclusao >= func.now() - func.make_interval(0, MESES_SEM_REINSPECAO),
+        )
+    )
+
+
 class SqlAlchemyCandidatoRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -123,15 +138,16 @@ class SqlAlchemyCandidatoRepository:
         bairro: Optional[str] = None,
         classe: Optional[str] = None,
         alimentador: Optional[str] = None,
+        sem_ordem_ativa: bool = False,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 50,
     ) -> tuple[list[CandidatoFila], int, ResumoFila]:
         regiao = _condicoes_regiao(municipio, bairro, classe, alimentador)
         elegivel = FilaPerdas.status_triagem == STATUS_ELEGIVEL
-        if GOLD_SOURCE == 'real':
-            # A rota existente gera ordens; validacao documental fica na auditoria.
-            elegivel = elegivel & (FilaPerdas.acao_recomendada == 'INSPECAO_PRIORITARIA')
         ativas = _subconsulta_ordens_ativas()
+        condicoes_fila = [elegivel, *regiao, FilaPerdas.id_uc.not_in(_subconsulta_inspecionadas_recentes())]
+        if sem_ordem_ativa:
+            condicoes_fila.append(ativas.c.id_uc.is_(None))
 
         # A posição é global dentro do resultado filtrado, antes da paginação.
         posicao = func.row_number().over(order_by=_ordem_fila()).label("posicao")
@@ -144,6 +160,7 @@ class SqlAlchemyCandidatoRepository:
                 UnidadeConsumidora.alimentador,
                 posicao,
                 FilaPerdas.motivos_json,
+                FilaPerdas.acao_recomendada,
                 FilaPerdas.kwh_estimado,
                 FilaPerdas.score,
                 FilaPerdas.confianca_evidencia,
@@ -151,7 +168,7 @@ class SqlAlchemyCandidatoRepository:
             )
             .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == FilaPerdas.id_uc)
             .outerjoin(ativas, ativas.c.id_uc == FilaPerdas.id_uc)
-            .where(elegivel, *regiao)
+            .where(*condicoes_fila)
             .subquery("fila_filtrada")
         )
 
@@ -170,6 +187,7 @@ class SqlAlchemyCandidatoRepository:
                 alimentador=linha.alimentador,
                 posicao=linha.posicao,
                 motivos=_motivos(linha.motivos_json),
+                acao_recomendada=linha.acao_recomendada,
                 kwh_estimado=linha.kwh_estimado,
                 score=linha.score,
                 confianca_evidencia=linha.confianca_evidencia,
@@ -181,7 +199,8 @@ class SqlAlchemyCandidatoRepository:
         total = int(self.db.scalar(
             select(func.count(FilaPerdas.id_uc))
             .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == FilaPerdas.id_uc)
-            .where(elegivel, *regiao)
+            .outerjoin(ativas, ativas.c.id_uc == FilaPerdas.id_uc)
+            .where(*condicoes_fila)
         ) or 0)
 
         analisadas = int(self.db.scalar(
@@ -196,19 +215,21 @@ class SqlAlchemyCandidatoRepository:
                 func.coalesce(func.sum(FilaPerdas.kwh_estimado), 0),
             )
             .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == FilaPerdas.id_uc)
-            .where(elegivel, *regiao)
+            .outerjoin(ativas, ativas.c.id_uc == FilaPerdas.id_uc)
+            .where(*condicoes_fila)
         ).one()
 
         ordens_ativas = int(self.db.scalar(
             select(func.count(OrdemInspecao.id_ordem))
             .select_from(FilaPerdas)
             .join(UnidadeConsumidora, UnidadeConsumidora.id_uc == FilaPerdas.id_uc)
+            .outerjoin(ativas, ativas.c.id_uc == FilaPerdas.id_uc)
             .join(
                 OrdemInspecao,
                 (OrdemInspecao.id_uc == FilaPerdas.id_uc)
                 & OrdemInspecao.status.in_([status.value for status in STATUS_ATIVOS]),
             )
-            .where(elegivel, *regiao)
+            .where(*condicoes_fila)
         ) or 0)
 
         return itens, total, ResumoFila(

@@ -15,6 +15,7 @@ import ModalCancelarOrdem from '@/components/inspecoes/ModalCancelarOrdem'
 import ModalConcluirOrdem from '@/components/inspecoes/ModalConcluirOrdem'
 import ModalDetalhesOrdem from '@/components/inspecoes/ModalDetalhesOrdem'
 import ModalIniciarCampo from '@/components/inspecoes/ModalIniciarCampo'
+import ResultadoInspecoes from '@/components/inspecoes/ResultadoInspecoes'
 import Badge, { type VarianteBadge } from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
@@ -447,6 +448,17 @@ export default function OrdensPage() {
 
               {/* Área principal da listagem */}
               <div className="bg-[#f4f6f7] p-5">
+                <ResultadoInspecoes
+                  filtros={{
+                    periodo_conclusao: periodoAtual,
+                    municipio,
+                    bairro,
+                    classe,
+                    alimentador,
+                  }}
+                  versao={contagem.CONCLUIDA}
+                  className="mb-5"
+                />
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex items-center gap-2">

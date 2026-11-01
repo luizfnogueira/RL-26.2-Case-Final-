@@ -14,10 +14,10 @@ class FiltrosDashboard(Contexto, Paginacao):
 
     @model_validator(mode='after')
     def validar_nivel(self):
+        # Bairro sem município misturaria bairros homônimos ("Centro" existe em vários municípios).
+        # Classe não exige pais: sem bairro, é o ranking de classes do município ou de toda a área.
         if self.nivel == 'bairro' and not self.municipio:
             raise ValueError('nivel bairro exige municipio')
-        if self.nivel == 'classe' and not (self.municipio and self.bairro):
-            raise ValueError('nivel classe exige municipio e bairro')
         return self
 
 

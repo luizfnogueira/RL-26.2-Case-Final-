@@ -50,7 +50,8 @@ class TestPeriodos:
 
 
 class TestDashboard:
-    @pytest.mark.parametrize('filtros', [{'nivel': 'bairro'}, {'nivel': 'classe', 'municipio': 'Recife'}])
+    # Classe não exige pais (ranking consolidado de classes); bairro sem município misturaria homônimos
+    @pytest.mark.parametrize('filtros', [{'nivel': 'bairro'}, {'nivel': 'classe', 'bairro': 'Boa Vista'}])
     def test_nivel_exige_filtros_ascendentes(self, filtros):
         erro(client.get('/dashboard', params={**PERIODOS, **filtros}), 422, 'DADOS_INVALIDOS')
 

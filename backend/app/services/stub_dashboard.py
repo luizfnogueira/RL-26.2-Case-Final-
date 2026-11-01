@@ -61,7 +61,8 @@ def _indicadores(soma: dict, base: dict, filtrado: bool) -> dict:
                 kpi[campo]['valor'] = None
         continuidade[nome] = kpi
     return {
-        'receita_faturada': _kpi('Receita faturada', soma['receita_atual'], soma['receita_comparacao'], 'BRL'),
+        'receita_faturada': _kpi('Receita faturada (com tributos)', soma['receita_atual'], soma['receita_comparacao'],
+                                 'BRL'),
         'energia_faturada': _kpi('Volume faturado', soma['energia_atual'], soma['energia_comparacao'], 'kWh'),
         'ucs_ativas': _kpi('UCs ativas', soma['ucs_ativas_atual'], soma['ucs_ativas_comparacao'], 'UCs'),
         'inadimplencia': {

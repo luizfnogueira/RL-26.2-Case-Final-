@@ -13,8 +13,13 @@ StatusOrdem = Literal['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 TextoLongo = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
-class FiltrosCandidatos(Contexto, Paginacao):
-    pass
+class FiltrosCandidatos(Contexto):
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=50, ge=1, le=200)
+    sem_ordem_ativa: bool = False
+
+
+AcaoRecomendada = Literal['INSPECAO_PRIORITARIA', 'VALIDACAO_DOCUMENTAL']
 
 
 class Candidato(Schema):
@@ -25,6 +30,7 @@ class Candidato(Schema):
     alimentador: str
     posicao: int = Field(ge=1)
     motivos: list[str]
+    acao_recomendada: AcaoRecomendada
     energia_estimada: Indicador
     score: float = Field(ge=0, le=100)
     confianca_evidencia: Literal['ALTA', 'MEDIA', 'BAIXA', 'INDETERMINADA']
@@ -40,6 +46,7 @@ class ResumoCandidatos(Schema):
 
 
 class Candidatos(Pagina[Candidato]):
+    page_size: int = Field(default=50, ge=1, le=200)
     periodo_referencia: Periodo
     resumo: ResumoCandidatos
     metadados: Metadados
@@ -49,6 +56,30 @@ class FiltrosInspecoes(FiltrosRegiao, Paginacao):
     id_uc: Texto | None = None
     status: StatusOrdem | None = None
     periodo_atual: Periodo | None = None
+
+
+class FiltrosIndicadoresOrdens(FiltrosRegiao):
+    # Janela pela data de conclusão; sem ela, todas as ordens concluídas
+    periodo_conclusao: Periodo | None = None
+
+
+class AcertoPorMotivo(Schema):
+    motivo: str
+    concluidas: int
+    com_irregularidade: int
+    taxa_acerto_pct: float
+
+
+class IndicadoresOrdens(Schema):
+    concluidas: int
+    com_irregularidade: int
+    taxa_acerto_pct: float | None
+    # Comparação de kWh por mês, só com as ordens que têm estimativa da fila
+    ordens_comparadas: int
+    kwh_mes_campo: float
+    kwh_mes_fila: float
+    por_motivo: list[AcertoPorMotivo]
+    metadados: Metadados
 
 
 class Resultado(Schema):
@@ -114,6 +145,18 @@ class CriarInspecao(Schema):
     motivo: TextoLongo | None = None
     kwh_estimado: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     observacoes: TextoLongo | None = None
+
+
+MAX_ORDENS_LOTE = 200
+
+
+class CriarInspecoesLote(Schema):
+    ordens: list[CriarInspecao] = Field(min_length=1, max_length=MAX_ORDENS_LOTE)
+
+
+class OrdensCriadas(Schema):
+    items: list[Ordem]
+    total: int
 
 
 class AtualizarInspecao(Schema):

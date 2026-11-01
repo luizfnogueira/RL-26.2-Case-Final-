@@ -25,8 +25,10 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /dashboard/comparacao | Ambos os períodos e `nivel=municipio|bairro|classe` obrigatórios; `itens` repetido de 2 a 4 vezes; município e bairro como filtros pai |
 | GET /unidades | busca (ID ou titular, 3–100 caracteres); município, bairro, classe, alimentador; page, page_size |
 | GET /unidades/{id} | periodo_atual opcional, sempre de 12 meses; sem ele, os 12 meses até o último mês da Gold |
-| GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; page, page_size |
+| GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; sem_ordem_ativa; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
+| POST /inspecoes/lote | corpo `{"ordens": [...]}` com 1 a 200 itens no formato do POST /inspecoes |
+| GET /inspecoes/indicadores | periodo_conclusao opcional (data de conclusão); município, bairro, classe, alimentador |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta |
 | GET /filtros | sem parâmetros |
@@ -57,6 +59,7 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 404 | ORDEM_NAO_ENCONTRADA | ID de ordem inexistente |
 | 409 | ORDEM_ATIVA_EXISTENTE | UC já tem ordem ABERTA ou EM_CAMPO |
 | 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
+| 422 | LOTE_REJEITADO | Alguma UC do lote falhou na validação; nenhuma ordem foi criada. `detalhes.falhas` lista `{id_uc, codigo, mensagem}` de cada UC |
 | 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
 | 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
@@ -75,19 +78,20 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 
 - `indicadores`: exatamente seis KPIs — receita_faturada, energia_faturada, ucs_ativas, inadimplencia, dec_medio, fec_medio. Cada um tem atual, comparação, diferença e variação percentual; campos não aplicáveis retornam null.
 - Definições da Gold (`agg_kpis_mensal`; com filtro, as mesmas regras sobre `fato_uc_mes`):
-  - `receita_faturada` = Σ `valor_total` (com tributos).
+  - `receita_faturada` = Σ `valor_total` (com tributos). Rótulo na tela: **“Receita faturada (com tributos)”**; a ponte da Tela 2 usa a receita de energia, sem tributos.
   - `energia_faturada` = Σ `consumo_kwh_valido` do `fato_uc_mes` (consumo sem as leituras negativas não recuperadas).
   - `ucs_ativas` = UCs **ligadas até o fim do último mês** de cada janela (`data_ligacao`; sem data, conta sempre), a mesma regra do Cc da `gold.fato_alimentador_mes`: o retrato da base de clientes, como as distribuidoras reportam.
   - `inadimplencia` = Σ `valor_total` das faturas `EM ABERTO` no período (`valor_em_aberto` da Gold); inclui o percentual da receita em cada período e a variação em pontos percentuais. Rótulo na tela: **“Valor em aberto”**. No mercado, inadimplência é o valor **vencido** e não pago; nesta base o histórico termina em jun/2026 e toda fatura em aberto já venceu, então os dois números coincidem.
   - `dec_medio` / `fec_medio` = soma dos DEC/FEC mensais da janela; cada mês divide pelas UCs atendidas naquele mês (Cc mensal). Seguem as regras da `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais (PRODIST Módulo 8), sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva (sem contar em dobro o tempo sobreposto). Com filtro de bairro, classe ou alimentador, retornam null: a continuidade só é agregada por alimentador e município.
 - `serie_historica`: 48 pontos mensais, jul/2022–jun/2026, cada um com receita e energia. A janela da série é independente das duas janelas de comparação.
 - `ponte_receita`: decompõe a **receita de energia** (sem tributos), como `gold.agg_preco_volume`: receita_energia_comparacao + efeito_preco + efeito_volume = receita_energia_atual, sem resíduo. Exemplo do stub: 205,9 + 24,7 − 8,2 = 222,4 milhões. efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação, por recorte e depois somado; efeito_preco = variação da receita de energia − efeito_volume. reajuste_percentual = variação da tarifa média de energia. Não há parcela de bandeira/mix.
-- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
-- Nível bairro exige município; nível classe exige município e bairro. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
+- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado pelo efeito-volume em BRL, da maior perda de receita por volume (mais negativo) para a menor, depois nome.
+- Nível bairro exige município (bairros homônimos existem em vários municípios). Nível classe aceita qualquer combinação dos pais: sem filtros é o ranking das classes de toda a área; com município, as classes do município; com município e bairro, as do bairro. O breadcrumb traz só os pais enviados. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
 
 ```http
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=bairro&municipio=Recife
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
+GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe
 ```
 
 A API lê os efeitos pré-calculados em `gold.agg_preco_volume` e só os soma; não refaz a decomposição. A tabela existe para P1 × P2 (`periodo_atual=2025-07/2026-06`, `periodo_comparacao=2022-07/2023-06`) e por município, bairro e classe. Fora disso — outras janelas ou filtro de alimentador — `ponte_receita` vem com todos os valores null e `drill_down` com a lista vazia, e `metadados.observacoes` diz o motivo; os KPIs e a série seguem calculados normalmente.
@@ -174,32 +178,29 @@ No mock (`GOLD_SOURCE=seed`), duas UCs têm a visão detalhada e só a janela 20
 ## 6. GET /inspecoes/candidatos — Tela 4
 
 ```http
-GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=20
+GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=50
 ```
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/candidatos.json)**
 
-`resumo`, antes da paginação e com os mesmos filtros: UCs analisadas (UCs do cadastro, o universo da `tb_fila_perdas_auditoria`), UCs priorizadas (UCs na `tb_fila_perdas`, todas elegíveis), potencial de recuperação (Σ `kwh_estimado` das priorizadas) e ordens ativas (do schema `portal`). Cada candidato: ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa.
+O padrão retorna todas as UCs com `status_triagem=ELEGIVEL` em `tb_fila_perdas`, incluindo as duas ações recomendadas. UCs com ordem `CONCLUIDA` nos últimos 6 meses (pela `data_conclusao` no portal) ficam fora da fila, com ou sem irregularidade encontrada; passada a janela, voltam se a Gold ainda as priorizar. `page_size` é 50 por padrão e aceita de 1 a 200; `page` começa em 1. O único filtro próprio da fila é `sem_ordem_ativa` (booleano, padrão `false`): quando `true`, oculta as UCs com ordem `ABERTA` ou `EM_CAMPO`. O total e os indicadores de UCs priorizadas, potencial de recuperação e ordens ativas são calculados depois desses filtros e antes da paginação; `ucs_analisadas` continua representando o universo da auditoria após os filtros geográficos.
 
-Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após filtros (na Gold, `posicao_fila`). Só UCs com `status_triagem = ELEGIVEL` entram. `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada; a tela deve deixar isso claro. Desabilitar seleção de UC com ordem ativa no front; POST também valida duplicidade. Estimativa futura não é o kWh já recuperado do histórico.
+Cada candidato inclui `acao_recomendada` (`INSPECAO_PRIORITARIA` ou `VALIDACAO_DOCUMENTAL`), além de ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa. Os filtros geográficos município, bairro, classe e alimentador são mantidos; não há filtros por motivo ou status nesta rota. Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após todos os filtros (na Gold, `posicao_fila`). `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada.
 
 ## 7. Ordens — Telas 4 e 5
 
-### Regra da fila com Gold real
+### Relação da fila com as ordens
 
-Com `GOLD_SOURCE=real`, `GET /inspecoes/candidatos` exige tanto
-`status_triagem=ELEGIVEL` quanto `acao_recomendada=INSPECAO_PRIORITARIA`.
-O total de candidatos, as UCs priorizadas e o potencial de recuperação do resumo
-consideram esse recorte, antes da paginação.
+As UCs com `INSPECAO_PRIORITARIA` podem ser selecionadas para gerar uma ordem de campo,
+desde que não tenham ordem ativa. UCs com `VALIDACAO_DOCUMENTAL` aparecem na fila com
+essa recomendação, mas a seleção para ordem de campo fica desabilitada. O `POST /inspecoes`
+também rejeita essas UCs com 422 `DADOS_INVALIDOS`, independentemente de a fonte ser `seed`
+ou `real`. Ordens ativas continuam visíveis por padrão, identificadas por `ordem_ativa` e
+`id_ordem_ativa`; `sem_ordem_ativa=true` as oculta da fila.
 
-Casos de `VALIDACAO_DOCUMENTAL` permanecem na Gold, mas não aparecem na fila de
-inspeção nem podem gerar ordem de campo pelo `POST /inspecoes`. O backend aplica
-esse bloqueio mesmo quando a chamada é feita diretamente, sem passar pela tela.
-Não há endpoint ou tela de tratamento documental definido nesta entrega.
-
-Esse comportamento foi alinhado com o responsável pela interface da fila em
-27/10/2026, sem incompatibilidade com o fluxo visual existente. O modo `seed`
-mantém o comportamento de desenvolvimento.
+Os filtros de região seguem disponíveis na fila; filtros por motivo e status de triagem
+não fazem parte do contrato dessa rota. Não há endpoint ou tela de tratamento documental
+definido nesta entrega.
 
 ### Ciclo das ordens
 
@@ -208,7 +209,7 @@ Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadore
 - Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
 - `data_prevista` é campo, não status. Uma ordem ativa por UC.
 - Resposta usa id_ordem inteiro, id_uc, equipe_responsavel, datas, motivo, kwh_estimado, observacoes, resultado e historico[].
-- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado, observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
+- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado (**kWh por mês** da irregularidade, estimado em campo; 0 sem irregularidade), observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
 - Com irregularidade: tipo obrigatório e kWh não negativo. Sem irregularidade: tipo null e kWh zero. Não há `classificacao` ou `INCONCLUSIVA` neste contrato, para corresponder ao modelo existente.
 - `historico[]`: id_historico, id_ordem, status_anterior, status_novo, data_mudanca, usuario, justificativa_ou_motivo e detalhes.
 
@@ -226,9 +227,9 @@ GET /inspecoes?page=1&page_size=20
 
 Obrigatórios: id_uc e equipe_responsavel. data_prevista opcional no modelo do Gabriel; a modal pode exigir antes do envio. Demais campos opcionais. Servidor gera ID, datas, status e histórico.
 
-Com `GOLD_SOURCE=real`, uma UC marcada como `VALIDACAO_DOCUMENTAL` em
-`gold.tb_fila_perdas` retorna **422 `DADOS_INVALIDOS`**, sem criar ordem nem
-histórico. A interface deve exibir a mensagem retornada pela API:
+Uma UC marcada como `VALIDACAO_DOCUMENTAL` em `gold.tb_fila_perdas` retorna
+**422 `DADOS_INVALIDOS`**, sem criar ordem nem histórico, tanto com `GOLD_SOURCE=seed`
+quanto com `GOLD_SOURCE=real`. A interface deve exibir a mensagem retornada pela API:
 
 ```json
 {
@@ -255,6 +256,42 @@ Content-Type: application/json
 
 
 **201 — [JSON completo da resposta](../backend/app/services/fixtures/ordem_criada.json)**
+
+### POST /inspecoes/lote
+
+Cria de 1 a 200 ordens de uma vez (seleção múltipla da Tela 4), **tudo ou nada**. Cada UC passa pelas mesmas validações do `POST /inspecoes` antes de qualquer gravação: UC inexistente, UC com ordem ABERTA/EM_CAMPO, UC em `VALIDACAO_DOCUMENTAL` ou UC repetida no lote. Se uma falhar, nenhuma ordem é criada e a resposta lista todas as falhas:
+
+```json
+{
+  "codigo": "LOTE_REJEITADO",
+  "mensagem": "Nenhuma ordem do lote foi criada: corrija as UCs listadas em detalhes.falhas.",
+  "detalhes": {
+    "falhas": [
+      {"id_uc": "UC-DEMO-002", "codigo": "ORDEM_ATIVA_EXISTENTE", "mensagem": "A Unidade Consumidora 'UC-DEMO-002' já possui a ordem ativa #1 com status 'ABERTA'."}
+    ]
+  }
+}
+```
+
+Com todas válidas, as ordens e seus eventos de histórico são gravados num único commit. Se uma ordem ativa for criada em paralelo entre a validação e a gravação, o índice único barra, o lote inteiro é desfeito e a resposta é 409 `ORDEM_ATIVA_EXISTENTE`.
+
+[Corpo de exemplo](../backend/app/services/fixtures/criar_inspecoes_lote.json) · **201 — [resposta](../backend/app/services/fixtures/ordens_criadas_lote.json)**: `{"items": [Ordem, ...], "total": n}`, na ordem do pedido.
+
+### GET /inspecoes/indicadores
+
+Resultado das inspeções concluídas, para saber se a fila está acertando. Calculado só sobre ordens `CONCLUIDA`; os filtros de região seguem o cadastro da UC e `periodo_conclusao` filtra pela data de conclusão (sem ele, todas as concluídas).
+
+| Campo | Cálculo |
+| --- | --- |
+| `concluidas` | Ordens concluídas no recorte |
+| `com_irregularidade` | Concluídas com `irregularidade_detectada = true` |
+| `taxa_acerto_pct` | `com_irregularidade ÷ concluidas × 100`, uma casa; `null` sem concluídas |
+| `ordens_comparadas` | Concluídas com `kwh_estimado`; só elas entram nas duas somas de kWh abaixo |
+| `kwh_mes_campo` | Σ `resultado.kwh_recuperado` dessas ordens, em kWh/mês (informado em campo) |
+| `kwh_mes_fila` | Σ `kwh_estimado` dessas ordens ÷ 3, em kWh/mês. O `kwh_estimado` da `tb_fila_perdas` é `queda_kwh_mensal × meses_atuais`, uma janela de 3 meses |
+| `por_motivo` | Para cada motivo da suspeita: concluídas, com irregularidade e taxa. O motivo vem do campo `motivo` da ordem, com os motivos da fila separados por ` · `; uma ordem com dois motivos conta nos dois. Ordenado por concluídas e depois pela taxa |
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/indicadores_ordens.json)**
 
 ### PATCH /inspecoes/{id}
 
@@ -301,7 +338,7 @@ Cancelamento (ordem 1 ou 2):
 
 Resposta completa da ordem com histórico acrescentado. Campos não enviados permanecem; não permite trocar UC, ID ou data de criação. A equipe pode mudar ao iniciar campo. Combinações de campos inválidas: 422; transição inválida: 400.
 
-Persistência: `GET`, `POST` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
+Persistência: `GET`, `POST`, `POST /lote` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
 
 ## 8. GET /operacao — Tela 6
 
@@ -330,14 +367,90 @@ Content-Type: application/json
 
 ```json
 {
-  "pergunta": "Qual foi a receita no período?"
+  "pergunta": "Qual foi a receita no período?",
+  "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d"
 }
 ```
 
+`conversa_id` (UUID) é opcional. Na primeira pergunta o front não envia o campo: o backend cria o id e o devolve na resposta. Nas perguntas seguintes, o front reenvia o mesmo id, e o agente usa as últimas trocas daquela conversa (até 3, guardadas no servidor) para entender perguntas de continuação ("E só comercial?"). Em conversa mais longa, ele recebe também a lista das 10 perguntas anteriores, montada pelo backend a partir do log (sem chamar o modelo e sem sair do servidor), para responder "qual foi o primeiro município que perguntei?". “Limpar conversa” no front começa uma conversa nova. Um id desconhecido ou expirado (mais de 2 h sem perguntas) abre uma conversa nova, sem erro.
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_ia.json)**
 
-Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
+Resposta: resposta, sql (string/null), tabelas[], dados{colunas[], linhas[][]}, status (`ok`, `nao_sei`, `bloqueado`, `esclarecer`), gerado_em e metadados. Linhas seguem a ordem de colunas. O bloco “Como cheguei nisso” usa esses três campos de auditoria, não raciocínio interno do agente.
+
+Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem eles continuam válidos:
+
+| Campo | Tipo | Para quê |
+| --- | --- | --- |
+| `conversa_id` | UUID | Memória da conversa (ver acima). |
+| `apresentacao` | `"texto"`, `"tabela"` ou `"grafico"` | Com `tabela`, a Tela 7 mostra `dados` como tabela no corpo da resposta. Regra do agente: várias linhas, ou 1 linha com 3 ou mais colunas, vão em tabela; status diferente de `ok` vai sempre em texto. Até 50 linhas, e o texto informa o total real. Com `grafico`, a Tela 7 desenha o campo `grafico` (abaixo) e `dados` leva todas as linhas da consulta (até 500). |
+| `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
+| `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
+| `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
+
+**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta dois casos:
+
+| Caso | Exemplo | Opções |
+| --- | --- | --- |
+| Bairro que existe em 2 municípios ou mais, sem nenhum município na pergunta. A troca anterior só resolve numa continuação ("E no Centro?") logo depois de uma pergunta com um município só | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 10) e "Todos os municípios juntos". Um município citado resolve, mesmo sem esse bairro: aí o agente responde que não há dados |
+| "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
+
+```json
+{
+  "status": "esclarecer",
+  "resposta": "O bairro Centro existe em 3 municípios. De qual você quer saber?",
+  "esclarecimento": {
+    "pergunta": "O bairro Centro existe em 3 municípios. De qual você quer saber?",
+    "opcoes": [
+      {"rotulo": "Centro de Recife", "pergunta": "Qual a receita do Centro (bairro Centro, em Recife)?"},
+      {"rotulo": "Todos os municípios juntos", "pergunta": "Qual a receita do Centro (bairro Centro, somando todos os municípios)?"}
+    ]
+  }
+}
+```
+
+`opcoes` tem de 2 a 11 itens. Cada `pergunta` já vem completa: o front a envia como uma pergunta nova, na mesma conversa, e ela não pede esclarecimento de novo. A troca `esclarecer` vai para o log em `ia.interacao`, mas não entra na memória da conversa. [Exemplo completo (bairro)](../backend/app/services/fixtures/resposta_ia_esclarecer.json), [exemplo do ano](../backend/app/services/fixtures/resposta_ia_esclarecer_ano.json).
+
+**Gráfico na conversa.** Quem decide o tipo é o backend, pela forma de `dados` e pela pergunta; o modelo não desenha nem escreve número. Os valores de `grafico` são células de `dados`, que vêm do banco, já ordenados e cortados no limite. Com gráfico, `dados` leva todas as linhas da consulta (até 500, o limite da ferramenta), não só as 50 da tabela: o gráfico é montado com todas, e o "Ver como tabela" da Tela 7 mostra `dados` inteiro, com as colunas e linhas que ficaram fora do desenho. Regras (Nastengraph, *Bar/Pie/Line charts best practices*):
+
+| Situação | Gráfico |
+| --- | --- |
+| Comparação P1 × P2 (colunas `..._p1`/`..._p2` ou coluna `periodo`), sem pedido | Barras: verticais com P1 e P2; horizontais com P1 e P2 lado a lado quando há uma categoria. Ordem natural (P1 → P2), categorias do maior para o menor pelo P2 |
+| Série no tempo (`mes_referencia`, `ano`, `mes`, `data_*`), sem pedido | Linhas com 3 meses ou mais, até 48 pontos e 4 linhas; 2 pontos viram barras verticais (até 24). O eixo mensal vai do primeiro ao último mês, ou até a faixa `BETWEEN` do SQL; mês que a consulta não trouxe é `null` (buraco na linha) e é citado em `nota` |
+| Pessoa pede "gráfico", "barras", "pizza" ou "linhas" | O tipo pedido quando faz sentido. Categorias viram barras horizontais, do maior para o menor (ou na ordem do SQL, quando já vem ordenada), até 20. "Barra" no singular (bairro Barra de Jangada) e "linhas de distribuição" não contam como pedido |
+| Pizza pedida | Só com totais somáveis (receita, kWh, contagens), nunca médias, taxas, DEC ou percentuais; até 5 fatias, da maior para a menor, com "Outros" no fim. Fatias quase iguais, médias, valores negativos, períodos ou indicadores diferentes viram barras, e a `nota` começa com "Você pediu pizza, mas o gráfico está em barras:" seguido do motivo |
+| Linhas pedidas sem tempo | Barras, com a explicação em `nota` |
+| Ranking ou lista sem pedido, ou um número só | Sem gráfico (tabela ou texto). Com pedido e um número só, `metadados.observacoes` explica |
+
+Campos de `grafico`:
+
+| Campo | Valores | Para quê |
+| --- | --- | --- |
+| `tipo` | `barras`, `pizza`, `linhas` | Forma do gráfico |
+| `titulo` | texto (até 150) | A pergunta interpretada, sem a menção ao gráfico ("formatado para gráfico de pizza") e cortada numa palavra inteira |
+| `eixo` | `categoria`, `tempo`, `periodo` | Como o front formata as categorias: nomes da Gold (`formatarNome`), meses (`2025-07` → `Jul/2025`) ou P1/P2 como estão |
+| `orientacao` | `horizontal`, `vertical` ou `null` | Obrigatória nas barras; `null` na pizza e nas linhas |
+| `unidade` | `brl`, `kwh`, `pct`, `h` ou `null` | Uma unidade por gráfico, pelo sufixo do alias do SQL; nunca dois eixos |
+| `categorias` | 1 a 48 textos | Eixo das barras e das linhas, ou as fatias |
+| `series` | 1 a 4 itens `{nome, valores[]}` | Um valor (número ou `null`) por categoria, na mesma ordem. Pizza: 1 série, sem negativos nem `null` |
+| `origem` | `automatico`, `pedido` | Se veio da forma dos dados ou de um pedido da pessoa |
+| `omitidos` | inteiro ≥ 0 | Categorias ou séries fora do limite; a tabela completa segue em `dados` ("Ver como tabela") e no CSV |
+| `nota` | texto ou `null` | Por que o tipo pedido não foi usado (ex.: pizza de média) e o que ficou fora do desenho: meses além do limite ("aparecem os últimos 24"), municípios além de 4 linhas, colunas de outra unidade ("Consumo ficou fora do gráfico, que tem um eixo só"), meses que a consulta não trouxe e consulta cortada por `LIMIT`. A Tela 7 mostra a nota acima do gráfico |
+
+Exemplos completos (valores fictícios): [barras P1 × P2](../backend/app/services/fixtures/resposta_ia_grafico_barras.json), [pizza](../backend/app/services/fixtures/resposta_ia_grafico_pizza.json), [linhas](../backend/app/services/fixtures/resposta_ia_grafico_linhas.json). Um gráfico que não passe nessas regras é descartado e a resposta sai como tabela ou texto, nunca 503.
+
+Blocos de `detalhes_tecnicos`. Campos novos da telemetria são aceitos e o front os ignora:
+
+| Bloco | Conteúdo |
+| --- | --- |
+| `estrutura_pensamento` | `pergunta_interpretada`, `plano` (`tabelas`, `colunas`, `filtros`, `agregacao`, `ordenacao`, `limite`, `periodo`), `skills`, `premissas` e `justificativa` (declarada pelo modelo, e assim rotulada na tela) |
+| `acoes[]` | Ferramentas chamadas pelo agente, em ordem: `ordem`, `ferramenta`, `argumentos`, `resumo_retorno`, `sucesso` |
+| `consulta` | `sql_executado`, `tentativas` e `linhas` |
+| `tokens_tempo` | `tokens_entrada`, `tokens_saida`, `tokens_raciocinio`, `chamadas`, `latencia_total_ms`, `etapas_ms{}`, `modelo`, `provedor` e `cache` |
+| `verificacoes` | `sql_validado`, `numeros_conferidos` e `confianca` (`alta`, `media` ou `baixa`) |
+| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). A Tela 7 mostra `taxa_invencao` como "Taxa de invenção" e `por_status.nao_sei.recall` como "Não sei correto" (das perguntas sem resposta possível, quantas o agente admitiu não saber). |
+
+As métricas de `avaliacao` medem o conjunto de perguntas com gabarito, não esta resposta. As verificações desta resposta ficam em `verificacoes`.
 
 Cenários demonstrativos:
 
@@ -346,13 +459,17 @@ Cenários demonstrativos:
 | Qual foi a receita no período? | ok — exemplo acima |
 | Qual a previsão de lucro em 2030? | [nao_sei](../backend/app/services/fixtures/resposta_ia_nao_sei.json) |
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
+| Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
+| Qual a receita do Centro? / Qual foi a receita deste ano? | esclarecer — exemplos acima (no mock, "Centro" é um bairro fictício de Recife, Olinda e Paulista) |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 
-- `mock` (padrão): os três cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
-- `real`: a pergunta vai para o agente, que gera e executa a consulta somente leitura na Gold.
+- `mock` (padrão): os cenários acima, sem chamar o agente; outras perguntas retornam nao_sei. A demonstração de bloqueio não substitui as proteções do agente real.
+- `real`: a pergunta vai para o agente PydanticAI da Equipe 3, que roda dentro do backend, sem chamada HTTP. Ele gera e executa a consulta somente leitura na Gold, com o usuário do banco próprio do agente. A API carrega as últimas trocas da conversa e grava cada resposta, inclusive `bloqueado` e `nao_sei`, em `ia.interacao`, que também serve de log de auditoria.
 
-Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. Chaves e endereço do agente ficam só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos; validar os nomes reais com a Equipe 3.
+**Respostas pré-calculadas.** Em `IA_MODO=real`, uma resposta `ok` de pergunta sem histórico fica guardada em `ia.resposta_cache`, por versão da Gold. Uma pergunta nova igual ou muito parecida (texto 90% semelhante, sem acento, pontuação e palavras vazias) e com os mesmos nomes da Gold, números, P1/P2, meses e qualificadores (maior/menor, média/total, gráfico) recebe essa resposta sem chamar o modelo. "Receita comercial em Jaboatão" e "em Olinda" nunca se confundem. No reaproveitamento, `detalhes_tecnicos.tokens_tempo.cache` vem `true`, com tokens e chamadas zerados, e `metadados.observacoes` cita a pergunta original. O gráfico é montado de novo para a pergunta nova. Recarregar a Gold esvazia o cache; `AI_CACHE_ENABLED=0` desliga.
+
+Em qualquer modo, a API confere a resposta contra este formato antes de devolvê-la. Agente fora do ar, sem resposta dentro do `IA_TIMEOUT_S` (o agente tem 5 s a menos, para sobrar tempo de gravar) ou com resposta fora do formato: 503 `AGENTE_INDISPONIVEL`, com mensagem amigável. A chave do modelo fica só no `.env` do backend, nunca na resposta. Nome `gold_receita_demo` e SQL do exemplo são ilustrativos.
 
 ## 10. POST /ia/insight — Telas 2 e 3
 
@@ -427,9 +544,9 @@ Resposta separada do chat: `titulo`, `texto`, `numeros_utilizados[]` (nome, rót
 
 Receita usa **seis números**: receita de energia atual, receita de energia base, variação do volume, reajuste, efeito-preço e efeito-volume (os mesmos da `ponte_receita` e dos KPIs do `GET /dashboard`, lidos da Gold). Os números enviados são opcionais; se presentes, precisam corresponder aos da Gold para o recorte (senão 422 `DADOS_INVALIDOS`). A API nunca confia em valores do navegador nem do módulo de IA: os números da resposta são sempre os da Gold.
 
-**Insight da receita (B5).** Só existe para `periodo_atual=2025-07/2026-06` × `periodo_comparacao=2022-07/2023-06`, sem `alimentador` e em recorte com decomposição na Gold; fora disso, 422 `DECOMPOSICAO_INDISPONIVEL`. Nomes de município e bairro vão como estão no banco (a Gold usa maiúsculas, ex.: `RECIFE`, `BOA VISTA`). O texto vem do módulo da Equipe 3 (`IA_MODO=real`, `IA_INSIGHT_URL`, `IA_TIMEOUT_S`) ou de um texto por regra (`IA_MODO=mock`). **Diferente do chat, falha do módulo não vira 503:** fora do ar, lento além do `IA_TIMEOUT_S`, erro HTTP ou resposta fora de `{titulo, texto}` devolvem 200 com um texto alternativo montado por regra sobre os mesmos números, e `metadados.observacoes` ganha uma linha começando por `Texto alternativo:`. O front usa esse prefixo para não rotular o texto como gerado por IA.
+**Insight da receita (B5).** Só existe para `periodo_atual=2025-07/2026-06` × `periodo_comparacao=2022-07/2023-06`, sem `alimentador` e em recorte com decomposição na Gold; fora disso, 422 `DECOMPOSICAO_INDISPONIVEL`. Nomes de município e bairro vão como estão no banco (a Gold usa maiúsculas, ex.: `RECIFE`, `BOA VISTA`). O texto vem do agente de insight da Equipe 3 (`IA_MODO=real`, dentro do backend, com prazo de `IA_TIMEOUT_S` − 5 s) ou de um texto por regra (`IA_MODO=mock`). **Diferente do chat, falha do módulo não vira 503:** fora do ar, lento além do `IA_TIMEOUT_S`, erro HTTP ou resposta fora de `{titulo, texto}` devolvem 200 com um texto alternativo montado por regra sobre os mesmos números, e `metadados.observacoes` ganha uma linha começando por `Texto alternativo:`. O front usa esse prefixo para não rotular o texto como gerado por IA.
 
-Formato assumido para o módulo da Equipe 3 (a confirmar até 29/10): `POST IA_INSIGHT_URL` com `{contexto, filtros, numeros_utilizados[]}` e `Authorization: Bearer IA_API_KEY`, resposta `{titulo, texto}`.
+Agente de insight (GENAI-25, `backend/app/ai/insights.py`): recebe os seis números já formatados (mais o recorte e os períodos) e escreve título e texto com marcadores, como `{efeito_preco}`. O código troca cada marcador pelo valor da Gold, então nenhum número do texto sai do modelo. Algarismo fora de marcador ou marcador inexistente pedem uma nova tentativa; se o erro se repetir, vale o texto alternativo. `IA_INSIGHT_URL` não é mais usada.
 
 Para UC360:
 
@@ -545,4 +662,3 @@ A Gold não muda para atender o portal. Onde este contrato divergia dela, a API 
 | Chamados | Sem histórico | Seção 5: chamado sem `historico`, com `tempo_atendimento_h` |
 | Fila | Ordem por score, `kwh_estimado` e `id_uc`; `posicao_fila`; listas em `motivos_json`; `confianca_evidencia` | Seção 6: mesma ordem; API mapeia `posicao_fila` → `posicao`, converte `motivos_json` em `motivos[]` e repassa `confianca_evidencia` |
 | Medidor | `dim_uc` traz só o medidor ativo: id, tipo, modelo e data de instalação | Seção 5: medidor com esses campos e a última leitura do `fato_uc_mes` |
-

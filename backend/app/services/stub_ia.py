@@ -4,6 +4,8 @@ import re
 from app.core.exceptions import AppException, UCInexistenteException
 from app.schemas.dashboard import FiltrosDashboard
 from app.schemas.ia import PedidoInsight, PerguntaIA
+from app.services import esclarecimento_ia
+from app.services.grafico_ia import ler_pedido
 from app.services.stub_dashboard import montar_dashboard
 from app.services.stubs import CAMPOS_REGIAO, exemplo, verificar_cenario
 
@@ -12,6 +14,7 @@ PERGUNTA_BLOQUEADA = 'drop table clientes'
 # Pedido de alterar ou apagar dados: bloqueado, como no mock do front (services/mock/ia.ts)
 DESTRUTIVA = re.compile(r'\b(drop|delete|truncate|apague|apagar|exclua|excluir|remova|remover)\b', re.IGNORECASE)
 UC_INSIGHT = 'UC-DEMO-001'
+BAIRROS_AMBIGUOS_DEMO = {'CENTRO': {'RECIFE', 'OLINDA', 'PAULISTA'}}
 NUMEROS_UNIDADE = (
     ('ultimo_mes', 'Último mês'),
     ('mesmo_mes_ano_anterior', 'Mesmo mês do ano anterior'),
@@ -26,6 +29,16 @@ def responder(dados: PerguntaIA) -> dict:
         return exemplo('resposta_ia_bloqueado')
     if pergunta == PERGUNTA_OK:
         return exemplo('resposta_ia')
+    # Esclarecimento com um bairro fictício que existe em três municípios ("Qual a receita do Centro?")
+    esclarecer = esclarecimento_ia.detectar(dados.pergunta, [], BAIRROS_AMBIGUOS_DEMO)
+    if esclarecer:
+        return {**esclarecimento_ia.resposta(esclarecer, '2026-10-21T06:15:00-03:00'),
+                'metadados': {'dados_ficticios': True, 'gold_atualizada_em': '2026-10-21T06:15:00-03:00',
+                              'observacoes': ['Resposta pré-definida do stub; não há agente conectado.']}}
+    # Pedido de gráfico: um exemplo por tipo (barras P1 × P2, pizza, linhas), montados pelo grafico_ia
+    pedido, tipo = ler_pedido(dados.pergunta)
+    if pedido:
+        return exemplo(f'resposta_ia_grafico_{tipo or "barras"}')
     return exemplo('resposta_ia_nao_sei')
 
 
