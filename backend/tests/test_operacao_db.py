@@ -27,6 +27,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 from app.db.session import engine
 from app.main import app
+from app.core.auth import proteger_rotas
+# Isola a regra de negocio; a protecao real e coberta por test_auth_*.
+app.dependency_overrides[proteger_rotas] = lambda: None
 
 consultas = []
 event.listen(engine, 'before_cursor_execute', lambda conn, cursor, statement, params, context, many: consultas.append(statement))
@@ -124,6 +127,9 @@ from sqlalchemy import event,func,select
 from sqlalchemy.orm import Session
 from app.db.session import engine
 from app.main import app
+from app.core.auth import proteger_rotas
+# Isola a regra de negocio; a protecao real e coberta por test_auth_*.
+app.dependency_overrides[proteger_rotas] = lambda: None
 from app.models.gold import DecFecAlimentadorMes as M
 
 with Session(engine) as db:

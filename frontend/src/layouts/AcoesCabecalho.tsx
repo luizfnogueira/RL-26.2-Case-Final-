@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, Download } from 'lucide-react'
-import Avatar from '@/components/common/Avatar'
-import { gerarAtualizacaoMock, USUARIO_MOCK } from '@/data/usuario.mock'
+import { Download } from 'lucide-react'
+import MenuConta from '@/auth/MenuConta'
+import { gerarAtualizacaoMock } from '@/data/usuario.mock'
 import { formatarAtualizacao } from '@/utils/datas'
 
 /**
@@ -44,14 +44,7 @@ export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?
       >
         <Download size={20} strokeWidth={1.5} aria-hidden="true" />
       </button>
-      <div className="flex items-center gap-2.5">
-        <div className="hidden lg:block">
-          <p className="text-titulo text-ink">{USUARIO_MOCK.nome}</p>
-          <p className="text-corpo text-ink-2">{USUARIO_MOCK.cargo}</p>
-        </div>
-        <Avatar iniciais={USUARIO_MOCK.iniciais} />
-        <ChevronDown size={18} strokeWidth={1.5} aria-hidden="true" className="text-ink-3" />
-      </div>
+      <MenuConta />
     </div>
   )
 }

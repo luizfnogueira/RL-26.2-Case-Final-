@@ -97,7 +97,7 @@ describe('Tela 7 — painel do Assistente', () => {
   it('cartões de teste demonstram "não sei" e o bloqueio, e a saudação usa o nome do usuário', async () => {
     abrirPortal()
     const painel = abrirPainel()
-    expect(within(painel).getByText(/Olá, Patrícia\./)).toBeTruthy()
+    expect(within(painel).getByText(/Olá\./)).toBeTruthy()
 
     fireEvent.click(within(painel).getByRole('button', { name: /Testar "Não sei"/ }))
     expect(within(painel).getByText(PERGUNTAS_DE_TESTE.naoSei)).toBeTruthy()

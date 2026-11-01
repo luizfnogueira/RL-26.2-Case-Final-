@@ -17,10 +17,12 @@ from app.models.usuario import Usuario
 
 SEGREDO = 'somente-testes-auth-b-segredo-de-32-bytes'
 SENHA = '  Minha senha de teste!  '
+CONVITE = 'CONVITE-SINTETICO-TESTE'
 
 
 def cadastro(**alteracoes):
-    return {'nome': 'Artur Teste', 'email': 'artur@example.com', 'senha': SENHA, **alteracoes}
+    return {'nome': 'Artur Teste', 'email': 'artur@example.com', 'senha': SENHA,
+            'convite': CONVITE, **alteracoes}
 
 
 @pytest.fixture
@@ -34,8 +36,8 @@ def engine():
 
 @pytest.fixture
 def client(engine, monkeypatch):
-    monkeypatch.setattr(auth_config, 'AUTH_ENABLED', True)
     monkeypatch.setattr(auth_config, 'JWT_SECRET', SEGREDO)
+    monkeypatch.setattr(auth_config, 'AUTH_INVITE_CODE', CONVITE)
 
     def banco():
         with Session(engine, expire_on_commit=False) as db:
@@ -56,11 +58,12 @@ def autenticar(client):
     return resposta.json()
 
 
-def test_cadastro_sem_convite_login_me_e_rota_protegida(client, engine):
-    criado = client.post('/auth/register', json={**cadastro(), 'email': ' ARTUR@EXAMPLE.COM '})
+def test_cadastro_com_convite_login_me_e_rota_protegida(client, engine):
+    criado = client.post('/auth/register', json=cadastro(email=' ARTUR@EXAMPLE.COM ', convite=f' {CONVITE} '))
     assert criado.status_code == 201
     usuario = criado.json()
-    assert set(usuario) == {'id', 'nome', 'email', 'perfil'}
+    assert set(usuario) == {'id', 'nome', 'email', 'perfil', 'cargo'}
+    assert usuario['cargo'] is None
     assert usuario['email'] == 'artur@example.com'
     assert usuario['perfil'] == 'usuario'
     with Session(engine) as db:
@@ -91,8 +94,26 @@ def test_email_duplicado_normalizado(client):
     assert resposta.json()['codigo'] == 'EMAIL_JA_CADASTRADO'
 
 
+@pytest.mark.parametrize('rota', ['/auth/register', '/auth/login'])
+def test_erro_email_reservado_explica_campo_sem_expor_entradas(client, engine, rota):
+    dados = cadastro(email='artur@venergy.test')
+    if rota.endswith('login'):
+        dados = {campo: dados[campo] for campo in ('email', 'senha')}
+    resposta = client.post(rota, json=dados)
+    assert resposta.status_code == 422
+    assert set(resposta.json()) == {'codigo', 'mensagem'}
+    assert resposta.json()['codigo'] == 'DADOS_INVALIDOS'
+    assert 'e-mail válido' in resposta.json()['mensagem']
+    assert '.test' in resposta.json()['mensagem']
+    assert resposta.headers['cache-control'] == 'no-store'
+    for valor in (dados['email'], SENHA, CONVITE):
+        assert valor not in resposta.text
+    with Session(engine) as db:
+        assert db.scalar(select(Usuario)) is None
+
+
 @pytest.mark.parametrize('campo,valor', [
-    ('convite', 'campo-removido'), ('perfil', 'administrador'), ('ativo', True), ('id', str(uuid4())),
+    ('convite', ' '), ('convite', 'x' * 129), ('perfil', 'administrador'), ('ativo', True), ('id', str(uuid4())),
     ('nome', ' '), ('nome', 'x' * 121), ('email', 'invalido'), ('senha', 'curta'), ('senha', 'x' * 129),
 ])
 def test_recusa_escalada_de_perfil_e_entradas_invalidas(client, campo, valor):
@@ -100,6 +121,35 @@ def test_recusa_escalada_de_perfil_e_entradas_invalidas(client, campo, valor):
     assert resposta.status_code == 422
     assert resposta.json()['codigo'] == 'DADOS_INVALIDOS'
     assert SENHA not in resposta.text
+    assert CONVITE not in resposta.text
+
+
+@pytest.mark.parametrize('convite', ['', 'errado', 'convite-sintetico-teste', 'código-inválido'])
+def test_convite_invalido_nao_cria_usuario(client, engine, convite):
+    resposta = client.post('/auth/register', json=cadastro(convite=convite))
+    assert resposta.status_code == (422 if not convite else 403)
+    if convite:
+        assert resposta.json()['codigo'] == 'CONVITE_INVALIDO'
+    assert CONVITE not in resposta.text
+    with Session(engine) as db:
+        assert db.scalar(select(Usuario)) is None
+
+
+def test_convite_obrigatorio(client, engine):
+    dados = cadastro()
+    del dados['convite']
+    assert client.post('/auth/register', json=dados).status_code == 422
+    with Session(engine) as db:
+        assert db.scalar(select(Usuario)) is None
+
+
+def test_convite_nao_configurado_bloqueia_cadastro_sem_impedir_login(client, monkeypatch):
+    autenticar(client)
+    monkeypatch.setattr(auth_config, 'AUTH_INVITE_CODE', '')
+    resposta = client.post('/auth/register', json=cadastro(email='outra@example.com'))
+    assert resposta.status_code == 503
+    assert resposta.json()['codigo'] == 'CADASTRO_INDISPONIVEL'
+    assert client.post('/auth/login', json={'email': 'artur@example.com', 'senha': SENHA}).status_code == 200
 
 
 
@@ -159,10 +209,11 @@ def test_protecao_central_cobre_rotas_da_equipe(client, metodo, caminho):
     assert client.request(metodo, caminho).status_code == 401
 
 
-def test_flag_desligada_preserva_portal_mas_me_exige_token(client, monkeypatch):
-    monkeypatch.setattr(auth_config, 'AUTH_ENABLED', False)
-    assert client.get('/').status_code == 200
+def test_portal_permanente_exige_token_mesmo_com_flag_antiga_desligada(client, monkeypatch):
+    monkeypatch.setenv('AUTH_ENABLED', 'false')
+    assert client.get('/').status_code == 401
     assert client.get('/auth/me').status_code == 401
+    assert client.get('/health').status_code == 200
 
 
 def test_preflight_permite_authorization_na_origem_do_front(client):
@@ -192,7 +243,39 @@ def test_seed_nao_promove_usuario_existente(client, engine):
             criar_administrador(db, nome='Admin', email='artur@example.com', senha=SENHA)
 
 
-@pytest.mark.parametrize('valor', ['yes', '0', '', 'habilitado'])
-def test_flag_invalida_nao_desliga_protecao_silenciosamente(valor):
-    with pytest.raises(ValueError, match='AUTH_ENABLED'):
-        auth_config.validar_habilitacao(valor)
+def test_atualiza_cargo_sem_modificar_nome_email_ou_permissoes(client):
+    sessao = autenticar(client)
+    headers = {'Authorization': 'Bearer ' + sessao['access_token']}
+    atualizado = client.patch('/auth/me', json={'cargo': '  Analista de Operação  '}, headers=headers)
+    assert atualizado.status_code == 200
+    assert atualizado.headers['cache-control'] == 'no-store'
+    esperado = {**sessao['usuario'], 'cargo': 'Analista de Operação'}
+    assert atualizado.json() == esperado
+    assert client.get('/auth/me', headers=headers).json() == esperado
+    novo_login = client.post('/auth/login', json={'email': 'artur@example.com', 'senha': SENHA})
+    assert novo_login.json()['usuario'] == esperado
+    visual = client.patch('/auth/me', json={'cargo': 'Administrador'}, headers=headers).json()
+    assert visual['cargo'] == 'Administrador'
+    assert visual['perfil'] == 'usuario'
+    assert client.patch('/auth/me', json={'cargo': ' '}, headers=headers).json()['cargo'] is None
+
+
+@pytest.mark.parametrize('dados', [{}, {'cargo': 'x' * 81}, {'cargo': 123},
+    {'cargo': 'Diretoria', 'perfil': 'administrador'}, {'cargo': 'Diretoria', 'id': 'outro'},
+    {'cargo': 'Diretoria', 'email': 'outra@example.com'}])
+def test_recusa_cargo_invalido_e_alteracoes_de_outros_campos(client, dados):
+    sessao = autenticar(client)
+    headers = {'Authorization': 'Bearer ' + sessao['access_token']}
+    assert client.patch('/auth/me', json=dados, headers=headers).status_code == 422
+    assert client.get('/auth/me', headers=headers).json() == sessao['usuario']
+
+
+def test_edicao_exige_token_e_altera_somente_a_propria_conta(client, engine):
+    sessao = autenticar(client)
+    outra = client.post('/auth/register', json=cadastro(email='outra@example.com')).json()
+    assert client.patch('/auth/me', json={'cargo': 'Diretoria'}).status_code == 401
+    headers = {'Authorization': 'Bearer ' + sessao['access_token']}
+    assert client.patch('/auth/me', json={'cargo': 'Diretoria'}, headers=headers).status_code == 200
+    with Session(engine) as db:
+        assert db.get(Usuario, outra['id']).cargo is None
+        assert db.get(Usuario, sessao['usuario']['id']).cargo == 'Diretoria'

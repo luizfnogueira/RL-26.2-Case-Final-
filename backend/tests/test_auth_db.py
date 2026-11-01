@@ -54,6 +54,9 @@ def test_banco_impede_emails_duplicados_em_cadastros_concorrentes(engine):
 
 def test_inicializacao_e_recarga_gold_preservam_usuarios(client, engine):
     sessao = autenticar(client)
+    with Session(engine) as db:
+        db.get(Usuario, sessao['usuario']['id']).cargo = 'Operação'
+        db.commit()
     with engine.connect() as conn:
         antes = conn.execute(text('SELECT id, email, senha_hash, perfil FROM portal.usuarios')).all()
     criar_tabela(engine)
@@ -61,4 +64,18 @@ def test_inicializacao_e_recarga_gold_preservam_usuarios(client, engine):
     with engine.connect() as conn:
         depois = conn.execute(text('SELECT id, email, senha_hash, perfil FROM portal.usuarios')).all()
     assert antes == depois
+    assert client.get('/auth/me', headers={'Authorization': 'Bearer ' + sessao['access_token']}).json()['cargo'] == 'Operação'
+    assert client.get('/auth/me', headers={'Authorization': 'Bearer ' + sessao['access_token']}).status_code == 200
+
+
+def test_migracao_adiciona_cargo_em_instalacao_antiga_sem_perder_conta(client, engine):
+    sessao = autenticar(client)
+    with engine.begin() as conn:
+        antes = conn.execute(text('SELECT id, email, senha_hash, perfil FROM portal.usuarios')).all()
+        conn.execute(text('ALTER TABLE portal.usuarios DROP COLUMN cargo'))
+    criar_tabela(engine)
+    criar_tabela(engine)
+    with engine.connect() as conn:
+        assert conn.execute(text('SELECT id, email, senha_hash, perfil FROM portal.usuarios')).all() == antes
+        assert conn.execute(text('SELECT cargo FROM portal.usuarios')).scalar() is None
     assert client.get('/auth/me', headers={'Authorization': 'Bearer ' + sessao['access_token']}).status_code == 200

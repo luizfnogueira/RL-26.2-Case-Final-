@@ -17,6 +17,7 @@ class Usuario(PortalBase):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
+    cargo: Mapped[str | None] = mapped_column(String(80), nullable=True)
     email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
     senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     perfil: Mapped[str] = mapped_column(String(20), nullable=False, default='usuario')

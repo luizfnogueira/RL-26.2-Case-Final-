@@ -1,4 +1,4 @@
-"""Contrato provisório de AUTH-b, seguindo o fluxo do cronograma."""
+"""Contratos de autenticação e perfil da conta do portal."""
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator, model_validator
@@ -33,13 +33,23 @@ class EntradaAuth(BaseModel):
         return valor.strip().lower() if isinstance(valor, str) else valor
 
 
-class CadastroAuth(EntradaAuth):
+class DadosNovaConta(EntradaAuth):
+    """Dados comuns ao cadastro e à criação explícita de administrador pelo servidor."""
     nome: Annotated[str, Field(min_length=2, max_length=120)]
     senha: Annotated[SecretStr, Field(min_length=8, max_length=128)]
 
     @field_validator('nome', mode='before')
     @classmethod
     def limpar_nome(cls, valor):
+        return valor.strip() if isinstance(valor, str) else valor
+
+
+class CadastroAuth(DadosNovaConta):
+    convite: Annotated[SecretStr, Field(min_length=1, max_length=128)]
+
+    @field_validator('convite', mode='before')
+    @classmethod
+    def limpar_convite(cls, valor):
         return valor.strip() if isinstance(valor, str) else valor
 
 
@@ -52,8 +62,19 @@ class UsuarioPublico(BaseModel):
 
     id: str
     nome: str
+    cargo: str | None = None
     email: str
     perfil: Literal['usuario', 'administrador']
+
+
+class AtualizacaoPerfil(BaseModel):
+    model_config = ConfigDict(extra='forbid', hide_input_in_errors=True)
+    cargo: Annotated[str | None, Field(max_length=80)]
+
+    @field_validator('cargo', mode='before')
+    @classmethod
+    def limpar_cargo(cls, valor):
+        return (valor.strip() or None) if isinstance(valor, str) else valor
 
 
 class SessaoAuth(BaseModel):

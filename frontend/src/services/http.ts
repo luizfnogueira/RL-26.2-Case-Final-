@@ -63,7 +63,8 @@ export async function requisitar<T>(
   caminho: string,
   opcoes: OpcoesRequisicao = {},
 ): Promise<T> {
-  if (USE_MOCKS) {
+  // Mocks são exclusivos dos dados de negócio; autenticação sempre usa a API.
+  if (USE_MOCKS && !caminho.startsWith('/auth/')) {
     const { atenderMock } = await import('./mock')
     return (await atenderMock(metodo, caminho, opcoes)) as T
   }

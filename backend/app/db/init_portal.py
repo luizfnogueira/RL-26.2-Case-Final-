@@ -4,12 +4,14 @@ from app.db.base import PortalBase
 from app.db.session import engine
 from app.models import portal  # noqa: F401
 from app.models import usuario  # noqa: F401
+from app.db.init_auth import criar_tabela
 
 
 def main():
     with engine.begin() as conn:
         conn.execute(text('CREATE SCHEMA IF NOT EXISTS portal'))
         PortalBase.metadata.create_all(conn)
+    criar_tabela()
 
 
 if __name__ == '__main__':

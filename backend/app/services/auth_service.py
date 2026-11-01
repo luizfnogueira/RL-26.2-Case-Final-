@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from app.core import auth_config
 from app.core.security import criar_token, gerar_hash_senha, verificar_senha
 from app.repositories import auth_repository as repo
-from app.schemas.auth import CadastroAuth, LoginAuth, SessaoAuth, UsuarioPublico
+from app.schemas.auth import AtualizacaoPerfil, CadastroAuth, LoginAuth, SessaoAuth, UsuarioPublico
+from app.models.usuario import Usuario
 
 # Usuário inexistente também percorre a verificação Argon2; não há senha de conta padrão.
 _HASH_INEXISTENTE = gerar_hash_senha(secrets.token_urlsafe(32))
@@ -20,6 +21,15 @@ def exigir_configuracao():
 
 def cadastrar(db: Session, entrada: CadastroAuth) -> UsuarioPublico:
     exigir_configuracao()
+    if not auth_config.AUTH_INVITE_CODE:
+        raise HTTPException(503, detail={
+            'codigo': 'CADASTRO_INDISPONIVEL',
+            'mensagem': 'O cadastro está indisponível no momento. Entre em contato com a equipe.'})
+    if not secrets.compare_digest(entrada.convite.get_secret_value().encode('utf-8'),
+                                  auth_config.AUTH_INVITE_CODE.encode('utf-8')):
+        raise HTTPException(403, detail={
+            'codigo': 'CONVITE_INVALIDO',
+            'mensagem': 'Código de convite inválido. Confira o código recebido da equipe.'})
     try:
         usuario = repo.criar(db, nome=entrada.nome, email=str(entrada.email),
                              senha_hash=gerar_hash_senha(entrada.senha.get_secret_value()))
@@ -41,3 +51,7 @@ def entrar(db: Session, entrada: LoginAuth) -> SessaoAuth:
     return SessaoAuth(
         access_token=criar_token(usuario.id, usuario.perfil, segredo=auth_config.JWT_SECRET),
         usuario=UsuarioPublico.model_validate(usuario))
+
+
+def atualizar_perfil(db: Session, usuario: Usuario, entrada: AtualizacaoPerfil) -> UsuarioPublico:
+    return UsuarioPublico.model_validate(repo.atualizar_cargo(db, usuario, entrada.cargo))

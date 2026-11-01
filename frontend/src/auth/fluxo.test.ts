@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { destinoSeguro, nomeDoDestino, rotaDaPrevia } from './fluxo'
+import { destinoSeguro, nomeDoDestino, rotaAuth } from './fluxo'
 
-describe('destino da prévia de autenticação', () => {
+describe('destino da autenticação', () => {
   it.each([
     null,
     '',
@@ -10,7 +10,7 @@ describe('destino da prévia de autenticação', () => {
     '/\\externo.test',
     '/\n/externo.test',
     '/login',
-    '/dev/auth/login',
+    '/cadastro',
     '/desconhecido',
     '/receita/../../login',
     'javascript:alert(1)',
@@ -28,11 +28,11 @@ describe('destino da prévia de autenticação', () => {
   })
 
   it('carrega apenas o destino seguro para a próxima etapa, sem propagar cenário de teste', () => {
-    const rota = new URL(rotaDaPrevia('login', '/receita?municipio=RECIFE'), 'https://portal.test')
-    expect(rota.pathname).toBe('/dev/auth/login')
+    const rota = new URL(rotaAuth('login', '/receita?municipio=RECIFE'), 'https://portal.test')
+    expect(rota.pathname).toBe('/login')
     expect(rota.searchParams.get('destino')).toBe('/receita?municipio=RECIFE')
     expect(rota.searchParams.has('cenario')).toBe(false)
-    expect(rotaDaPrevia('login', 'https://externo.test')).toBe('/dev/auth/login')
+    expect(rotaAuth('login', 'https://externo.test')).toBe('/login')
     expect(nomeDoDestino('/unidades/UC-DEMO-001')).toBe('Visão 360')
     expect(nomeDoDestino('/receita')).toBe('Diagnóstico da receita')
   })

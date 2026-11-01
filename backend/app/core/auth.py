@@ -41,5 +41,4 @@ def proteger_rotas(
     credencial: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
-    if auth_config.AUTH_ENABLED:
-        get_current_user(credencial, db)
+    get_current_user(credencial, db)

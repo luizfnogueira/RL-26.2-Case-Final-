@@ -17,6 +17,13 @@ def por_id(db: Session, id_usuario: str) -> Usuario | None:
     return db.get(Usuario, id_usuario)
 
 
+def atualizar_cargo(db: Session, usuario: Usuario, cargo: str | None) -> Usuario:
+    usuario.cargo = cargo
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
 def criar(db: Session, *, nome: str, email: str, senha_hash: str, perfil: str = 'usuario') -> Usuario:
     usuario = Usuario(nome=nome, email=email, senha_hash=senha_hash, perfil=perfil)
     db.add(usuario)

@@ -1,22 +1,9 @@
-/** Estado exclusivo da prévia visual. Não é contrato de /auth nem sessão real. */
-export const ETAPAS = ['login', 'cadastro', 'confirmacao', 'sessao', 'expirada'] as const
+export const ETAPAS = ['login', 'cadastro'] as const
 export type EtapaAuth = (typeof ETAPAS)[number]
-export type CenarioEnvio = 'normal' | 'invalido' | 'indisponivel'
-export type PessoaExemplo = { nome: string; email: string }
-
-export const EXEMPLO = { nome: 'Artur', email: 'artur@venergy.test' }
-export const SENHA_EXEMPLO = 'EnergiaDemo2026!'
+export type PessoaCadastro = { nome: string; email: string }
 
 export function etapaValida(etapa: string | undefined): etapa is EtapaAuth {
   return ETAPAS.some((valor) => valor === etapa)
-}
-
-export function mensagemDoCenario(cenario: CenarioEnvio): string | null {
-  if (cenario === 'invalido')
-    return 'E-mail ou senha inválidos. Confira os dados e tente novamente.'
-  if (cenario === 'indisponivel')
-    return 'Não foi possível conectar agora. Tente novamente em instantes.'
-  return null
 }
 
 const ORIGEM_PORTAL = 'https://portal.venergy.invalid'
@@ -53,7 +40,7 @@ export function nomeDoDestino(destino: string): string {
   return DESTINOS[caminho as keyof typeof DESTINOS] ?? 'Visão 360'
 }
 
-export function rotaDaPrevia(etapa: EtapaAuth, destino: string): string {
+export function rotaAuth(etapa: EtapaAuth, destino: string): string {
   const seguro = destinoSeguro(destino)
-  return `/dev/auth/${etapa}${seguro === '/painel' ? '' : `?${new URLSearchParams({ destino: seguro })}`}`
+  return `/${etapa}${seguro === '/painel' ? '' : `?${new URLSearchParams({ destino: seguro })}`}`
 }

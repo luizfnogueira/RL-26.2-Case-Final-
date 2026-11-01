@@ -12,11 +12,11 @@ from app.core.security import gerar_hash_senha
 from app.db.init_auth import criar_tabela
 from app.db.session import engine
 from app.repositories import auth_repository as repo
-from app.schemas.auth import CadastroAuth
+from app.schemas.auth import DadosNovaConta
 
 
 def criar_administrador(db: Session, *, nome: str, email: str, senha: str):
-    entrada = CadastroAuth(nome=nome, email=email, senha=senha)
+    entrada = DadosNovaConta(nome=nome, email=email, senha=senha)
     existente = repo.por_email(db, str(entrada.email))
     if existente:
         if existente.perfil != 'administrador' or not existente.ativo:
@@ -33,7 +33,7 @@ def main():
     senha = os.getenv('AUTH_ADMIN_PASSWORD', '')
     # Validação antes de qualquer escrita; mensagens nunca incluem credenciais.
     try:
-        CadastroAuth(nome=nome, email=email, senha=senha)
+        DadosNovaConta(nome=nome, email=email, senha=senha)
     except ValidationError:
         raise SystemExit('Defina AUTH_ADMIN_NOME, AUTH_ADMIN_EMAIL e AUTH_ADMIN_PASSWORD válidos.') from None
     criar_tabela()
