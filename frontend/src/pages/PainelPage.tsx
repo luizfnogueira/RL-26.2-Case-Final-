@@ -1,30 +1,25 @@
 import { ArrowRight, ChartNoAxesCombined } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
+import type { KeyboardEvent } from 'react'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
 import HistoricoExecutivo from '@/components/painel/HistoricoExecutivo'
 import IndicadoresExecutivos from '@/components/painel/IndicadoresExecutivos'
+import ComparacaoRecortes from '@/components/painel/ComparacaoRecortes'
 import { leituraDoPeriodo, ORDEM_KPIS } from '@/components/painel/indicadores'
 import Badge from '@/components/ui/Badge'
 import EmptyState from '@/components/ui/EmptyState'
 import ErrorState from '@/components/ui/ErrorState'
 import SeloFicticio from '@/components/ui/SeloFicticio'
 import Skeleton from '@/components/ui/Skeleton'
-import { useComparacaoUrl } from '@/hooks/useComparacaoUrl'
 import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
 import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
-import { buscarComparacao, buscarDashboard } from '@/services/dashboard'
+import { buscarDashboard } from '@/services/dashboard'
 import { construirQuery } from '@/services/http'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
 import { cx } from '@/utils/cx'
 import { formatarAtualizacao } from '@/utils/datas'
-import {
-  formatarEnergia,
-  formatarNome,
-  formatarPercentual,
-  formatarReais,
-} from '@/utils/formatacao'
 import {
   duracaoEmMeses,
   formatarPeriodo,
@@ -38,17 +33,11 @@ const PADROES: FiltrosUrl = {
   periodo_comparacao: PERIODO_COMPARACAO_PADRAO,
 }
 
-const ROTULO_NIVEL = { municipio: 'Município', bairro: 'Bairro', classe: 'Classe' } as const
-
-/** DEC, FEC e contagens: até duas casas, no formato pt-BR ("3,74", "17.995"). */
-const decimal = (valor: number) => valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
-
 export default function PainelPage() {
   const opcoesFiltros = useOpcoesFiltros()
   const { filtros } = useFiltrosUrl(CAMPOS, PADROES)
-  const [, setParams] = useSearchParams()
-  const comparacaoUrl = useComparacaoUrl()
-  const estaNaComparacao = comparacaoUrl.estaAtiva
+  const [params, setParams] = useSearchParams()
+  const estaNaComparacao = params.get('aba') === 'comparar'
 
   const periodo_atual = filtros.periodo_atual ?? PERIODO_ATUAL_PADRAO
   const periodo_comparacao = filtros.periodo_comparacao ?? PERIODO_COMPARACAO_PADRAO
@@ -57,30 +46,6 @@ export default function PainelPage() {
     (sinal) => buscarDashboard({ periodo_atual, periodo_comparacao, municipio }, sinal),
     [periodo_atual, periodo_comparacao, municipio],
     { habilitada: !estaNaComparacao },
-  )
-
-  const consultaComparacao = useConsulta(
-    (sinal) =>
-      buscarComparacao(
-        {
-          periodo_atual: comparacaoUrl.filtros.periodo_atual,
-          periodo_comparacao: comparacaoUrl.filtros.periodo_comparacao,
-          nivel: comparacaoUrl.filtros.nivel,
-          itens: comparacaoUrl.filtros.itens,
-          municipio: comparacaoUrl.filtros.municipio,
-          bairro: comparacaoUrl.filtros.bairro,
-        },
-        sinal,
-      ),
-    [
-      comparacaoUrl.filtros.periodo_atual,
-      comparacaoUrl.filtros.periodo_comparacao,
-      comparacaoUrl.filtros.nivel,
-      comparacaoUrl.filtros.itens.join(','),
-      comparacaoUrl.filtros.municipio,
-      comparacaoUrl.filtros.bairro,
-    ],
-    { habilitada: estaNaComparacao && comparacaoUrl.filtros.itens.length >= 2 },
   )
 
   const dados = consulta.dados
@@ -104,17 +69,36 @@ export default function PainelPage() {
     )
   }
 
+  function navegarAbas(evento: KeyboardEvent<HTMLDivElement>) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return
+    evento.preventDefault()
+    const abas = [...evento.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    const atual = abas.findIndex((aba) => aba === document.activeElement)
+    const destino =
+      evento.key === 'Home'
+        ? 0
+        : evento.key === 'End'
+          ? abas.length - 1
+          : (atual + (evento.key === 'ArrowRight' ? 1 : -1) + abas.length) % abas.length
+    abas[destino]?.click()
+    abas[destino]?.focus()
+  }
+
   return (
     <Pagina titulo="Painel executivo" subtitulo="Visão consolidada da saúde do negócio">
       <div
         role="tablist"
         aria-label="Abas do painel executivo"
+        onKeyDown={navegarAbas}
         className="flex w-fit gap-1 rounded-full bg-surface-alt p-1"
       >
         <button
           type="button"
           role="tab"
+          id="aba-geral"
+          aria-controls="painel-geral"
           aria-selected={!estaNaComparacao}
+          tabIndex={estaNaComparacao ? -1 : 0}
           onClick={() => alternarAba('geral')}
           className={cx(
             'cursor-pointer rounded-full px-3.5 py-1 text-legenda transition-colors',
@@ -128,7 +112,10 @@ export default function PainelPage() {
         <button
           type="button"
           role="tab"
+          id="aba-comparar"
+          aria-controls="painel-comparar"
           aria-selected={estaNaComparacao}
+          tabIndex={estaNaComparacao ? 0 : -1}
           onClick={() => alternarAba('comparar')}
           className={cx(
             'cursor-pointer rounded-full px-3.5 py-1 text-legenda transition-colors',
@@ -142,7 +129,12 @@ export default function PainelPage() {
       </div>
 
       {!estaNaComparacao ? (
-        <>
+        <section
+          role="tabpanel"
+          id="painel-geral"
+          aria-labelledby="aba-geral"
+          className="flex flex-col gap-4"
+        >
           <BarraDeFiltros
             campos={CAMPOS}
             padroes={PADROES}
@@ -237,124 +229,9 @@ export default function PainelPage() {
               </p>
             </>
           ) : null}
-        </>
-      ) : (
-        <section role="tabpanel" aria-label="Aba de comparação" className="flex flex-col gap-4">
-          {comparacaoUrl.filtros.itens.length < 2 ? (
-            <EmptyState
-              titulo="Selecione de 2 a 4 itens para comparar"
-              descricao="Escolha municípios, bairros ou classes para comparar os indicadores lado a lado."
-            />
-          ) : consultaComparacao.erro ? (
-            <ErrorState
-              erro={consultaComparacao.erro}
-              aoTentarNovamente={consultaComparacao.recarregar}
-              className="rounded-card bg-surface-card shadow-card"
-            />
-          ) : consultaComparacao.carregando ? (
-            <div
-              aria-label="Carregando comparação de recortes"
-              aria-busy="true"
-              className="flex flex-col gap-4"
-            >
-              <Skeleton className="h-48 w-full rounded-card" />
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {comparacaoUrl.filtros.itens.map((i) => (
-                  <Skeleton key={i} className="h-64 rounded-card" />
-                ))}
-              </div>
-            </div>
-          ) : consultaComparacao.dados ? (
-            <>
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-titulo-lg">Comparação de recortes</h2>
-                  <p className="mt-1 text-legenda text-ink-2">
-                    {formatarPeriodo(consultaComparacao.dados.filtros.periodo_atual)}{' '}
-                    <span className="mx-1">vs.</span>{' '}
-                    {formatarPeriodo(
-                      consultaComparacao.dados.filtros.periodo_comparacao ??
-                        comparacaoUrl.filtros.periodo_comparacao,
-                    )}
-                    {' · '}Nível: {ROTULO_NIVEL[consultaComparacao.dados.filtros.nivel]}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variante="info">
-                    {consultaComparacao.dados.itens.length} recortes comparados
-                  </Badge>
-                  <SeloFicticio metadados={consultaComparacao.dados.metadados} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {consultaComparacao.dados.itens.map((item) => (
-                  <div
-                    key={item.nome}
-                    className="rounded-card border border-borda bg-surface-card p-4 shadow-card"
-                  >
-                    <h3 className="text-titulo-sm font-medium text-ink">
-                      {formatarNome(item.nome)}
-                    </h3>
-                    <p className="mt-1 text-legenda text-ink-2">
-                      {decimal(item.ucs_ativas.atual.valor ?? 0)} UCs ativas
-                    </p>
-                    <div className="mt-3 flex flex-col gap-2 text-corpo">
-                      <div className="flex justify-between">
-                        <span className="text-ink-2">Receita/UC:</span>
-                        <span className="font-medium text-ink">
-                          {item.receita_media_uc.atual.valor !== null
-                            ? formatarReais(item.receita_media_uc.atual.valor)
-                            : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-ink-2">Consumo/UC:</span>
-                        <span className="font-medium text-ink">
-                          {item.consumo_medio_uc.atual.valor !== null
-                            ? formatarEnergia(item.consumo_medio_uc.atual.valor)
-                            : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-ink-2">Em aberto:</span>
-                        <span className="font-medium text-ink">
-                          {item.valor_em_aberto_pct.atual.valor !== null
-                            ? formatarPercentual(item.valor_em_aberto_pct.atual.valor)
-                            : '—'}
-                        </span>
-                      </div>
-                      {item.dec.atual.valor !== null && (
-                        <div className="flex justify-between">
-                          <span className="text-ink-2">DEC:</span>
-                          <span className="font-medium text-ink">
-                            {decimal(item.dec.atual.valor)} h
-                          </span>
-                        </div>
-                      )}
-                      {item.fec.atual.valor !== null && (
-                        <div className="flex justify-between">
-                          <span className="text-ink-2">FEC:</span>
-                          <span className="font-medium text-ink">
-                            {decimal(item.fec.atual.valor)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {consultaComparacao.dados.metadados.observacoes.length > 0 && (
-                <ul className="text-legenda leading-5 text-ink-2">
-                  {consultaComparacao.dados.metadados.observacoes.map((obs) => (
-                    <li key={obs}>{obs}</li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : null}
         </section>
+      ) : (
+        <ComparacaoRecortes opcoesFiltros={opcoesFiltros} />
       )}
     </Pagina>
   )
