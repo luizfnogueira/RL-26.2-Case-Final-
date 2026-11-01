@@ -336,23 +336,55 @@ def test_gd_de_contexto_sai_quando_nao_cabe_nas_4_frases():
 
 MAIS_CARA, MAIS_BARATA = ({'bandeira': 'VERMELHA P2', 'bandeira_anterior': 'VERDE'},
                           {'bandeira': 'AMARELA', 'bandeira_anterior': 'VERMELHA P1'})
+# Varredura: 9 consumos × 16 contas × 3 GDs × 2 situações de fatura = 864 combinações. Cada uma é um
+# subteste; ao falhar, o pytest mostra os quatro rótulos.
 # Contas fixas (valores que não seguem o consumo) e contas pelo preço médio (valor = consumo × preço)
-CONTAS = [contas(), VALOR_SUBIU, VALOR_CAIU, contas(valor=300, valor_anterior=200, **MAIS_CARA),
-          contas(valor=100, valor_anterior=200, **MAIS_BARATA), contas(valor_anterior=None), [],
-          (0.8, {}), (0.82, {}), (0.76, MAIS_BARATA), (0.84, MAIS_CARA), (1.0, MAIS_CARA), (1.0, MAIS_BARATA),
-          (0.6, MAIS_BARATA), (1.3, {}), (0.35, {})]
-CONSUMOS = [{}, CAIU, ESTAVEL, ABAIXO_DA_MEDIA, {'ultimo': 200, 'ano_anterior': 150},
-            {'ultimo': 200, 'ano_anterior': 300, 'base': 150}, {**ESTAVEL, 'tipo': 'ESTIMADA'},
-            {'ultimo': 357, 'ano_anterior': 298}, {'ultimo': 245, 'ano_anterior': 298}]
-GDS = [None, gd(date(2025, 2, 1)), gd(date(2025, 11, 20))]
-TODOS = list(itertools.product(CONSUMOS, CONTAS, GDS, [[], UMA_ABERTA]))
+CONTAS = {
+    'valor igual (200 × 200)': contas(),
+    'valor subindo (300 × 200)': VALOR_SUBIU,
+    'valor caindo (100 × 200)': VALOR_CAIU,
+    'valor subindo, bandeira mais cara (300 × 200)': contas(valor=300, valor_anterior=200, **MAIS_CARA),
+    'valor caindo, bandeira mais barata (100 × 200)': contas(valor=100, valor_anterior=200, **MAIS_BARATA),
+    'sem valor do ano anterior': contas(valor_anterior=None),
+    'sem conta nos dois meses': [],
+    'preço R$ 0,80 × 0,80': (0.8, {}),
+    'preço R$ 0,82 × 0,80': (0.82, {}),
+    'preço R$ 0,76 × 0,80, bandeira mais barata': (0.76, MAIS_BARATA),
+    'preço R$ 0,84 × 0,80, bandeira mais cara': (0.84, MAIS_CARA),
+    'preço R$ 1,00 × 0,80, bandeira mais cara': (1.0, MAIS_CARA),
+    'preço R$ 1,00 × 0,80, bandeira mais barata': (1.0, MAIS_BARATA),
+    'preço R$ 0,60 × 0,80, bandeira mais barata': (0.6, MAIS_BARATA),
+    'preço R$ 1,30 × 0,80 (fora do padrão)': (1.3, {}),
+    'preço R$ 0,35 × 0,80 (fora do padrão)': (0.35, {}),
+}
+CONSUMOS = {
+    'subiu 38% no ano (412 × 298), acima da média': {},
+    'caiu 67% no ano (100 × 300), abaixo da média': CAIU,
+    'estável (305 × 298)': ESTAVEL,
+    'estável no ano (52 × 60), 36% abaixo da média': ABAIXO_DA_MEDIA,
+    'subiu 33% no ano (200 × 150), abaixo da média': {'ultimo': 200, 'ano_anterior': 150},
+    'caiu 33% no ano (200 × 300), acima da média': {'ultimo': 200, 'ano_anterior': 300, 'base': 150},
+    'estável (305 × 298), leitura estimada no mês': {**ESTAVEL, 'tipo': 'ESTIMADA'},
+    'estável no ano, 19,8% acima (357 × 298)': {'ultimo': 357, 'ano_anterior': 298},
+    'estável no ano, 17,8% abaixo (245 × 298)': {'ultimo': 245, 'ano_anterior': 298},
+}
+GDS = {'sem GD': None, 'GD desde fev/2025 (antes do período)': gd(date(2025, 2, 1)),
+       'GD em nov/2025 (no período)': gd(date(2025, 11, 20))}
+ABERTAS = {'sem faturas em aberto': [], '1 fatura em aberto': UMA_ABERTA}
 # Palavras que somariam percentuais ou dividiriam a mudança entre consumo e preço
 SOMA_OU_PARTE = re.compile(r'\b(soma\w*|total|parte|partes|contribu\w*|respons\w*|responde\w*|dos quais|'
                            r'das quais|metade|maioria|maior parcela|parcela)\b|\+|=', re.IGNORECASE)
 
 
-@pytest.mark.parametrize('consumo, conta, geracao, abertas', TODOS)
-def test_garantias_do_texto_em_todas_as_combinacoes(consumo, conta, geracao, abertas):
+def test_garantias_do_texto_em_todas_as_combinacoes(subtests):
+    for (nome_consumo, consumo), (nome_conta, conta), (nome_gd, geracao), (nome_abertas, abertas) in (
+            itertools.product(CONSUMOS.items(), CONTAS.items(), GDS.items(), ABERTAS.items())):
+        with subtests.test(consumo=nome_consumo, conta=nome_conta, gd=nome_gd, abertas=nome_abertas):
+            _garantias(consumo, conta, geracao, abertas)
+
+
+def _garantias(consumo, conta, geracao, abertas):
+    """As garantias de uma combinação (o mesmo corpo do teste parametrizado de antes)."""
     if isinstance(conta, tuple):
         preco, bandeiras = conta
         conta = por_preco(consumo.get('ultimo', 412), consumo.get('ano_anterior', 298), preco, **bandeiras)

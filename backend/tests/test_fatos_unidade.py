@@ -1,4 +1,5 @@
 """V1c: fatos da UC para o resumo por IA, sem banco (função pura e carregador com repository falso)."""
+import itertools
 import json
 from dataclasses import replace
 from datetime import date
@@ -145,11 +146,25 @@ def test_consumo_e_valor_estaveis_abaixo_da_media_nao_tem_motivo():
     assert f['motivos'] == []
 
 
-@pytest.mark.parametrize('kwargs', [{}, {'ultimo': 200, 'ano_anterior': 150}, CAIU,
-                                    {'ultimo': 200, 'ano_anterior': 300, 'base': 150}])
-@pytest.mark.parametrize('conta', [VALOR_SUBIU, VALOR_CAIU, contas()])
-def test_consumo_subiu_e_consumo_caiu_nunca_saem_juntos(kwargs, conta):
-    assert not {'consumo_subiu', 'consumo_caiu'} <= set(fatos(historico(**kwargs), conta)['motivos'])
+# Varredura: 4 consumos × 3 contas. Cada combinação é um subteste; ao falhar, o pytest mostra os rótulos.
+CONSUMOS_JUNTOS = {
+    'subiu 38% no ano (412 × 298), acima da média': {},
+    'subiu 33% no ano (200 × 150), abaixo da média': {'ultimo': 200, 'ano_anterior': 150},
+    'caiu 67% no ano (100 × 300), abaixo da média': CAIU,
+    'caiu 33% no ano (200 × 300), acima da média': {'ultimo': 200, 'ano_anterior': 300, 'base': 150},
+}
+CONTAS_JUNTOS = {
+    'valor subindo (300 × 200)': VALOR_SUBIU,
+    'valor caindo (100 × 200)': VALOR_CAIU,
+    'valor igual (200 × 200)': contas(),
+}
+
+
+def test_consumo_subiu_e_consumo_caiu_nunca_saem_juntos(subtests):
+    for (nome_consumo, kwargs), (nome_conta, conta) in itertools.product(CONSUMOS_JUNTOS.items(),
+                                                                          CONTAS_JUNTOS.items()):
+        with subtests.test(consumo=nome_consumo, conta=nome_conta):
+            assert not {'consumo_subiu', 'consumo_caiu'} <= set(fatos(historico(**kwargs), conta)['motivos'])
 
 
 # ---------- preço médio por kWh e decomposição ----------
@@ -199,13 +214,18 @@ def test_nenhum_componente_passa_do_limiar_e_o_motivo_e_a_combinacao(ultimo, pre
     assert f['motivos'] == ['consumo_e_preco_kwh']
 
 
-@pytest.mark.parametrize('ultimo', range(240, 360, 7))
-@pytest.mark.parametrize('preco', [0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
-def test_combinacao_nunca_tem_consumo_e_preco_em_sentidos_opostos(ultimo, preco):
+# Varredura: 18 consumos do mês (240 a 359 kWh, de 7 em 7, contra 298) × 7 preços (contra R$ 0,80)
+CONSUMOS_SENTIDOS = range(240, 360, 7)
+PRECOS_SENTIDOS = [0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+
+
+def test_combinacao_nunca_tem_consumo_e_preco_em_sentidos_opostos(subtests):
     # Sentidos opostos e os dois abaixo de 20%: o valor muda menos que o maior deles e não passa de 20%
-    f = fatos(historico(ultimo=ultimo, ano_anterior=298), por_preco(ultimo, 298, preco))
-    if 'consumo_e_preco_kwh' in f['motivos']:
-        assert (f['consumo_mes_kwh'] > f['consumo_ano_anterior_kwh']) == (f['preco_kwh_mes'] > f['preco_kwh_ano_anterior'])
+    for ultimo, preco in itertools.product(CONSUMOS_SENTIDOS, PRECOS_SENTIDOS):
+        with subtests.test(consumo=f'{ultimo} kWh × 298 kWh', preco=f'R$ {preco:.2f} × R$ 0,80 por kWh'):
+            f = fatos(historico(ultimo=ultimo, ano_anterior=298), por_preco(ultimo, 298, preco))
+            if 'consumo_e_preco_kwh' in f['motivos']:
+                assert (f['consumo_mes_kwh'] > f['consumo_ano_anterior_kwh']) == (f['preco_kwh_mes'] > f['preco_kwh_ano_anterior'])
 
 
 def test_bandeira_nunca_e_motivo_proprio():
