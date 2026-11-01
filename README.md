@@ -1,5 +1,154 @@
 # RL-26.2-Case-Final-
 
+## Autenticação: configuração obrigatória
+
+**Depois de atualizar para esta versão, as rotas de negócio da API exigem login.**
+Prepare o ambiente antes de usar o portal, inclusive se você desenvolve somente o frontend
+com dados mockados. `VITE_USE_MOCKS` controla os dados de negócio; cadastro, login e perfil
+sempre usam a API e o PostgreSQL. Não há conta, senha ou convite padrão no código.
+
+### 1. Criar os arquivos de ambiente sem sobrescrever os existentes
+
+Execute na **raiz do repositório**. O pull não traz os `.env` locais.
+
+PowerShell (Windows):
+
+```powershell
+if (!(Test-Path backend/.env)) {
+    Copy-Item backend/.env.example backend/.env
+}
+if (!(Test-Path frontend/.env)) {
+    Copy-Item frontend/.env.example frontend/.env
+}
+```
+
+Bash (Linux/macOS/Git Bash):
+
+```bash
+test -f backend/.env || cp backend/.env.example backend/.env
+test -f frontend/.env || cp frontend/.env.example frontend/.env
+```
+
+Se os arquivos já existem, apenas acrescente ou confira as variáveis abaixo. Preserve a
+conexão, as senhas e as configurações de dados/IA já usadas pelo seu ambiente.
+
+### 2. Configurar chave, convite e conexão
+
+Gere uma chave **localmente**, sem copiar a de outra instalação:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Se não tiver Python instalado, pode usar a imagem oficial pelo Docker:
+
+```bash
+docker run --rm python:3.13-slim python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Edite `backend/.env`:
+
+| Variável | O que configurar |
+| --- | --- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | A conexão do PostgreSQL desse ambiente; a senha do exemplo vem vazia e deve ser preenchida. Não troque as credenciais de um volume existente só para habilitar o AUTH. |
+| `DATABASE_URL` | Conexão usada fora do Docker, coerente com o banco existente. Dentro do Compose, a API recebe a conexão com o host `postgres`. |
+| `JWT_SECRET` | Cole a chave gerada pelo comando acima. Deve ter pelo menos 32 bytes. Mantenha-a estável nesse ambiente; trocar a chave invalida as sessões emitidas anteriormente. |
+| `AUTH_INVITE_CODE` | Defina um convite não vazio, com até 128 caracteres, ou use o definido pelo responsável pelo backend compartilhado. O código é sensível a maiúsculas e minúsculas. |
+| `CORS_ORIGINS` | Inclua a origem do frontend, por exemplo `http://localhost:5173` e/ou `http://127.0.0.1:5173`. |
+
+O convite atual é **compartilhado por ambiente**, não é de uso único e não tem expiração
+própria. Cada instalação local pode ter seu código; quem usa o mesmo backend usa o convite
+desse backend. Alterar o convite não apaga contas existentes nem muda suas senhas.
+
+Em `frontend/.env`, confira `VITE_API_URL` (normalmente `http://localhost:8000`) e
+`VITE_USE_MOCKS`: `false` para dados da API; `true` para dados de negócio fictícios.
+Quem usa apenas esses mocks pode subir o backend com `GOLD_SOURCE=seed` e `IA_MODO=mock`,
+sem carregar a Gold para autenticar. Para trabalhar com dados reais, preserve a configuração
+e a carga existentes. **Não execute seed ou recarga da Gold para testar autenticação.**
+
+Nunca envie os `.env`, chaves, senhas, convites ou tokens ao GitHub, ao PR ou ao grupo.
+Compartilhe o convite necessário ao cadastro por canal privado. `JWT_SECRET` e
+`AUTH_INVITE_CODE` ficam somente no backend: variáveis `VITE_` são públicas no navegador.
+As antigas flags `AUTH_ENABLED` e `VITE_AUTH_PREVIEW_API` não liberam acesso anônimo.
+
+### 3. Subir ou atualizar os serviços
+
+Na raiz do repositório:
+
+```bash
+docker compose -f backend/docker-compose.yml up -d --build --wait
+```
+
+O Compose cria ou atualiza `portal.usuarios`, incluindo o campo opcional de cargo,
+sem recarregar a Gold e sem redefinir contas, senhas ou permissões existentes.
+Na execução manual fora do Compose, instale `backend/requirements.txt` no seu ambiente
+Python e execute `python -m app.db.init_auth` **na pasta `backend`** antes de iniciar a API.
+
+Depois de editar o `.env` do backend, recrie a API para aplicar as variáveis; `restart`
+sozinho mantém o ambiente anterior do container:
+
+```bash
+docker compose -f backend/docker-compose.yml up -d --force-recreate api
+```
+
+Em outro terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Reinicie o Vite depois de mudar `frontend/.env`.
+
+### 4. Criar a conta e entrar
+
+1. Abra `http://localhost:5173/cadastro` (ou o endereço informado pelo Vite).
+2. Informe nome, e-mail individual válido, senha de 8 a 128 caracteres, confirmação da
+   senha e o convite configurado no backend acessado. Domínios reservados como `.test`
+   são recusados; não use o mesmo e-mail para várias pessoas no backend compartilhado.
+3. Ao concluir, o portal volta ao login com o e-mail preenchido. Entre com o mesmo e-mail
+   e senha; o convite é solicitado somente no cadastro. Não há etapa de confirmação por e-mail.
+4. O login abre o painel ou o destino interno preservado. No menu do avatar, use
+   **Editar perfil** para salvar **Cargo ou área** (opcional, até 80 caracteres) e
+   **Sair da conta** para limpar a sessão local.
+
+O cadastro cria perfil `usuario`. O bootstrap de administrador é uma ação explícita do
+responsável pelo ambiente: configurar `AUTH_ADMIN_NOME`, `AUTH_ADMIN_EMAIL` e
+`AUTH_ADMIN_PASSWORD` no backend e executar `python -m app.db.seed_auth` na pasta
+`backend` (ou `docker compose exec api python -m app.db.seed_auth` na mesma pasta).
+Esse comando não promove uma conta comum existente nem redefine sua senha.
+
+### Diagnóstico de acesso
+
+| Situação | Comportamento |
+| --- | --- |
+| `JWT_SECRET` vazio | `503 AUTH_INDISPONIVEL` no cadastro, login, perfil e rotas protegidas. Configure a chave e recrie a API. Uma chave preenchida, mas inválida/curta, impede a inicialização; confira os logs sem publicar seus valores. |
+| `AUTH_INVITE_CODE` vazio | Somente novos cadastros recebem `503 CADASTRO_INDISPONIVEL`. Contas já existentes continuam entrando se o JWT estiver configurado. |
+| Convite incorreto | `403 CONVITE_INVALIDO`; a conta não é criada. Confira o convite do backend que o frontend acessa. |
+| E-mail já cadastrado | `409 EMAIL_JA_CADASTRADO`; use o login dessa conta. |
+| Token ausente, expirado ou rejeitado | `401 NAO_AUTENTICADO`; o portal retorna ao login. Senha incorreta no login retorna `401 CREDENCIAIS_INVALIDAS`. |
+| Apenas o frontend está rodando | Login/cadastro não funcionam, mesmo com dados de negócio mockados. Suba a API e o PostgreSQL e confira `VITE_API_URL`/CORS. |
+
+`GET /health` é público e não verifica a configuração do AUTH: uma API saudável pode
+responder `503 AUTH_INDISPONIVEL` se a chave não foi configurada.
+Os corpos HTTP, limites e erros estão no [contrato da API](docs/api-contract.md).
+
+### Decisões pendentes do time
+
+- **Permissões:** hoje todas as contas ativas autenticadas têm as mesmas permissões de
+  leitura e escrita nas rotas de negócio, inclusive ordens, respeitando as validações de
+  cada rota. `perfil` não filtra recortes ou operações; Cargo ou área é apenas apresentação.
+  Se o time adotar hierarquia, deverá definir e aplicar a política no backend, por exemplo
+  exigir administrador nas escritas. Essa restrição ainda não está implementada.
+- **Tentativas de login:** ainda não há limite de tentativas ou bloqueio temporário.
+  A política e sua implementação precisam ser combinadas pelo time.
+- **Demo e entrega:** definir quem administra o ambiente, quem terá conta, qual convite
+  será usado e como fornecê-lo em privado. Os valores não devem ser registrados aqui.
+- **Comunicação:** antes de integrar o AUTH na main, avisar o grupo sobre a configuração
+  obrigatória e a necessidade de backend para quem usa mocks. Atualizar a main, sozinho,
+  não configura os `.env` nem cria contas.
+
 ## Backend
 
 Banco de dados: **PostgreSQL 16+**. A Gold fica no schema `gold`, as ordens do portal no schema `portal` e as conversas do assistente de IA no schema `ia`; a recarga da Gold nunca toca no `portal` nem no `ia`.
@@ -25,13 +174,13 @@ desenvolver sem acesso ao pacote privado. Use um banco separado da Gold real.
 
 ```bash
 cd backend
-cp .env.example .env                              # defina POSTGRES_PASSWORD
+test -f .env || cp .env.example .env              # preserve o existente; configure banco e AUTH conforme a seção inicial
 docker compose up -d --build --wait
 docker compose exec api python -m app.db.init_portal
 docker compose exec api python -m app.db.seed
 ```
 
-Após a carga do seed, `/dashboard` e `/filtros` usam os dados fictícios.
+Após a carga do seed, `/dashboard` e `/filtros` usam os dados fictícios mediante autenticação.
 
 ### Execução com a Gold real
 
@@ -41,7 +190,7 @@ Conclua a importação antes de consultar os endpoints.
 
 ```bash
 cd backend
-cp .env.example .env                              # defina POSTGRES_PASSWORD (as credenciais ficam só no .env)
+test -f .env || cp .env.example .env              # preserve o existente; configure banco e AUTH conforme a seção inicial
 # Edite .env e altere GOLD_SOURCE para real antes de subir a API.
 docker compose up -d --build --wait               # sobe o PostgreSQL e a API e espera ficarem prontos
 # Coloque os 14 CSVs e _manifesto.csv privados em backend/data/gold.
@@ -105,19 +254,20 @@ React + TypeScript (Vite) + Tailwind CSS, com a identidade visual FILO (tokens e
 
 ```bash
 cd frontend
-npm install
-cp .env.example .env             # Windows: copy .env.example .env
+npm ci
+test -f .env || cp .env.example .env  # no PowerShell, use o bloco seguro da seção inicial
 npm run dev
 ```
 
-O portal abre em http://localhost:5173.
+O portal abre em http://localhost:5173/login. A API e o PostgreSQL são necessários para
+autenticar, inclusive com dados de negócio mockados.
 
 ### Variáveis de ambiente (`frontend/.env`)
 
-| Variável             | Padrão                  | Uso                                                                   |
+| Variável             | Valor no `.env.example` | Uso                                                                   |
 | -------------------- | ----------------------- | --------------------------------------------------------------------- |
 | `VITE_API_URL`       | `http://localhost:8000` | URL base da API FastAPI                                               |
-| `VITE_USE_MOCKS`     | `true`                  | `true`: usa mocks rotulados como fictícios e dispensa o backend       |
+| `VITE_USE_MOCKS`     | `false`                 | `true`: usa mocks nos dados de negócio; autenticação continua na API |
 | `VITE_MOCK_DELAY_MS` | `350`                   | Atraso artificial dos mocks (ms), para ver os estados de carregamento |
 
 ### Conectar o frontend ao backend e à Gold
@@ -140,13 +290,17 @@ rotas usam o cadastro fictício.
 
 `layouts/` (menu, cabeçalho, rodapé, botão da IA) · `pages/` (uma por tela) · `components/` (por assunto) · `hooks/` · `services/` (cliente HTTP e `env.ts`) · `types/` · `data/` (mocks) · `utils/`.
 
-Rotas: `/painel`, `/receita`, `/unidades` e `/unidades/:id`, `/perdas/fila`, `/perdas/ordens`, `/operacao`, `/assistente`.
+Rotas públicas: `/login` e `/cadastro`. Rotas do portal, após validar a sessão:
+`/painel`, `/receita`, `/unidades` e `/unidades/:id`, `/perdas/fila`, `/perdas/ordens`,
+`/operacao`, `/assistente`.
 
 ### Camada de dados
 
-O front fala com a API só por `src/services`. Cada função devolve tipos de `src/types`, que espelham o contrato V2 (`docs/api-contract.md`).
+O cliente HTTP comum fica em `src/services`; as chamadas e os tipos de autenticação ficam
+em `src/auth/api.ts` e usam esse mesmo cliente. Os tipos de negócio em `src/types`
+espelham o contrato V2 (`docs/api-contract.md`).
 
-- **Mocks** (`VITE_USE_MOCKS=true`): `services/mock` atende as mesmas rotas e erros do stub do backend, com dados fictícios. As ordens de inspeção ficam em memória durante a sessão (criar, iniciar, concluir e cancelar funcionam; recarregar a página volta ao snapshot).
+- **Mocks** (`VITE_USE_MOCKS=true`): `services/mock` atende as rotas de negócio com dados fictícios. As ordens de inspeção ficam em memória durante a sessão (criar, iniciar, concluir e cancelar funcionam; recarregar a página volta ao snapshot). As rotas `/auth/*` continuam usando a API real.
 - **API real** (`VITE_USE_MOCKS=false`): `fetch` em `VITE_API_URL`. Todo erro chega como `ApiError` com `{status, codigo, mensagem}`.
 - **Hooks**: `useConsulta` (leituras, com loading, erro e descarte de respostas antigas) e `useAcao` (POST e PATCH).
 - **Fixtures**: `src/data/mocks` é cópia de `backend/app/services/fixtures`. Atualize com `npm run mocks:sync`; `npm run typecheck` falha se um fixture deixar de bater com os tipos.
@@ -161,7 +315,7 @@ const { dados, erro, carregando, recarregar } = useConsulta(
 
 ### Autenticação no cliente HTTP
 
-Com `VITE_USE_MOCKS=false`, o cliente HTTP (`services/http.ts`) é o único lugar que envia `Authorization: Bearer <token>`, lendo o token de `auth/tokenStorage.ts` (`get`, `set`, `clear`, chave `venergy_token`). Login e cadastro não levam token. Um 401 em qualquer outra rota limpa o token e chama o gancho registrado por `aoNaoAutorizado(fn)` (em `auth/naoAutorizado.ts`); sem gancho, o navegador vai para `/login?destino=...`. O 401 de credenciais inválidas no login não derruba a sessão. A tela de login só deve aceitar `destino` quando for um caminho do próprio portal (começa com `/` e não com `//`).
+O cliente HTTP (`services/http.ts`) é o único lugar que envia `Authorization: Bearer <token>`, lendo o token de `auth/tokenStorage.ts` (`get`, `set`, `clear`, chave `venergy_token` no `localStorage`). `/auth/*` sempre usa a API real, independentemente de `VITE_USE_MOCKS`. Login e cadastro não levam token. Um 401 em qualquer outra rota limpa o token e chama o gancho registrado por `aoNaoAutorizado(fn)` (em `auth/naoAutorizado.ts`); sem gancho, o navegador vai para `/login?destino=...`. O 401 de credenciais inválidas no login não derruba a sessão. O login aceita como `destino` apenas rotas internas conhecidas do portal, preservando filtros; destinos externos, desconhecidos ou circulares voltam ao painel. O logout remove o token local, sem endpoint de revogação no servidor; um token copiado continua sujeito à expiração de 60 minutos e à verificação da conta e do perfil no banco.
 
 ### Tela 2: diagnóstico da receita (`/receita`)
 

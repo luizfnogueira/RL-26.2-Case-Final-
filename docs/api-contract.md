@@ -12,6 +12,7 @@ Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos
 - `metadados.dados_ficticios=true` identifica o mock. `gold_atualizada_em` é timestamp da última carga **de dados**, distinto de `gerado_em` da IA. Neste stub ambos são fictícios; o front formata “hoje, 06:15” a partir do timestamp, sem texto fixo.
 - `page=1`, `page_size=20` por padrão; limites 1 e 100. Resposta paginada: `{items, page, page_size, total}`. `total` após filtros, antes da paginação; página além do fim retorna `items: []`.
 - Filtros geográficos combinam por AND; `bairro` exige `municipio`. Campos extras de escrita: 422.
+- As rotas de negócio e `GET /` exigem `Authorization: Bearer <access_token>`. Cadastro e login são públicos; `GET /health`, `/docs` e `/openapi.json` também não exigem token. As operações `/auth` estão detalhadas na seção 2.1 e persistem em `portal.usuarios`, independentemente de `GOLD_SOURCE` ou dos mocks de negócio do frontend.
 
 ### Períodos e filtros
 
@@ -42,7 +43,7 @@ Os cenários analíticos estão preparados para as duas janelas anuais acima. Ou
 
 Esses limites de cenário não se aplicam a `GET /operacao`: a API consulta o PostgreSQL nos modos `seed` e `real`, aceita qualquer período válido e retorna apenas os meses disponíveis na fonte. Um recorte sem dados retorna 200 com séries e rankings vazios.
 
-Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeção, que são lidas do schema `portal`. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH das demais rotas usam snapshot: alterações não persistem entre chamadas. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
+Filtros e paginação dos mocks operam sobre exemplos locais. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. As ordens na API persistem no schema `portal`, e `/auth` sempre usa contas persistidas em `portal.usuarios`; o comportamento de snapshot dos exemplos não se aplica à autenticação. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
 
 ## 2. Erros
 
@@ -55,9 +56,13 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 400 | TRANSICAO_INVALIDA | Estado atual não permite a transição |
 | 400 | JUSTIFICATIVA_OBRIGATORIA | Cancelamento sem justificativa |
 | 400 | RESULTADO_INCOMPLETO | Conclusão sem resultado |
+| 401 | CREDENCIAIS_INVALIDAS | E-mail/senha incorretos, conta inexistente ou inativa no login; mensagem genérica |
+| 401 | NAO_AUTENTICADO | Token ausente, inválido ou expirado; conta inativa/inexistente ou perfil do token diferente do atual |
+| 403 | CONVITE_INVALIDO | Código de convite não corresponde ao configurado no servidor; não cria conta |
 | 404 | UC_INEXISTENTE | UC não disponível no cadastro/cenário |
 | 404 | ORDEM_NAO_ENCONTRADA | ID de ordem inexistente |
 | 409 | ORDEM_ATIVA_EXISTENTE | UC já tem ordem ABERTA ou EM_CAMPO |
+| 409 | EMAIL_JA_CADASTRADO | E-mail já cadastrado, após normalização, em `POST /auth/register` |
 | 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
 | 422 | LOTE_REJEITADO | Alguma UC do lote falhou na validação; nenhuma ordem foi criada. `detalhes.falhas` lista `{id_uc, codigo, mensagem}` de cada UC |
 | 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
@@ -65,8 +70,172 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
 | 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
 | 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` e no `POST /ia/insight` de unidade com `GOLD_SOURCE=real` |
+| 503 | AUTH_INDISPONIVEL | `JWT_SECRET` não configurado; impede cadastro, login e acesso às rotas protegidas |
+| 503 | CADASTRO_INDISPONIVEL | `AUTH_INVITE_CODE` não configurado; impede somente novos cadastros, sem impedir login de contas existentes |
 
 `AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
+
+## 2.1 Autenticação e perfil — /auth
+
+O [README](../README.md) descreve a criação dos `.env`, geração da chave, definição do
+convite, inicialização e cadastro pelo portal. Os exemplos abaixo são **fictícios**;
+marcadores de convite, senha e token devem ser substituídos no ambiente de teste e nunca
+representam credenciais padrão da aplicação. Respostas de AUTH não têm `metadados`
+analíticos nem dependem dos períodos da Gold.
+
+### Usuário público e sessão
+
+`UsuarioPublico` contém somente os campos abaixo. Não devolve senha, hash, convite,
+chave JWT, estado interno da conta ou dados da Gold.
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "nome": "Pessoa de Exemplo",
+  "cargo": null,
+  "email": "pessoa@example.com",
+  "perfil": "usuario"
+}
+```
+
+| Campo | Contrato |
+| --- | --- |
+| `id` | String UUID emitida pelo servidor. |
+| `nome` | Nome cadastrado, com espaços externos removidos. |
+| `cargo` | String opcional de apresentação, até 80 caracteres, ou `null`. Não define permissões. |
+| `email` | E-mail normalizado em minúsculas, sem espaços externos, único no banco. |
+| `perfil` | `usuario` ou `administrador`, definido pelo servidor; o cadastro público sempre cria `usuario`. |
+
+JWT assinado com HS256, validade de **3.600 segundos (60 minutos)**. Claims internos:
+`sub` (ID da conta), `perfil`, `iat` e `exp`. Assinatura e expiração são verificadas pelo
+servidor; a conta deve existir, estar ativa e continuar com o perfil registrado no token.
+Modificar o texto de `cargo` não modifica esse perfil. Os sucessos das quatro operações
+abaixo usam `Cache-Control: no-store` e `Pragma: no-cache`.
+
+### POST /auth/register — criar conta com convite
+
+Público, sem token. `Content-Type: application/json`.
+
+```json
+{
+  "nome": "Pessoa de Exemplo",
+  "email": "pessoa@example.com",
+  "senha": "SUBSTITUA_PELA_SUA_SENHA",
+  "convite": "SUBSTITUA_PELO_CONVITE_DO_AMBIENTE"
+}
+```
+
+| Campo | Validação |
+| --- | --- |
+| `nome` | Obrigatório, string de 2 a 120 caracteres, após remover espaços externos. |
+| `email` | Obrigatório, formato válido, até 254 caracteres. Domínios reservados como `.test` não são aceitos. |
+| `senha` | Obrigatória, de 8 a 128 caracteres. Espaços fazem parte da senha; não são removidos nem há truncamento. |
+| `convite` | Obrigatório, de 1 a 128 caracteres após remover espaços externos. Comparação sensível a maiúsculas/minúsculas com `AUTH_INVITE_CODE` do backend. |
+
+Campos extras, como `perfil`, `ativo`, `id` ou `cargo`, são rejeitados com 422. O convite
+atual é compartilhado por ambiente, sem consumo por cadastro, uso único ou expiração
+própria. Não é armazenado como atributo da conta. A senha é persistida somente como
+hash Argon2id, e a unicidade do e-mail também é garantida pelo banco.
+
+**201:** `UsuarioPublico`, como no exemplo acima. O cadastro **não emite token** e
+não autentica automaticamente. O frontend retorna a `/login` com o e-mail preenchido;
+não há confirmação por e-mail.
+
+**Erros:** 403 `CONVITE_INVALIDO`, 409 `EMAIL_JA_CADASTRADO`,
+422 `DADOS_INVALIDOS`, 503 `AUTH_INDISPONIVEL` ou `CADASTRO_INDISPONIVEL`.
+Convite ausente/vazio é erro de validação (422); convite preenchido, mas incorreto,
+retorna 403. Nenhum desses casos cria a conta.
+
+### POST /auth/login — entrar
+
+Público, sem token. `Content-Type: application/json`.
+
+```json
+{
+  "email": "pessoa@example.com",
+  "senha": "SUBSTITUA_PELA_SUA_SENHA"
+}
+```
+
+`email` segue a normalização e o limite do cadastro; `senha` deve conter de 1 a 128
+caracteres e é verificada sem remover espaços. Campos extras, inclusive `convite`,
+são rejeitados. O convite é usado somente para criar a conta.
+
+**200:**
+
+```json
+{
+  "access_token": "<JWT_EMITIDO_PELO_SERVIDOR>",
+  "token_type": "bearer",
+  "usuario": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "nome": "Pessoa de Exemplo",
+    "cargo": null,
+    "email": "pessoa@example.com",
+    "perfil": "usuario"
+  }
+}
+```
+
+**Erros:** 401 `CREDENCIAIS_INVALIDAS`, 422 `DADOS_INVALIDOS` e
+503 `AUTH_INDISPONIVEL`. E-mail inexistente, senha incorreta ou conta inativa retornam
+a mesma mensagem: `E-mail ou senha inválidos.` O 401 inclui `WWW-Authenticate: Bearer`.
+No frontend, esse 401 não dispara o tratamento de expiração de outra sessão.
+
+### GET /auth/me — consultar a própria conta
+
+Exige `Authorization: Bearer <access_token>`. Sem corpo ou filtros de região.
+
+**200:** `UsuarioPublico` da conta identificada pelo token. `cargo` pode ser `null`.
+
+**Erros:** 401 `NAO_AUTENTICADO` (com `WWW-Authenticate: Bearer`) e
+503 `AUTH_INDISPONIVEL`. O 401 também cobre token adulterado, sem assinatura aceita,
+expirado, conta removida/inativa e mudança do perfil no banco após a emissão do token.
+
+### PATCH /auth/me — alterar Cargo ou área da própria conta
+
+Exige `Authorization: Bearer <access_token>` e `Content-Type: application/json`.
+
+```json
+{"cargo": "Analista de Operação"}
+```
+
+O único campo permitido é `cargo`, obrigatório no corpo, com string de até 80 caracteres
+após remover espaços externos, ou `null`. String vazia/só de espaços vira `null`.
+Para remover o cargo personalizado:
+
+```json
+{"cargo": null}
+```
+
+**200:** `UsuarioPublico` completo e atualizado. A mudança persiste em `portal.usuarios`
+e aparece no próximo login ou `GET /auth/me`. Sem cargo personalizado, o frontend mostra
+o perfil de acesso abaixo do nome.
+
+Não aceita ID de outra conta, nome, e-mail, senha, `perfil` ou outros campos. O usuário
+alvo é sempre obtido do token, e a operação não altera permissões.
+
+**Erros:** 401 `NAO_AUTENTICADO`, 422 `DADOS_INVALIDOS` e
+503 `AUTH_INDISPONIVEL`. Os erros de validação usam o formato comum
+`{"codigo":"DADOS_INVALIDOS","mensagem":"..."}`, sem devolver os valores recebidos.
+
+### Sessão no frontend e alcance das permissões
+
+- O token fica no `localStorage`, chave `venergy_token`. O cliente HTTP o envia somente
+  à API; `POST /auth/register` e `POST /auth/login` não levam esse cabeçalho.
+- Antes de montar uma tela privada, o frontend valida a conta em `GET /auth/me`.
+  Um 401 fora do login/cadastro limpa a sessão local e retorna a `/login`, preservando
+  apenas destinos internos conhecidos e os filtros. Não há tela separada de sessão ou expiração.
+- Logout remove o token local; **não há endpoint de logout, refresh ou revogação de JWT**.
+  Um token copiado continua sujeito à validade de 60 minutos e à conferência da conta/perfil.
+- Hoje `usuario` e `administrador` têm as mesmas permissões de leitura e escrita nas
+  rotas de negócio, inclusive ordens de inspeção, respeitando as validações de cada rota.
+  Não há filtro de dados por perfil. Hierarquia de acesso ainda precisa de decisão do time;
+  escrever `Administrador` em `cargo` não concede esse perfil.
+- Ainda não há limite de tentativas ou bloqueio temporário no login. A política de
+  tentativas e a definição das contas/convite de demo ficam pendentes de alinhamento.
+- `VITE_USE_MOCKS=true` não simula AUTH: API e PostgreSQL continuam necessários para
+  cadastro, login e perfil. As antigas flags de prévia não desabilitam a proteção.
 
 ## 3. GET /dashboard — Telas 1 e 2
 
