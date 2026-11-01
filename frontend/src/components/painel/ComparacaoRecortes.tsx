@@ -19,6 +19,7 @@ import { formatarAtualizacao } from '@/utils/datas'
 import { formatarNome } from '@/utils/formatacao'
 import { formatarPeriodo, PERIODO_ATUAL_PADRAO, PERIODO_COMPARACAO_PADRAO } from '@/utils/periodos'
 import TabelaComparacao from './TabelaComparacao'
+import { erroPeriodosComparacao } from './comparacao'
 
 const PADROES = {
   periodo_atual: PERIODO_ATUAL_PADRAO,
@@ -42,6 +43,7 @@ export default function ComparacaoRecortes({
   const filtros = { ...comparacao.filtros, itens }
   const selecao: SelecaoItens = { nivel: filtros.nivel, municipio: filtros.municipio, itens }
   const valida = selecaoValida(selecao)
+  const erroPeriodos = erroPeriodosComparacao(filtros.periodo_atual, filtros.periodo_comparacao)
   const consulta = useConsulta(
     (sinal) =>
       buscarComparacao(
@@ -63,7 +65,7 @@ export default function ComparacaoRecortes({
       filtros.bairro,
       JSON.stringify(itens),
     ],
-    { habilitada: valida },
+    { habilitada: valida && !erroPeriodos },
   )
   const campos: readonly CampoFiltro[] =
     filtros.nivel === 'classe'
@@ -114,6 +116,11 @@ export default function ComparacaoRecortes({
           Inverter períodos
         </Button>
       </div>
+      {erroPeriodos && (
+        <p role="alert" className="rounded-md bg-alerta-suave p-4 text-corpo text-alerta-escuro">
+          {erroPeriodos}
+        </p>
+      )}
       <Card
         titulo="Escolha os recortes"
         subtitulo="Compare de 2 a 4 itens do mesmo nível, nos mesmos períodos."
@@ -191,7 +198,7 @@ export default function ComparacaoRecortes({
                   : 'Escolha municípios, bairros ou classes no seletor acima.'
           }
         />
-      ) : consulta.erro ? (
+      ) : erroPeriodos ? null : consulta.erro ? (
         <ErrorState
           erro={consulta.erro}
           aoTentarNovamente={consulta.recarregar}
@@ -199,6 +206,7 @@ export default function ComparacaoRecortes({
         />
       ) : consulta.carregando ? (
         <div
+          role="status"
           aria-label="Carregando comparação de recortes"
           aria-busy="true"
           className="space-y-3 rounded-card bg-surface-card p-6 shadow-card"

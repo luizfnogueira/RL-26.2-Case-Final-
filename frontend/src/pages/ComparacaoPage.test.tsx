@@ -61,6 +61,64 @@ afterEach(() => {
 })
 
 describe('C3 integrada ao seletor e à camada de dados existentes', () => {
+  it('orienta a correção de durações diferentes e consulta só depois de corrigir o período', async () => {
+    vi.mocked(useOpcoesFiltros).mockReturnValue({
+      opcoes: { ...opcoes, periodos: [PA, PC, '2026-06', '2025-06'] },
+      metadados: null,
+      carregando: false,
+      erro: null,
+    })
+    const buscar = espiar()
+    abrir(urlPadrao + '&periodo_atual=2026-06&periodo_comparacao=' + PC)
+    expect(screen.getByRole('alert').textContent).toContain(
+      'O atual tem 1 mês e o de comparação tem 12 meses',
+    )
+    expect(buscar).not.toHaveBeenCalled()
+    expect(screen.queryByRole('table')).toBeNull()
+    expect(screen.queryByLabelText('Carregando comparação de recortes')).toBeNull()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Comparar com' }), {
+      target: { value: '2025-06' },
+    })
+    await screen.findByRole('columnheader', { name: 'Recife' })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(buscar).toHaveBeenLastCalledWith(
+      expect.objectContaining({ periodo_atual: '2026-06', periodo_comparacao: '2025-06' }),
+      expect.any(AbortSignal),
+    )
+    expect(endereco().getAll('itens')).toEqual(['RECIFE', 'OLINDA'])
+  })
+
+  it('não envia períodos iguais vindos de um link e permite corrigir sem perder a seleção', async () => {
+    const buscar = espiar()
+    abrir(urlPadrao + '&periodo_atual=' + PA + '&periodo_comparacao=' + PA)
+    expect(screen.getByRole('alert').textContent).toContain('Escolha períodos diferentes')
+    expect(buscar).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Comparar com' }), {
+      target: { value: PC },
+    })
+    await screen.findByRole('columnheader', { name: 'Recife' })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(buscar).toHaveBeenCalledTimes(1)
+  })
+
+  it('oculta resultados anteriores quando a mudança de período torna a comparação inválida', async () => {
+    vi.mocked(useOpcoesFiltros).mockReturnValue({
+      opcoes: { ...opcoes, periodos: [PA, PC, '2026-06'] },
+      metadados: null,
+      carregando: false,
+      erro: null,
+    })
+    const buscar = espiar()
+    abrir()
+    await screen.findByRole('columnheader', { name: 'Recife' })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Período atual' }), {
+      target: { value: '2026-06' },
+    })
+    expect(screen.queryByRole('table')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toContain('mesma duração')
+    expect(buscar).toHaveBeenCalledTimes(1)
+  })
+
   it('inverte as duas janelas em uma única mudança e mantém os itens', async () => {
     const buscar = espiar()
     abrir()

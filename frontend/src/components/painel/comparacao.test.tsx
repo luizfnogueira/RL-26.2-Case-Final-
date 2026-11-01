@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import fixture from '@/data/mocks/comparacao.json'
 import type { Comparacao } from '@/types/dashboard'
@@ -53,6 +53,43 @@ describe('critérios documentados de C3', () => {
 })
 
 describe('tabela de comparação', () => {
+  it('mostra as diferenças absolutas da API, inclusive quando a base zero impede a variação', () => {
+    const dados = exemplo()
+    const receita = dados.itens[0].receita_media_uc
+    receita.atual.valor = 123
+    receita.comparacao.valor = 0
+    // Valor deliberadamente distinto da subtração: o resultado vem da API.
+    receita.diferenca.valor = 98.76
+    receita.variacao_percentual.valor = null
+    dados.itens[0].ucs_ativas.diferenca.valor = -12
+    dados.itens[0].consumo_medio_uc.diferenca.valor = 0
+    dados.itens[0].dec.diferenca.valor = -1.2345
+    dados.itens[0].fec.diferenca.valor = 2.3456
+    render(<TabelaComparacao dados={dados} />)
+    const texto = (nome: string) => within(linha(nome)).getAllByRole('cell')[1].textContent
+    expect(texto('Receita por UC')).toContain('Diferença: +R$ 98,76')
+    expect(texto('UCs ativas')).toContain('Diferença: -12')
+    expect(texto('Consumo por UC')).toContain('Diferença: 0')
+    expect(texto('DEC')).toContain('Diferença: -1,2345')
+    expect(texto('FEC')).toContain('Diferença: +2,3456')
+    expect(within(linha('Receita por UC')).getByTitle(/base de comparação é zero/)).toBeTruthy()
+  })
+
+  it('permite abrir a explicação de ausência e identifica o indicador e recorte para leitores de tela', () => {
+    const dados = exemplo()
+    dados.itens[0].dec.atual.valor = null
+    render(<TabelaComparacao dados={dados} />)
+    const ajuda = screen.getByLabelText('Por que o valor atual de DEC de Recife está ausente?')
+    const detalhe = ajuda.closest('details')!
+    expect(ajuda.tagName).toBe('SUMMARY')
+    expect(detalhe.open).toBe(false)
+    fireEvent.click(ajuda)
+    expect(detalhe.open).toBe(true)
+    expect(within(detalhe).getByText(/A fonte não informou este indicador/)).toBeTruthy()
+    fireEvent.click(ajuda)
+    expect(detalhe.open).toBe(false)
+  })
+
   it('mostra valores e variações da API e diferencia pontos percentuais de variação relativa', () => {
     const dados = exemplo()
     const aberto = dados.itens[0].valor_em_aberto_pct

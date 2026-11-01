@@ -1,4 +1,15 @@
 import type { Comparacao, ItemComparacao, Kpi } from '@/types/dashboard'
+import { duracaoEmMeses } from '@/utils/periodos'
+
+/** Mesmas regras de duração e igualdade do contrato Contexto, antes de consultar C1. */
+export function erroPeriodosComparacao(atual: string, comparacao: string): string | null {
+  if (atual === comparacao) return 'Escolha períodos diferentes para comparar.'
+  const mesesAtual = duracaoEmMeses(atual)
+  const mesesComparacao = duracaoEmMeses(comparacao)
+  if (mesesAtual !== mesesComparacao)
+    return `Os períodos precisam ter a mesma duração. O atual tem ${mesesAtual} ${mesesAtual === 1 ? 'mês' : 'meses'} e o de comparação tem ${mesesComparacao} ${mesesComparacao === 1 ? 'mês' : 'meses'}. Ajuste os períodos acima.`
+  return null
+}
 
 export type CampoComparacao = Exclude<keyof ItemComparacao, 'nome'>
 
@@ -71,15 +82,17 @@ export function motivoAusencia(
   item: ItemComparacao,
   campo: CampoComparacao,
   kpi: Kpi,
-  lado: 'atual' | 'comparacao' | 'variacao_percentual',
+  lado: 'atual' | 'comparacao' | 'diferenca' | 'variacao_percentual',
   nivel: Comparacao['filtros']['nivel'],
 ): string {
   if ((campo === 'dec' || campo === 'fec') && nivel !== 'municipio')
     return 'DEC e FEC não são disponibilizados por bairro ou classe; a continuidade é medida por alimentador e município.'
   if (lado === 'variacao_percentual' && kpi.comparacao.valor === 0)
     return 'A base de comparação é zero; a variação percentual não é definida.'
-  if (lado !== 'variacao_percentual' && item.ucs_ativas[lado].valor === 0)
+  if ((lado === 'atual' || lado === 'comparacao') && item.ucs_ativas[lado].valor === 0)
     return 'Nenhuma UC ativa neste recorte no período; a fonte não disponibiliza este indicador.'
+  if (lado === 'diferenca')
+    return 'A fonte não informou a diferença entre os períodos; ela depende dos dois valores.'
   return lado === 'variacao_percentual'
     ? 'A fonte não informou um dos valores necessários à variação.'
     : 'A fonte não informou este indicador para o recorte e o período.'
