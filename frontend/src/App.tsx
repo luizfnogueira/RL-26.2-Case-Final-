@@ -1,4 +1,8 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
+import AuthProvider from '@/auth/AuthProvider'
+import ExigirAutenticacao from '@/auth/ExigirAutenticacao'
+import AuthPage from '@/pages/auth/AuthPage'
+import RedirecionarAuthLegado from '@/auth/RedirecionarAuthLegado'
 import AppLayout from '@/layouts/AppLayout'
 import AssistentePage from '@/pages/AssistentePage'
 import FilaPage from '@/pages/FilaPage'
@@ -10,8 +14,16 @@ import ReceitaPage from '@/pages/ReceitaPage'
 import UnidadePage from '@/pages/UnidadePage'
 
 const router = createBrowserRouter([
+  { path: 'login', element: <AuthPage etapa="login" /> },
+  { path: 'cadastro', element: <AuthPage etapa="cadastro" /> },
+  { path: 'dev/auth', element: <RedirecionarAuthLegado /> },
+  { path: 'dev/auth/:etapa', element: <RedirecionarAuthLegado /> },
   {
-    element: <AppLayout />,
+    element: (
+      <ExigirAutenticacao>
+        <AppLayout />
+      </ExigirAutenticacao>
+    ),
     children: [
       { index: true, element: <Navigate to="/painel" replace /> },
       { path: 'painel', element: <PainelPage /> },
@@ -40,5 +52,9 @@ const router = createBrowserRouter([
 ])
 
 export default function App() {
-  return <RouterProvider router={router} />
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  )
 }

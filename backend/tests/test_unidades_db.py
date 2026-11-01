@@ -31,6 +31,9 @@ PREENCHER = {
 VERIFICAR = """
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.auth import proteger_rotas
+# Isola a regra de negocio; a protecao real e coberta por test_auth_*.
+app.dependency_overrides[proteger_rotas] = lambda: None
 
 with TestClient(app) as client:
     r = client.get('/unidades', params={'busca': 'uc-te'})

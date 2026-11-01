@@ -286,6 +286,9 @@ def test_pg_api_real_source_and_documental_guard(package, pg, status, valor_em_a
     check = """
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.auth import proteger_rotas
+# Isola a regra de negocio; a protecao real e coberta por test_auth_*.
+app.dependency_overrides[proteger_rotas] = lambda: None
 import os
 with TestClient(app) as client:
     r = client.get('/inspecoes/candidatos', params={'periodo_atual':'2025-07/2026-06'})
@@ -313,6 +316,9 @@ with TestClient(app) as client:
     check = """
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.auth import proteger_rotas
+# Isola a regra de negocio; a protecao real e coberta por test_auth_*.
+app.dependency_overrides[proteger_rotas] = lambda: None
 with TestClient(app) as client:
     r = client.get('/inspecoes/candidatos', params={'periodo_atual':'2025-07/2026-06'})
     assert r.status_code == 200 and r.json()['total'] == 1
