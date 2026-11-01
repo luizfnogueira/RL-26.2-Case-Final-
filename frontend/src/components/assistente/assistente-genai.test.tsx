@@ -109,6 +109,9 @@ describe('GENAI-18/19 — detalhes técnicos', () => {
     expect(within(detalhes).getByText('Acurácia de execução')).toBeTruthy()
     expect(within(detalhes).getByText('85%')).toBeTruthy()
     expect(within(detalhes).getByRole('table', { name: /por status/ })).toBeTruthy()
+    // Não sei correto = recall do status nao_sei (0,89 no exemplo)
+    const naoSei = within(detalhes).getByText('Não sei correto')
+    expect(naoSei.nextElementSibling?.textContent).toBe('89%')
   })
 
   it('uma aba aberta por vez', async () => {

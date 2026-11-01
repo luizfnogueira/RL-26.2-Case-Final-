@@ -58,6 +58,30 @@ class FiltrosInspecoes(FiltrosRegiao, Paginacao):
     periodo_atual: Periodo | None = None
 
 
+class FiltrosIndicadoresOrdens(FiltrosRegiao):
+    # Janela pela data de conclusão; sem ela, todas as ordens concluídas
+    periodo_conclusao: Periodo | None = None
+
+
+class AcertoPorMotivo(Schema):
+    motivo: str
+    concluidas: int
+    com_irregularidade: int
+    taxa_acerto_pct: float
+
+
+class IndicadoresOrdens(Schema):
+    concluidas: int
+    com_irregularidade: int
+    taxa_acerto_pct: float | None
+    # Comparação de kWh por mês, só com as ordens que têm estimativa da fila
+    ordens_comparadas: int
+    kwh_mes_campo: float
+    kwh_mes_fila: float
+    por_motivo: list[AcertoPorMotivo]
+    metadados: Metadados
+
+
 class Resultado(Schema):
     irregularidade_detectada: bool
     tipo_irregularidade: Texto | None = None
@@ -121,6 +145,18 @@ class CriarInspecao(Schema):
     motivo: TextoLongo | None = None
     kwh_estimado: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     observacoes: TextoLongo | None = None
+
+
+MAX_ORDENS_LOTE = 200
+
+
+class CriarInspecoesLote(Schema):
+    ordens: list[CriarInspecao] = Field(min_length=1, max_length=MAX_ORDENS_LOTE)
+
+
+class OrdensCriadas(Schema):
+    items: list[Ordem]
+    total: int
 
 
 class AtualizarInspecao(Schema):

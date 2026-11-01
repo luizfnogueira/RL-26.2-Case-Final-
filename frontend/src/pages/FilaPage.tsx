@@ -14,7 +14,7 @@ import { useConsulta } from '@/hooks/useConsulta'
 import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
 import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
-import { buscarCandidatos, criarInspecao, normalizarErro } from '@/services'
+import { buscarCandidatos, criarInspecoesEmLote, falhasDoLote, normalizarErro } from '@/services'
 import type { Candidato, ConfiancaEvidencia } from '@/types/inspecoes'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
 import { formatarAtualizacao } from '@/utils/datas'
@@ -240,25 +240,31 @@ export default function FilaPage() {
     setErroCriacao(null)
 
     try {
-      // Cada ordem nasce com o contexto da Gold: motivos da fila e kWh estimado do candidato.
-      for (const candidato of Object.values(selecionadas)) {
-        await criarInspecao({
+      // Um lote, tudo ou nada. Cada ordem nasce com o contexto da Gold: motivos e kWh estimado da fila.
+      const criadas = await criarInspecoesEmLote(
+        Object.values(selecionadas).map((candidato) => ({
           id_uc: candidato.id_uc,
           equipe_responsavel: equipe.trim(),
           data_prevista: dataPrevista || null,
           motivo: candidato.motivos.join(' · ') || null,
           kwh_estimado: candidato.energia_estimada.valor ?? null,
-        })
-      }
-      setToast({ tipo: 'sucesso', texto: `${quantidadeSelecionada} ordens geradas` })
+        })),
+      )
+      setToast({ tipo: 'sucesso', texto: `${criadas.total} ordens geradas` })
       setSelecao({ chave: chaveRecorte, itens: {} })
       setModalAberto(false)
       navigate('/perdas/ordens')
     } catch (erro: unknown) {
-      const mensagem = normalizarErro(erro).mensagem
+      const falhas = falhasDoLote(erro)
+      const mensagem =
+        falhas.length > 0
+          ? `Nenhuma ordem foi criada. Revise: ${falhas
+              .map((falha) => `${falha.id_uc} (${falha.mensagem})`)
+              .join('; ')}`
+          : normalizarErro(erro).mensagem
       setErroCriacao(mensagem)
       setToast({ tipo: 'erro', texto: mensagem })
-      // Uma criação anterior no lote pode ter sido gravada: recarrega os bloqueios da fila.
+      // Outra pessoa pode ter criado ordem para uma UC da seleção: atualiza os bloqueios da fila.
       candidatos.recarregar()
     } finally {
       setCriando(false)

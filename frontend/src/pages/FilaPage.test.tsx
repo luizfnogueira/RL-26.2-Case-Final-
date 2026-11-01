@@ -1,6 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import candidatosFixture from '@/data/mocks/candidatos.json'
-import { buscarCandidatos, buscarFiltros, criarInspecao, normalizarErro } from '@/services'
+import {
+  buscarCandidatos,
+  buscarFiltros,
+  criarInspecoesEmLote,
+  falhasDoLote,
+  normalizarErro,
+} from '@/services'
 import { ApiError } from '@/services/erro-api'
 import type { OpcoesFiltrosApi } from '@/types/filtros'
 import type { Candidatos, ParamsCandidatos } from '@/types/inspecoes'
@@ -12,7 +18,8 @@ import FilaPage from './FilaPage'
 const mocks = vi.hoisted(() => ({
   buscarCandidatos: vi.fn(),
   buscarFiltros: vi.fn(),
-  criarInspecao: vi.fn(),
+  criarInspecoesEmLote: vi.fn(),
+  falhasDoLote: vi.fn(),
   normalizarErro: vi.fn(),
 }))
 
@@ -45,7 +52,8 @@ function opcoesDoFixture(): OpcoesFiltrosApi {
 
 beforeEach(() => {
   vi.mocked(buscarFiltros).mockResolvedValue(opcoesDoFixture())
-  vi.mocked(criarInspecao).mockResolvedValue({} as never)
+  vi.mocked(criarInspecoesEmLote).mockResolvedValue({ items: [], total: 1 })
+  vi.mocked(falhasDoLote).mockReturnValue([])
   vi.mocked(normalizarErro).mockImplementation(
     (erro: unknown) => new ApiError(0, 'ERRO', erro instanceof Error ? erro.message : String(erro)),
   )
@@ -218,15 +226,43 @@ describe('FilaPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
 
     await waitFor(() =>
-      expect(mocks.criarInspecao).toHaveBeenCalledWith(
+      expect(mocks.criarInspecoesEmLote).toHaveBeenCalledWith([
         expect.objectContaining({
           id_uc: 'UC-DEMO-001',
           equipe_responsavel: 'Equipe Norte 02',
           motivo: candidato.motivos.join(' · '),
           kwh_estimado: candidato.energia_estimada.valor,
         }),
-      ),
+      ]),
     )
+  })
+
+  it('lote recusado: avisa que nenhuma ordem foi criada e lista as UCs com problema', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+    const recusa = new ApiError(422, 'LOTE_REJEITADO', 'Nenhuma ordem do lote foi criada.')
+    vi.mocked(criarInspecoesEmLote).mockRejectedValue(recusa)
+    vi.mocked(falhasDoLote).mockReturnValue([
+      { id_uc: 'UC-DEMO-001', codigo: 'ORDEM_ATIVA_EXISTENTE', mensagem: 'já possui ordem ativa' },
+    ])
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem de inspeção' }))
+    fireEvent.change(screen.getByLabelText('Equipe responsável *'), {
+      target: { value: 'Equipe Norte 02' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
+
+    const avisos = await screen.findAllByText(
+      'Nenhuma ordem foi criada. Revise: UC-DEMO-001 (já possui ordem ativa)',
+    )
+    expect(avisos.length).toBeGreaterThan(0)
+    expect(falhasDoLote).toHaveBeenCalledWith(recusa)
   })
 
   it('mostra o domínio de filtros vindo de /filtros, sem lista fixa no front', async () => {

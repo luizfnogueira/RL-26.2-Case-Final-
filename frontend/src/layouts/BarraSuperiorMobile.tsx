@@ -1,8 +1,7 @@
 import { Menu } from 'lucide-react'
 import { Link } from 'react-router'
-import Avatar from '@/components/common/Avatar'
+import MenuConta from '@/auth/MenuConta'
 import { LogoMarca } from '@/components/common/Logo'
-import { USUARIO_MOCK } from '@/data/usuario.mock'
 
 type Props = { onAbrirMenu: () => void }
 
@@ -25,7 +24,7 @@ export default function BarraSuperiorMobile({ onAbrirMenu }: Props) {
           <span className="text-titulo-lg font-normal text-marca">V-Energy</span>
         </Link>
       </div>
-      <Avatar iniciais={USUARIO_MOCK.iniciais} tamanho="sm" />
+      <MenuConta compacto />
     </header>
   )
 }

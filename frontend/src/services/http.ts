@@ -24,19 +24,30 @@ export interface OpcoesRequisicao {
   sinal?: AbortSignal
 }
 
-type ValorQuery = string | number | boolean | null | undefined
+type ValorQuery =
+  string | number | boolean | null | undefined | readonly (string | number | boolean)[]
 
 export function construirQuery(params?: object): string {
   const busca = new URLSearchParams()
   for (const [chave, valor] of Object.entries((params ?? {}) as Record<string, ValorQuery>)) {
     if (valor === undefined || valor === null || valor === '') continue
-    busca.set(chave, String(valor))
+    if (Array.isArray(valor)) {
+      for (const item of valor) {
+        if (item !== undefined && item !== null && item !== '') {
+          busca.append(chave, String(item))
+        }
+      }
+    } else {
+      busca.set(chave, String(valor))
+    }
   }
   const texto = busca.toString()
   return texto ? `?${texto}` : ''
 }
 
-function ehCorpoDeErro(valor: unknown): valor is { codigo: string; mensagem: string } {
+function ehCorpoDeErro(
+  valor: unknown,
+): valor is { codigo: string; mensagem: string; detalhes?: Record<string, unknown> } {
   return (
     typeof valor === 'object' &&
     valor !== null &&
@@ -63,7 +74,8 @@ export async function requisitar<T>(
   caminho: string,
   opcoes: OpcoesRequisicao = {},
 ): Promise<T> {
-  if (USE_MOCKS) {
+  // Mocks são exclusivos dos dados de negócio; autenticação sempre usa a API.
+  if (USE_MOCKS && !caminho.startsWith('/auth/')) {
     const { atenderMock } = await import('./mock')
     return (await atenderMock(metodo, caminho, opcoes)) as T
   }
@@ -97,7 +109,8 @@ export async function requisitar<T>(
   if (!resposta.ok) {
     // Gancho único do 401: sessão inválida. O erro continua sendo lançado para a tela que pediu.
     if (resposta.status === 401 && !semSessao) tratarNaoAutorizado()
-    if (ehCorpoDeErro(corpo)) throw new ApiError(resposta.status, corpo.codigo, corpo.mensagem)
+    if (ehCorpoDeErro(corpo))
+      throw new ApiError(resposta.status, corpo.codigo, corpo.mensagem, corpo.detalhes)
     throw new ApiError(
       resposta.status,
       resposta.status >= 500 ? 'ERRO_INTERNO' : 'RESPOSTA_INVALIDA',

@@ -17,3 +17,6 @@ venv/
 # Cobertura de testes
 .coverage
 htmlcov/
+
+# Cache de ferramentas JS rodadas a partir do backend (ex.: vitest)
+node_modules/

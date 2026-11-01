@@ -138,15 +138,18 @@ def _corrigir_depois_de_preencher(texto: str) -> str:
 
 def construir_agente_insight(
     modelo: Model | None = None,
-    *,
-    instrucoes: str = INSTRUCOES,
+    instrucoes: str | None = None,
 ) -> Agent[dict[str, str], TextoInsightIA]:
-    """Agente pequeno, sem ferramentas, com raciocínio mínimo (perfil 'insight' do GENAI-1)."""
+    """Agente pequeno, sem ferramentas, com raciocínio mínimo (perfil 'insight' do GENAI-1).
+
+    `instrucoes` troca só o prompt de sistema (V1c: resumo da unidade); sem ele, vale o INSTRUCOES da receita,
+    lido na chamada.
+    """
     agente = Agent(
         modelo or criar_modelo("insight"),
         deps_type=dict,
         output_type=TextoInsightIA,
-        instructions=instrucoes,
+        instructions=instrucoes if instrucoes is not None else INSTRUCOES,
         model_settings=obter_model_settings("insight"),
         retries=2,
     )
@@ -170,10 +173,14 @@ def construir_agente_insight(
 def escrever_insight(
     valores: dict[str, str],
     modelo: Model | None = None,
-    *,
-    instrucoes: str = INSTRUCOES,
+    instrucoes: str | None = None,
 ) -> dict[str, str]:
-    """Recebe {marcador: valor já formatado} e devolve {titulo, texto} com os marcadores preenchidos."""
+    """Recebe {marcador: valor já formatado} e devolve {titulo, texto} com os marcadores preenchidos.
+
+    `instrucoes` é opcional (V1c: resumo da unidade); sem ele, vale o prompt da receita, lido na chamada.
+    """
+    if instrucoes is None:
+        instrucoes = INSTRUCOES
     usar_cache = modelo is None and os.getenv("AI_CACHE_ENABLED", "1").strip() != "0"
     chave_cache = (tuple(sorted(valores.items())), instrucoes)
     if usar_cache and chave_cache in _CACHE_INSIGHT:

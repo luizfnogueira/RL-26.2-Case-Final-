@@ -13,8 +13,10 @@ JANELA = [somar_meses('2025-07', i) for i in range(12)]          # 2025-07 … 2
 ANTERIORES = [somar_meses(m, -12) for m in JANELA]               # 2024-07 … 2025-06
 BASE_MEDIA = '2025-06/2026-05'                                   # 12 meses antes de 2026-06, sem ele
 CAUSA = ('Se o valor da conta subiu, a causa não é o consumo, '
-         'e sim tarifa, bandeira tarifária ou tributos.')
+         'e sim o preço da energia (tarifa ou bandeira tarifária).')
 EXPLICA = 'O aumento do consumo explica a conta mais alta.'
+MEDIA = ('A média dos 12 meses anteriores mistura meses de consumo alto e baixo; o mesmo mês do ano '
+         'anterior desconta a época do ano e é a comparação que vale aqui.')
 
 
 def _mes(mes, consumo, anterior=None, tipo='REAL', troca=False, flag=None):
@@ -70,9 +72,9 @@ def test_mes_no_texto_e_por_extenso(mes, texto):
     ({'ultimo': 400, 'ano_anterior': 280, 'base': 360}, 'Consumo subindo ao longo do ano',
      'Jun/2026 ficou 43% acima de jun/2025 e em linha com a média dos 12 meses anteriores.',
      'O aumento do consumo explica a conta mais alta: não é um pico só deste mês.'),
-    ({'ultimo': 200, 'ano_anterior': 150}, 'Consumo caindo nos últimos meses',
+    ({'ultimo': 200, 'ano_anterior': 150}, 'Consumo maior que no mesmo mês do ano anterior',
      'Jun/2026 ficou 33% acima de jun/2025 e 30% abaixo da média dos 12 meses anteriores.',
-     'Contra o ano anterior, o consumo explica a conta mais alta; contra os últimos meses, não.'),
+     'Contra o mesmo mês do ano anterior, o consumo subiu e pode explicar uma conta mais alta. ' + MEDIA),
     ({'ultimo': 420, 'ano_anterior': 400}, 'Alta sazonal',
      'Jun/2026 ficou 36% acima da média dos 12 meses anteriores e em linha com jun/2025.',
      'O consumo maior é típico desta época do ano e explica a conta mais alta.'),
@@ -80,9 +82,10 @@ def test_mes_no_texto_e_por_extenso(mes, texto):
      'Jun/2026 ficou em linha com jun/2025 e com a média dos 12 meses anteriores.', CAUSA),
     ({'ultimo': 52, 'ano_anterior': 60, 'base': 83}, 'Consumo caiu',
      'Jun/2026 ficou 36% abaixo da média dos 12 meses anteriores e em linha com jun/2025.', CAUSA),
-    ({'ultimo': 200, 'ano_anterior': 300, 'base': 150}, 'Consumo voltou a subir',
+    ({'ultimo': 200, 'ano_anterior': 300, 'base': 150}, 'Consumo menor que no mesmo mês do ano anterior',
      'Jun/2026 ficou 33% abaixo de jun/2025 e 23% acima da média dos 12 meses anteriores.',
-     'Contra os últimos meses, o consumo explica a conta mais alta; contra o ano anterior, não.'),
+     'Contra o mesmo mês do ano anterior, o consumo caiu e não explica uma conta mais alta; se o valor '
+     'subiu, a causa é o preço da energia (tarifa ou bandeira tarifária). ' + MEDIA),
     ({'ultimo': 200, 'ano_anterior': 300, 'base': 210}, 'Consumo caiu',
      'Jun/2026 ficou 33% abaixo de jun/2025 e em linha com a média dos 12 meses anteriores.', CAUSA),
     ({'ultimo': 100, 'ano_anterior': 300, 'base': 300}, 'Consumo caiu',
@@ -153,7 +156,7 @@ def test_exatamente_20_por_cento_abaixo_da_media_ainda_e_estavel():
 def test_acima_do_ano_anterior_mas_muito_abaixo_da_media_indica_queda_recente():
     d = diagnosticar_conta(historico(ultimo=200, ano_anterior=150), PERIODO)
     assert d['conta_alta'] is True
-    assert d['veredito']['titulo'] == 'Consumo caindo nos últimos meses'
+    assert d['veredito']['titulo'] == 'Consumo maior que no mesmo mês do ano anterior'
 
 
 def test_queda_forte_no_ano_e_media_em_linha_e_queda_contra_o_ano_anterior():
@@ -174,7 +177,7 @@ def test_queda_forte_no_ano_e_na_media():
 def test_queda_forte_no_ano_mas_acima_da_media_e_retomada():
     # −33% contra o ano anterior; média (300 + 11 × 150) / 12 = 162,5, então 200 está acima.
     d = diagnosticar_conta(historico(ultimo=200, ano_anterior=300, base=150), PERIODO)
-    assert d['veredito']['titulo'] == 'Consumo voltou a subir'
+    assert d['veredito']['titulo'] == 'Consumo menor que no mesmo mês do ano anterior'
 
 
 def test_exatamente_20_por_cento_abaixo_do_ano_anterior_ainda_e_em_linha():

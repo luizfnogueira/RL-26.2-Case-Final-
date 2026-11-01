@@ -4,12 +4,20 @@ import type { CodigoErro } from '@/types/comum'
 export class ApiError extends Error {
   readonly status: number
   readonly codigo: CodigoErro
+  /** Campo opcional do corpo de erro (ex.: `falhas` do 422 LOTE_REJEITADO). */
+  readonly detalhes?: Record<string, unknown>
 
-  constructor(status: number, codigo: CodigoErro, mensagem: string) {
+  constructor(
+    status: number,
+    codigo: CodigoErro,
+    mensagem: string,
+    detalhes?: Record<string, unknown>,
+  ) {
     super(mensagem)
     this.name = 'ApiError'
     this.status = status
     this.codigo = codigo
+    this.detalhes = detalhes
   }
 
   get mensagem(): string {

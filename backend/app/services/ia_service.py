@@ -18,12 +18,11 @@ from app.repositories import interacao_repository
 from app.repositories.gold_metadata import metadados_gold
 from app.schemas.ia import GraficoIA, PerguntaIA, RespostaIA
 from app.repositories import vocabulario_gold
-from app.services import cache_respostas, esclarecimento_ia, grafico_ia, stub_ia
+from app.services import cache_respostas, grafico_ia, stub_ia
 from app.ai.consulta import descrever_tabela, valores_distintos
 from app.ai.entidades import resolver_entidades
-from app.ai.guardrails import resposta_da_triagem, triar
-from app.ai.roteador import e_pergunta_da_plataforma
-from app.services.guia_plataforma import carregar_guia, secoes_para
+from app.ai.intencao import classificar, resposta_sem_consulta
+from app.services.guia_plataforma import secoes_para
 
 logger = logging.getLogger(__name__)
 
@@ -187,42 +186,36 @@ class AgenteReal:
 
     def perguntar(self, dados: PerguntaIA) -> dict:
         try:
-            # Pré-filtro (GENAI-22): o óbvio é barrado ou respondido antes de tudo, sem gastar tokens
-            triagem = triar(dados.pergunta)
-            segue = triagem.acao == "seguir"
             responder = self.responder or _responder_do_agente()
             executar_sql = self.executar_sql or _executor_sql()
-            
-            extras = {}
-            if self.executar_sql is None:
-                from app.ai.consulta import descrever_tabela, valores_distintos
-                extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
-            
             with self.sessao() as db:
                 historico = interacao_repository.carregar_historico(db, dados.conversa_id)
                 # Conversa longa: as perguntas anteriores às 3 da memória, em lista curta (só para o agente)
                 resumo = (interacao_repository.carregar_resumo(db, dados.conversa_id)
                           if len(historico) >= interacao_repository.MAX_TROCAS else [])
                 gold = metadados_gold(db, "agg_kpis_mensal", OBSERVACAO_SEED)
-                # Pergunta sobre o uso da plataforma (L3) desvia para o guia e nunca encosta no banco
-                plataforma = segue and (e_pergunta_da_plataforma(triagem.pergunta, carregar_guia())
-                                        or continua_o_guia(triagem.pergunta, historico))
                 # Nomes da Gold (uma consulta por versão): esclarecimento e assinatura do cache
                 nomes = vocabulario_gold.nomes(db, gold["gold_atualizada_em"])
-                # Pergunta ambígua volta com opções antes de gastar tokens
-                esclarecer = segue and not plataforma and esclarecimento_ia.detectar(
-                    dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
-                sem_o_comeco = segue and not esclarecer and (
+                # Roteador de intenção: segurança, fora de escopo, guia da plataforma, esclarecimento e dados
+                # ausentes são decididos antes de qualquer consulta, sem gastar tokens; só a rota consulta vai ao banco
+                intencao = classificar(dados.pergunta, historico, nomes["bairros_ambiguos"], nomes["municipios"])
+                segue = intencao.rota == "consulta"
+                # Pergunta sobre o uso da plataforma (L3) vai para o guia e nunca encosta no banco
+                plataforma = intencao.rota == "plataforma"
+                sem_o_comeco = segue and (
                     pede_o_comeco_da_conversa(dados.pergunta)
                     and interacao_repository.contar_trocas(db, dados.conversa_id) > len(historico) + len(resumo))
                 # Respostas pré-calculadas: pergunta igual ou parecida a uma já respondida, sem histórico
-                # O cache é por versão da Gold: resposta do guia fica de fora (o guia tem versão própria)
-                usa_cache = (cache_ligado() and segue and not plataforma and not historico and not esclarecer
-                             and not sem_o_comeco)
+                usa_cache = cache_ligado() and segue and not historico and not sem_o_comeco
                 reaproveitada = (cache_respostas.buscar(db, dados.pergunta, gold["gold_atualizada_em"], nomes)
                                  if usa_cache else None)
-            if self.executar_sql is None and segue and not plataforma:
-                extras["entidades_resolvidas"] = resolver_entidades(triagem.pergunta)
+
+            extras = {}
+            if self.executar_sql is None:
+                from app.ai.consulta import descrever_tabela, valores_distintos
+                extras = {"valores_distintos_fn": valores_distintos, "descrever_tabela_fn": descrever_tabela}
+                if segue:
+                    extras["entidades_resolvidas"] = resolver_entidades(intencao.pergunta)
             para_o_cache = None
             # Cada consulta do agente, completa: a resposta só leva 50 linhas e o gráfico precisa de todas
             resultados: list = []
@@ -231,27 +224,21 @@ class AgenteReal:
                 resultado = executar_sql(sql)
                 resultados.append(resultado)
                 return resultado
-            if not segue:
-                resposta = resposta_da_triagem(
-                    triagem,
-                    conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
-                    gold_atualizada_em=gold["gold_atualizada_em"],
-                )
-            elif esclarecer:
-                resposta = esclarecimento_ia.resposta(esclarecer, gold["gold_atualizada_em"])
+            if not segue and not plataforma:
+                resposta = resposta_sem_consulta(intencao, gold["gold_atualizada_em"])
             elif sem_o_comeco:
                 resposta = resposta_sem_o_comeco_da_conversa(historico, resumo, gold["gold_atualizada_em"])
             elif plataforma:
                 responder_guia = self.responder_guia or _responder_pelo_guia()
-                secoes = secoes_para(triagem.pergunta)
-                saida = executar_com_prazo(lambda: responder_guia(triagem.pergunta, secoes, historico),
+                secoes = secoes_para(intencao.pergunta)
+                saida = executar_com_prazo(lambda: responder_guia(intencao.pergunta, secoes, historico),
                                            self.prazo_s or prazo_ia_s())
                 resposta = resposta_do_guia(saida, secoes, gold["gold_atualizada_em"])
             elif reaproveitada is not None:
                 resposta = reaproveitada
             else:
                 resposta = executar_com_prazo(lambda: responder(
-                    triagem.pergunta,
+                    intencao.pergunta,
                     historico=historico,
                     resumo_conversa=resumo,
                     conversa_id=str(dados.conversa_id) if dados.conversa_id is not None else None,
@@ -345,17 +332,6 @@ def apagar_conversas_antigas() -> None:
 def _responder_pelo_guia() -> Callable:
     from app.ai.agente_guia import responder_pelo_guia  # o PydanticAI só é importado no modo real
     return responder_pelo_guia
-
-
-def continua_o_guia(pergunta: str, historico: list[dict]) -> bool:
-    """Follow-up de uma resposta do guia ("E como eu exporto?"): decide lendo junto com a pergunta anterior.
-
-    "E qual a receita de Olinda?" continua indo para os dados: o detector manda pergunta mista para dados.
-    """
-    if not historico or (historico[-1].get("filtros") or {}).get("fonte") != "guia":
-        return False
-    anterior = historico[-1].get("pergunta_interpretada") or ""
-    return e_pergunta_da_plataforma(f"{anterior} {pergunta}", carregar_guia())
 
 
 def resposta_do_guia(saida: Any, secoes: list, gold_atualizada_em: Any) -> dict:

@@ -1,4 +1,4 @@
-import type { Dashboard } from '@/types/dashboard'
+import type { Comparacao, Dashboard } from '@/types/dashboard'
 import type { PerguntaIA, RespostaIA, RespostaInsight } from '@/types/ia'
 import type { Candidatos, Ordens } from '@/types/inspecoes'
 import type { Operacao } from '@/types/operacao'
@@ -29,6 +29,7 @@ async function carregar<T>(modulo: Promise<{ default: unknown }>): Promise<T> {
 /** Cada chamada devolve uma cópia independente: alterar o resultado não afeta os mocks. */
 export const fixtures = {
   dashboard: () => carregar<Dashboard>(import('@/data/mocks/dashboard.json')),
+  comparacao: () => carregar<Comparacao>(import('@/data/mocks/comparacao.json')),
   recortes: () => carregar<{ recortes: Recorte[] }>(import('@/data/mocks/dashboard_recortes.json')),
   unidades: () => carregar<Unidades>(import('@/data/mocks/unidades.json')),
   unidade: () => carregar<Unidade360>(import('@/data/mocks/unidade.json')),
@@ -54,4 +55,7 @@ export const fixtures = {
   respostaInsight: () => carregar<RespostaInsight>(import('@/data/mocks/resposta_insight.json')),
   respostaInsightUnidade: () =>
     carregar<RespostaInsight>(import('@/data/mocks/resposta_insight_unidade.json')),
+  /** Formato do modo real (GOLD_SOURCE=real), fictício; o mock do insight segue o stub do seed. */
+  respostaInsightUnidadeReal: () =>
+    carregar<RespostaInsight>(import('@/data/mocks/resposta_insight_unidade_real.json')),
 }

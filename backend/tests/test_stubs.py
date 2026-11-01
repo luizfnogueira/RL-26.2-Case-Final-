@@ -2,6 +2,7 @@
 from fastapi.testclient import TestClient
 import pytest
 
+from app.core import config
 from app.db.session import get_db
 from app.main import app
 from app.routers import unidades
@@ -50,7 +51,8 @@ class TestPeriodos:
 
 
 class TestDashboard:
-    @pytest.mark.parametrize('filtros', [{'nivel': 'bairro'}, {'nivel': 'classe', 'municipio': 'Recife'}])
+    # Classe não exige pais (ranking consolidado de classes); bairro sem município misturaria homônimos
+    @pytest.mark.parametrize('filtros', [{'nivel': 'bairro'}, {'nivel': 'classe', 'bairro': 'Boa Vista'}])
     def test_nivel_exige_filtros_ascendentes(self, filtros):
         erro(client.get('/dashboard', params={**PERIODOS, **filtros}), 422, 'DADOS_INVALIDOS')
 
@@ -150,7 +152,12 @@ class TestIA:
 
 class TestInsight:
     # O insight da receita lê a ponte real (banco) desde a B5: ver tests/test_insight.py.
-    # Aqui ficam o resumo da unidade (ainda stub) e a validação de entrada.
+    # Aqui ficam o resumo da unidade (stub do seed) e a validação de entrada.
+
+    @pytest.fixture(autouse=True)
+    def modo_seed(self, monkeypatch):
+        # Com GOLD_SOURCE=real a unidade usa a Gold (V1c: tests/test_insight_unidade.py); aqui, o stub
+        monkeypatch.setattr(config, 'GOLD_SOURCE', 'seed')
 
     def test_unidade(self):
         response = client.post('/ia/insight', json=exemplo('pedido_insight_unidade'))

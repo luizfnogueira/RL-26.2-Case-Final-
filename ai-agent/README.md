@@ -13,8 +13,10 @@ Só uma etapa usa o modelo para responder (o agente gerador). As outras são có
 
 | # | Etapa | Arquivo | Tarefa | Estado |
 | --- | --- | --- | --- | --- |
-| 1 | Pré-filtro: bloqueia o óbvio sem chamar o modelo | `guardrails.py` | GENAI-22 | pendente |
-| 1b | Esclarecimento: bairro em vários municípios ou "este ano" voltam com opções, sem tokens | `services/esclarecimento_ia.py` | extra | pronto |
+| 1 | Roteador de intenção: escolhe a rota (`seguranca`, `apresentacao`, `fora_de_escopo`, `esclarecimento`, `dados_ausentes` ou `consulta`) antes de qualquer consulta, sem tokens; só `consulta` segue para o agente | `intencao.py` | extra | pronto |
+| 1a | Pré-filtro: segurança (escrita, injeção, prompt, dados pessoais), saudação e fora de escopo | `guardrails.py` | GENAI-22 | pronto |
+| 1b | Esclarecimento: bairro em vários municípios ou "este ano" voltam com opções | `services/esclarecimento_ia.py` | extra | pronto |
+| 1c | Dados ausentes: todos os anos citados fora de jul/2022 a jun/2026 (exceto datas do cadastro, como ligação e medidor) | `intencao.py` | extra | pronto |
 | 2 | Memória: últimas 3 trocas da conversa e resumo das 10 anteriores | `repositories/interacao_repository.py`, `agent.converter_historico_para_mensagens` | GENAI-11, 13 | pronto |
 | 3 | IR: liga "Jaboatão" ao valor do banco | `entidades.py` | GENAI-8 | pendente (hoje `valores_distintos` usa listas fixas) |
 | 4 | SS: escolhe 1 ou 2 skills | `roteador.py`, `skills/` | GENAI-7, 23 | `receita.md` pronta; demais skills pendentes |
@@ -30,10 +32,11 @@ Só uma etapa usa o modelo para responder (o agente gerador). As outras são có
 Caminho de uma pergunta com `IA_MODO=real`:
 
 1. O backend cria o `conversa_id` na primeira pergunta e carrega as últimas trocas daquela conversa.
-2. `responder()` escolhe as skills, monta as instruções (regras críticas no começo e no fim) e roda o agente com `UsageLimits(request_limit=6)`.
-3. O agente preenche o plano, chama `consultar_gold`, corrige o SQL se der erro e devolve o texto com marcadores (`{v1}`), que o código preenche com os valores do resultado.
-4. A ponte confere a resposta contra o contrato, grava a troca em `ia.interacao` e devolve a resposta com `apresentacao` e `detalhes_tecnicos`.
-5. Falha do provedor, estouro do prazo (`IA_TIMEOUT_S` − 5 s) ou resposta fora do contrato: 503 `AGENTE_INDISPONIVEL`. No insight, falha vira o texto por regra, nunca 503.
+2. O roteador de intenção classifica a pergunta (`Intencao`, schema Pydantic). As rotas que não consultam o banco respondem na hora: segurança com `bloqueado`, fora de escopo e dados ausentes com `nao_sei`, esclarecimento com `esclarecer`. Se o agente não conseguir comprovar o número na rota `consulta`, a resposta também sai `nao_sei`.
+3. `responder()` escolhe as skills, monta as instruções (regras críticas no começo e no fim) e roda o agente com `UsageLimits(request_limit=6)`.
+4. O agente preenche o plano, chama `consultar_gold`, corrige o SQL se der erro e devolve o texto com marcadores (`{v1}`), que o código preenche com os valores do resultado.
+5. A ponte confere a resposta contra o contrato, grava a troca em `ia.interacao` e devolve a resposta com `apresentacao` e `detalhes_tecnicos`.
+6. Falha do provedor, estouro do prazo (`IA_TIMEOUT_S` − 5 s) ou resposta fora do contrato: 503 `AGENTE_INDISPONIVEL`. No insight, falha vira o texto por regra, nunca 503.
 
 ## Segurança em camadas
 

@@ -15,6 +15,7 @@ import { formatarPeriodo } from '@/utils/periodos'
 import BlocoDiagnostico from './BlocoDiagnostico'
 import { BlocoChamados, BlocoConsumo, BlocoFaturas, BlocoInterrupcoes } from './BlocosHistorico'
 import { BlocoCadastro, BlocoGeracao, BlocoMedidor } from './BlocosCadastrais'
+import ResumoUnidadeIA from './ResumoUnidadeIA'
 
 const ESTILO_LINK =
   'inline-flex items-center gap-2 rounded-full border border-borda bg-surface-card px-4 py-2 text-corpo text-ink hover:bg-surface-alt'
@@ -69,6 +70,12 @@ export default function DetalheUnidade({ id }: { id: string }) {
     >
       <CabecalhoUnidade unidade={dados} />
       <BlocoDiagnostico diagnostico={dados.diagnostico_conta} consumo={dados.consumo} />
+      {/* Sob demanda; a key faz o card voltar ao estado inicial ao trocar de UC ou de período */}
+      <ResumoUnidadeIA
+        key={`${dados.cadastro.id_uc}|${dados.periodo_referencia}`}
+        idUc={dados.cadastro.id_uc}
+        periodo={dados.periodo_referencia}
+      />
       {/*
         Primeiro o que explica a conta (consumo e faturas), depois cadastro e histórico de atendimento.
         Consumo e faturas em largura inteira, um abaixo do outro: lado a lado, a lista de faturas

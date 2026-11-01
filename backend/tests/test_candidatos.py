@@ -361,3 +361,48 @@ class TestCandidatosNoBanco:
         )
         assert response.status_code == 422
         assert response.json()["codigo"] == "DADOS_INVALIDOS"
+
+    def test_uc_inspecionada_recentemente_sai_da_fila(self, client, engine):
+        antes = self.get(client, page_size=200)
+        candidato = next(
+            item for item in antes["items"]
+            if item["acao_recomendada"] == "INSPECAO_PRIORITARIA"
+        )
+        criada = client.post(
+            "/inspecoes",
+            json={
+                "id_uc": candidato["id_uc"],
+                "equipe_responsavel": "Equipe A1",
+                "motivo": "Teste de inspeção recente.",
+            },
+        )
+        id_ordem = criada.json()["id_ordem"]
+        assert client.patch(f"/inspecoes/{id_ordem}", json={"status": "EM_CAMPO"}).status_code == 200
+        concluida = client.patch(
+            f"/inspecoes/{id_ordem}",
+            json={
+                "status": "CONCLUIDA",
+                "resultado": {
+                    "irregularidade_detectada": False,
+                    "kwh_recuperado": 0,
+                    "observacoes": "Nada encontrado em campo.",
+                    "inspetor": "Inspetor de teste",
+                },
+            },
+        )
+        assert concluida.status_code == 200, concluida.text
+
+        depois = self.get(client, page_size=200)
+        assert candidato["id_uc"] not in {item["id_uc"] for item in depois["items"]}
+        assert depois["total"] == antes["total"] - 1
+        assert depois["resumo"]["ucs_priorizadas"]["valor"] == depois["total"]
+        assert any("últimos 6 meses" in obs for obs in depois["metadados"]["observacoes"])
+
+        # Passada a janela, a UC volta se a Gold ainda a priorizar
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE portal.ordens_inspecao SET data_conclusao = now() - interval '7 months' "
+                     "WHERE id_ordem = :id"),
+                {"id": id_ordem},
+            )
+        assert candidato["id_uc"] in {item["id_uc"] for item in self.get(client, page_size=200)["items"]}

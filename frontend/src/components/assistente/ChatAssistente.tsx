@@ -9,14 +9,13 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
-import { USUARIO_MOCK } from '@/data/usuario.mock'
+import { useIdentidade } from '@/auth/useIdentidade'
 import { cx } from '@/utils/cx'
 import { useAssistente } from './contexto'
 import MensagemAssistente from './MensagemAssistente'
 import { PERGUNTAS_DE_TESTE, PERGUNTAS_SUGERIDAS, SUGESTOES_POR_CATEGORIA } from './sugestoes'
 
 const LIMITE = 2000
-const PRIMEIRO_NOME = USUARIO_MOCK.nome.split(' ')[0]
 
 type Props = {
   /** Painel flutuante (estreito) ou tela /assistente (larga). */
@@ -84,6 +83,8 @@ const ABAS: { id: Aba; rotulo: string }[] = [
 
 /** Conversa do Assistente: abas de conversa e de sugestões, campo livre e aviso de somente leitura. */
 export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = false }: Props) {
+  const usuario = useIdentidade()
+  const primeiroNome = usuario.cargo ? usuario.nome.split(' ')[0] : ''
   const { mensagens, enviando, perguntar, tentarNovamente, limpar } = useAssistente()
   const [texto, setTexto] = useState('')
   const [aba, setAba] = useState<Aba>('conversa')
@@ -273,8 +274,8 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
                   <Sparkles size={16} strokeWidth={1.75} />
                 </span>
                 <p className="rounded-[14px] bg-surface-alt px-3.5 py-2.5 text-corpo">
-                  Olá, {PRIMEIRO_NOME}. Posso consultar os dados consolidados da V-Energy. O que
-                  você gostaria de saber?
+                  Olá{primeiroNome ? `, ${primeiroNome}` : ''}. Posso consultar os dados
+                  consolidados da V-Energy. O que você gostaria de saber?
                 </p>
               </div>
             </>

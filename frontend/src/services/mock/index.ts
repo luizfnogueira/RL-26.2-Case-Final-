@@ -5,7 +5,14 @@ import { montarComparacao } from './comparacao'
 import { montarDashboard } from './dashboard'
 import { listarFiltros } from './filtros'
 import { gerarInsightMock, responderPergunta } from './ia'
-import { atualizarOrdem, criarOrdem, listarCandidatos, listarOrdens } from './ordens'
+import {
+  atualizarOrdem,
+  criarOrdem,
+  criarOrdensEmLote,
+  indicadoresDasOrdens,
+  listarCandidatos,
+  listarOrdens,
+} from './ordens'
 import { montarOperacao } from './operacao'
 import { detalharUnidade, listarUnidades } from './unidades'
 import { atrasar, clonar, erroApi, type Registro } from './util'
@@ -55,6 +62,14 @@ export async function atenderMock(
       if (segundo === 'candidatos') {
         exigirMetodo(metodo, 'GET')
         return listarCandidatos(consulta)
+      }
+      if (segundo === 'indicadores') {
+        exigirMetodo(metodo, 'GET')
+        return indicadoresDasOrdens(consulta)
+      }
+      if (segundo === 'lote') {
+        exigirMetodo(metodo, 'POST')
+        return criarOrdensEmLote(corpoComoRegistro(corpo))
       }
       if (segundo === undefined) {
         if (metodo === 'GET') return listarOrdens(consulta)

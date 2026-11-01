@@ -2,6 +2,7 @@ import { CircleAlert, CircleHelp, RotateCw, Shield, Sparkles, TriangleAlert } fr
 import { Fragment, type ReactNode } from 'react'
 import type { ApiError } from '@/services/erro-api'
 import { cx } from '@/utils/cx'
+import { PERIODO_ATUAL_PADRAO, formatarMes } from '@/utils/periodos'
 import ComoCheguei from './ComoCheguei'
 import type { Mensagem } from './contexto'
 import GraficoResposta from './GraficoResposta'
@@ -75,6 +76,22 @@ function textoDoErro(erro: ApiError): string {
   return `Não foi possível responder agora (${erro.codigo}). ${mantida}`
 }
 
+/** Último mês da Gold: o fim da janela atual do case (jun/2026). */
+const ULTIMO_MES_GOLD = PERIODO_ATUAL_PADRAO.slice(-7)
+
+/** "Dados até Jun/2026 · base carregada em 24/10/2026": até onde vão os dados e de quando é a carga. */
+function RodapeDaBase({ goldAtualizadaEm }: { goldAtualizadaEm: string | null }) {
+  const carga = goldAtualizadaEm ? new Date(goldAtualizadaEm) : null
+  return (
+    <p className="mt-2 text-legenda text-ink-2">
+      Dados até {formatarMes(ULTIMO_MES_GOLD)}
+      {carga && !Number.isNaN(carga.getTime()) && (
+        <> · base carregada em {carga.toLocaleDateString('pt-BR')}</>
+      )}
+    </p>
+  )
+}
+
 const ICONE = { size: 16, strokeWidth: 1.75 }
 const TITULO_NAO_SEI = 'Não sei responder com os dados disponíveis'
 
@@ -94,7 +111,12 @@ type Props = {
 }
 
 /** Uma resposta do assistente em um dos estados: carregando, ok, não sei, bloqueado, esclarecer ou erro. */
-export default function MensagemAssistente({ mensagem, aoTentarNovamente, aoEscolher, enviando }: Props) {
+export default function MensagemAssistente({
+  mensagem,
+  aoTentarNovamente,
+  aoEscolher,
+  enviando,
+}: Props) {
   if (mensagem.estado === 'carregando') {
     return (
       <Fala icone={<Sparkles {...ICONE} />}>
@@ -176,6 +198,7 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, aoEsco
         <p className="mb-1 font-medium">{TITULO_NAO_SEI}</p>
         <p>{semTitulo(resposta.resposta, TITULO_NAO_SEI)}</p>
         <ComoCheguei resposta={resposta} />
+        <RodapeDaBase goldAtualizadaEm={resposta.metadados.gold_atualizada_em} />
       </Fala>
     )
   }
@@ -190,6 +213,7 @@ export default function MensagemAssistente({ mensagem, aoTentarNovamente, aoEsco
         <GraficoResposta grafico={resposta.grafico} dados={resposta.dados} />
       )}
       <ComoCheguei resposta={resposta} />
+      <RodapeDaBase goldAtualizadaEm={resposta.metadados.gold_atualizada_em} />
     </Fala>
   )
 }

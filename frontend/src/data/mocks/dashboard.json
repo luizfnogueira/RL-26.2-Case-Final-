@@ -9,7 +9,7 @@
   },
   "indicadores": {
     "receita_faturada": {
-      "rotulo": "Receita faturada",
+      "rotulo": "Receita faturada (com tributos)",
       "atual": {
         "valor": 284700000.0,
         "unidade": "BRL",

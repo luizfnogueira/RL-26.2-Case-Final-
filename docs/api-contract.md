@@ -12,6 +12,7 @@ Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos
 - `metadados.dados_ficticios=true` identifica o mock. `gold_atualizada_em` é timestamp da última carga **de dados**, distinto de `gerado_em` da IA. Neste stub ambos são fictícios; o front formata “hoje, 06:15” a partir do timestamp, sem texto fixo.
 - `page=1`, `page_size=20` por padrão; limites 1 e 100. Resposta paginada: `{items, page, page_size, total}`. `total` após filtros, antes da paginação; página além do fim retorna `items: []`.
 - Filtros geográficos combinam por AND; `bairro` exige `municipio`. Campos extras de escrita: 422.
+- As rotas de negócio e `GET /` exigem `Authorization: Bearer <access_token>`. Cadastro e login são públicos; `GET /health`, `/docs` e `/openapi.json` também não exigem token. As operações `/auth` estão detalhadas na seção 2.1 e persistem em `portal.usuarios`, independentemente de `GOLD_SOURCE` ou dos mocks de negócio do frontend.
 
 ### Períodos e filtros
 
@@ -27,6 +28,8 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | GET /unidades/{id} | periodo_atual opcional, sempre de 12 meses; sem ele, os 12 meses até o último mês da Gold |
 | GET /inspecoes/candidatos | periodo_atual obrigatório; comparação opcional; município, bairro, classe, alimentador; sem_ordem_ativa; page, page_size |
 | GET /inspecoes | id_uc, status, periodo_atual (data de criação); município, bairro, classe, alimentador; page, page_size |
+| POST /inspecoes/lote | corpo `{"ordens": [...]}` com 1 a 200 itens no formato do POST /inspecoes |
+| GET /inspecoes/indicadores | periodo_conclusao opcional (data de conclusão); município, bairro, classe, alimentador |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
 | POST /ia | pergunta |
 | GET /filtros | sem parâmetros |
@@ -40,7 +43,7 @@ Os cenários analíticos estão preparados para as duas janelas anuais acima. Ou
 
 Esses limites de cenário não se aplicam a `GET /operacao`: a API consulta o PostgreSQL nos modos `seed` e `real`, aceita qualquer período válido e retorna apenas os meses disponíveis na fonte. Um recorte sem dados retorna 200 com séries e rankings vazios.
 
-Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeção, que são lidas do schema `portal`. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. POST/PATCH das demais rotas usam snapshot: alterações não persistem entre chamadas. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
+Filtros e paginação dos mocks operam sobre exemplos locais. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. As ordens na API persistem no schema `portal`, e `/auth` sempre usa contas persistidas em `portal.usuarios`; o comportamento de snapshot dos exemplos não se aplica à autenticação. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
 
 ## 2. Erros
 
@@ -53,17 +56,186 @@ Filtros e paginação operam sobre exemplos locais, exceto as ordens de inspeç�
 | 400 | TRANSICAO_INVALIDA | Estado atual não permite a transição |
 | 400 | JUSTIFICATIVA_OBRIGATORIA | Cancelamento sem justificativa |
 | 400 | RESULTADO_INCOMPLETO | Conclusão sem resultado |
+| 401 | CREDENCIAIS_INVALIDAS | E-mail/senha incorretos, conta inexistente ou inativa no login; mensagem genérica |
+| 401 | NAO_AUTENTICADO | Token ausente, inválido ou expirado; conta inativa/inexistente ou perfil do token diferente do atual |
+| 403 | CONVITE_INVALIDO | Código de convite não corresponde ao configurado no servidor; não cria conta |
 | 404 | UC_INEXISTENTE | UC não disponível no cadastro/cenário |
 | 404 | ORDEM_NAO_ENCONTRADA | ID de ordem inexistente |
 | 409 | ORDEM_ATIVA_EXISTENTE | UC já tem ordem ABERTA ou EM_CAMPO |
+| 409 | EMAIL_JA_CADASTRADO | E-mail já cadastrado, após normalização, em `POST /auth/register` |
 | 422 | DADOS_INVALIDOS | Tipos, formato ou campos incompatíveis, inclusive resultado inconsistente |
+| 422 | LOTE_REJEITADO | Alguma UC do lote falhou na validação; nenhuma ordem foi criada. `detalhes.falhas` lista `{id_uc, codigo, mensagem}` de cada UC |
 | 422 | CENARIO_STUB_INDISPONIVEL | Consulta válida, mas fora dos cenários simulados |
 | 422 | DECOMPOSICAO_INDISPONIVEL | Insight da receita fora de P1 × P2, com filtro de alimentador ou em recorte sem decomposição na Gold |
 | 500 | ERRO_INTERNO | Falha inesperada, sem detalhes internos na resposta |
 | 503 | AGENTE_INDISPONIVEL | Agente de IA fora do ar, sem resposta dentro do `IA_TIMEOUT_S` ou com resposta fora do contrato |
-| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` |
+| 503 | GOLD_NAO_CARREGADA | Gold não carregada no banco (`gold.dim_mes` vazia); hoje em `GET /unidades/{id}` e no `POST /ia/insight` de unidade com `GOLD_SOURCE=real` |
+| 503 | AUTH_INDISPONIVEL | `JWT_SECRET` não configurado; impede cadastro, login e acesso às rotas protegidas |
+| 503 | CADASTRO_INDISPONIVEL | `AUTH_INVITE_CODE` não configurado; impede somente novos cadastros, sem impedir login de contas existentes |
 
 `AppException` e HTTPException passam pelo handler comum. Os códigos de domínio seguem `app/core/exceptions.py`. `nao_sei` e `bloqueado` são estados válidos de resposta da IA (HTTP 200), não erros de transporte.
+
+## 2.1 Autenticação e perfil — /auth
+
+O [README](../README.md) descreve a criação dos `.env`, geração da chave, definição do
+convite, inicialização e cadastro pelo portal. Os exemplos abaixo são **fictícios**;
+marcadores de convite, senha e token devem ser substituídos no ambiente de teste e nunca
+representam credenciais padrão da aplicação. Respostas de AUTH não têm `metadados`
+analíticos nem dependem dos períodos da Gold.
+
+### Usuário público e sessão
+
+`UsuarioPublico` contém somente os campos abaixo. Não devolve senha, hash, convite,
+chave JWT, estado interno da conta ou dados da Gold.
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "nome": "Pessoa de Exemplo",
+  "cargo": null,
+  "email": "pessoa@example.com",
+  "perfil": "usuario"
+}
+```
+
+| Campo | Contrato |
+| --- | --- |
+| `id` | String UUID emitida pelo servidor. |
+| `nome` | Nome cadastrado, com espaços externos removidos. |
+| `cargo` | String opcional de apresentação, até 80 caracteres, ou `null`. Não define permissões. |
+| `email` | E-mail normalizado em minúsculas, sem espaços externos, único no banco. |
+| `perfil` | `usuario` ou `administrador`, definido pelo servidor; o cadastro público sempre cria `usuario`. |
+
+JWT assinado com HS256, validade de **3.600 segundos (60 minutos)**. Claims internos:
+`sub` (ID da conta), `perfil`, `iat` e `exp`. Assinatura e expiração são verificadas pelo
+servidor; a conta deve existir, estar ativa e continuar com o perfil registrado no token.
+Modificar o texto de `cargo` não modifica esse perfil. Os sucessos das quatro operações
+abaixo usam `Cache-Control: no-store` e `Pragma: no-cache`.
+
+### POST /auth/register — criar conta com convite
+
+Público, sem token. `Content-Type: application/json`.
+
+```json
+{
+  "nome": "Pessoa de Exemplo",
+  "email": "pessoa@example.com",
+  "senha": "SUBSTITUA_PELA_SUA_SENHA",
+  "convite": "SUBSTITUA_PELO_CONVITE_DO_AMBIENTE"
+}
+```
+
+| Campo | Validação |
+| --- | --- |
+| `nome` | Obrigatório, string de 2 a 120 caracteres, após remover espaços externos. |
+| `email` | Obrigatório, formato válido, até 254 caracteres. Domínios reservados como `.test` não são aceitos. |
+| `senha` | Obrigatória, de 8 a 128 caracteres. Espaços fazem parte da senha; não são removidos nem há truncamento. |
+| `convite` | Obrigatório, de 1 a 128 caracteres após remover espaços externos. Comparação sensível a maiúsculas/minúsculas com `AUTH_INVITE_CODE` do backend. |
+
+Campos extras, como `perfil`, `ativo`, `id` ou `cargo`, são rejeitados com 422. O convite
+atual é compartilhado por ambiente, sem consumo por cadastro, uso único ou expiração
+própria. Não é armazenado como atributo da conta. A senha é persistida somente como
+hash Argon2id, e a unicidade do e-mail também é garantida pelo banco.
+
+**201:** `UsuarioPublico`, como no exemplo acima. O cadastro **não emite token** e
+não autentica automaticamente. O frontend retorna a `/login` com o e-mail preenchido;
+não há confirmação por e-mail.
+
+**Erros:** 403 `CONVITE_INVALIDO`, 409 `EMAIL_JA_CADASTRADO`,
+422 `DADOS_INVALIDOS`, 503 `AUTH_INDISPONIVEL` ou `CADASTRO_INDISPONIVEL`.
+Convite ausente/vazio é erro de validação (422); convite preenchido, mas incorreto,
+retorna 403. Nenhum desses casos cria a conta.
+
+### POST /auth/login — entrar
+
+Público, sem token. `Content-Type: application/json`.
+
+```json
+{
+  "email": "pessoa@example.com",
+  "senha": "SUBSTITUA_PELA_SUA_SENHA"
+}
+```
+
+`email` segue a normalização e o limite do cadastro; `senha` deve conter de 1 a 128
+caracteres e é verificada sem remover espaços. Campos extras, inclusive `convite`,
+são rejeitados. O convite é usado somente para criar a conta.
+
+**200:**
+
+```json
+{
+  "access_token": "<JWT_EMITIDO_PELO_SERVIDOR>",
+  "token_type": "bearer",
+  "usuario": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "nome": "Pessoa de Exemplo",
+    "cargo": null,
+    "email": "pessoa@example.com",
+    "perfil": "usuario"
+  }
+}
+```
+
+**Erros:** 401 `CREDENCIAIS_INVALIDAS`, 422 `DADOS_INVALIDOS` e
+503 `AUTH_INDISPONIVEL`. E-mail inexistente, senha incorreta ou conta inativa retornam
+a mesma mensagem: `E-mail ou senha inválidos.` O 401 inclui `WWW-Authenticate: Bearer`.
+No frontend, esse 401 não dispara o tratamento de expiração de outra sessão.
+
+### GET /auth/me — consultar a própria conta
+
+Exige `Authorization: Bearer <access_token>`. Sem corpo ou filtros de região.
+
+**200:** `UsuarioPublico` da conta identificada pelo token. `cargo` pode ser `null`.
+
+**Erros:** 401 `NAO_AUTENTICADO` (com `WWW-Authenticate: Bearer`) e
+503 `AUTH_INDISPONIVEL`. O 401 também cobre token adulterado, sem assinatura aceita,
+expirado, conta removida/inativa e mudança do perfil no banco após a emissão do token.
+
+### PATCH /auth/me — alterar Cargo ou área da própria conta
+
+Exige `Authorization: Bearer <access_token>` e `Content-Type: application/json`.
+
+```json
+{"cargo": "Analista de Operação"}
+```
+
+O único campo permitido é `cargo`, obrigatório no corpo, com string de até 80 caracteres
+após remover espaços externos, ou `null`. String vazia/só de espaços vira `null`.
+Para remover o cargo personalizado:
+
+```json
+{"cargo": null}
+```
+
+**200:** `UsuarioPublico` completo e atualizado. A mudança persiste em `portal.usuarios`
+e aparece no próximo login ou `GET /auth/me`. Sem cargo personalizado, o frontend mostra
+o perfil de acesso abaixo do nome.
+
+Não aceita ID de outra conta, nome, e-mail, senha, `perfil` ou outros campos. O usuário
+alvo é sempre obtido do token, e a operação não altera permissões.
+
+**Erros:** 401 `NAO_AUTENTICADO`, 422 `DADOS_INVALIDOS` e
+503 `AUTH_INDISPONIVEL`. Os erros de validação usam o formato comum
+`{"codigo":"DADOS_INVALIDOS","mensagem":"..."}`, sem devolver os valores recebidos.
+
+### Sessão no frontend e alcance das permissões
+
+- O token fica no `localStorage`, chave `venergy_token`. O cliente HTTP o envia somente
+  à API; `POST /auth/register` e `POST /auth/login` não levam esse cabeçalho.
+- Antes de montar uma tela privada, o frontend valida a conta em `GET /auth/me`.
+  Um 401 fora do login/cadastro limpa a sessão local e retorna a `/login`, preservando
+  apenas destinos internos conhecidos e os filtros. Não há tela separada de sessão ou expiração.
+- Logout remove o token local; **não há endpoint de logout, refresh ou revogação de JWT**.
+  Um token copiado continua sujeito à validade de 60 minutos e à conferência da conta/perfil.
+- Hoje `usuario` e `administrador` têm as mesmas permissões de leitura e escrita nas
+  rotas de negócio, inclusive ordens de inspeção, respeitando as validações de cada rota.
+  Não há filtro de dados por perfil. Hierarquia de acesso ainda precisa de decisão do time;
+  escrever `Administrador` em `cargo` não concede esse perfil.
+- Ainda não há limite de tentativas ou bloqueio temporário no login. A política de
+  tentativas e a definição das contas/convite de demo ficam pendentes de alinhamento.
+- `VITE_USE_MOCKS=true` não simula AUTH: API e PostgreSQL continuam necessários para
+  cadastro, login e perfil. As antigas flags de prévia não desabilitam a proteção.
 
 ## 3. GET /dashboard — Telas 1 e 2
 
@@ -75,19 +247,20 @@ GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06
 
 - `indicadores`: exatamente seis KPIs — receita_faturada, energia_faturada, ucs_ativas, inadimplencia, dec_medio, fec_medio. Cada um tem atual, comparação, diferença e variação percentual; campos não aplicáveis retornam null.
 - Definições da Gold (`agg_kpis_mensal`; com filtro, as mesmas regras sobre `fato_uc_mes`):
-  - `receita_faturada` = Σ `valor_total` (com tributos).
+  - `receita_faturada` = Σ `valor_total` (com tributos). Rótulo na tela: **“Receita faturada (com tributos)”**; a ponte da Tela 2 usa a receita de energia, sem tributos.
   - `energia_faturada` = Σ `consumo_kwh_valido` do `fato_uc_mes` (consumo sem as leituras negativas não recuperadas).
   - `ucs_ativas` = UCs **ligadas até o fim do último mês** de cada janela (`data_ligacao`; sem data, conta sempre), a mesma regra do Cc da `gold.fato_alimentador_mes`: o retrato da base de clientes, como as distribuidoras reportam.
   - `inadimplencia` = Σ `valor_total` das faturas `EM ABERTO` no período (`valor_em_aberto` da Gold); inclui o percentual da receita em cada período e a variação em pontos percentuais. Rótulo na tela: **“Valor em aberto”**. No mercado, inadimplência é o valor **vencido** e não pago; nesta base o histórico termina em jun/2026 e toda fatura em aberto já venceu, então os dois números coincidem.
   - `dec_medio` / `fec_medio` = soma dos DEC/FEC mensais da janela; cada mês divide pelas UCs atendidas naquele mês (Cc mensal). Seguem as regras da `gold.agg_dec_fec_mensal`: interrupções de 3 minutos ou mais (PRODIST Módulo 8), sem oscilação e sem ocorrências anteriores à ligação da UC, com a duração efetiva (sem contar em dobro o tempo sobreposto). Com filtro de bairro, classe ou alimentador, retornam null: a continuidade só é agregada por alimentador e município.
 - `serie_historica`: 48 pontos mensais, jul/2022–jun/2026, cada um com receita e energia. A janela da série é independente das duas janelas de comparação.
 - `ponte_receita`: decompõe a **receita de energia** (sem tributos), como `gold.agg_preco_volume`: receita_energia_comparacao + efeito_preco + efeito_volume = receita_energia_atual, sem resíduo. Exemplo do stub: 205,9 + 24,7 − 8,2 = 222,4 milhões. efeito_volume = (kWh atual − kWh comparação) × tarifa de comparação, por recorte e depois somado; efeito_preco = variação da receita de energia − efeito_volume. reajuste_percentual = variação da tarifa média de energia. Não há parcela de bandeira/mix.
-- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado por maior queda absoluta em kWh, depois nome.
-- Nível bairro exige município; nível classe exige município e bairro. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
+- `drill_down`: nível, breadcrumb e lista paginada; receita de energia, volume, variação, queda em kWh, efeitos em BRL e filtros para cada linha. Ordenado pelo efeito-volume em BRL, da maior perda de receita por volume (mais negativo) para a menor, depois nome.
+- Nível bairro exige município (bairros homônimos existem em vários municípios). Nível classe aceita qualquer combinação dos pais: sem filtros é o ranking das classes de toda a área; com município, as classes do município; com município e bairro, as do bairro. O breadcrumb traz só os pais enviados. Ao selecionar uma linha, reenviar seus filtros com o próximo nível. Remover filtros descendentes ao voltar pelo breadcrumb.
 
 ```http
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=bairro&municipio=Recife
 GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe&municipio=Recife&bairro=Boa%20Vista
+GET /dashboard?periodo_atual=2025-07/2026-06&periodo_comparacao=2022-07/2023-06&nivel=classe
 ```
 
 A API lê os efeitos pré-calculados em `gold.agg_preco_volume` e só os soma; não refaz a decomposição. A tabela existe para P1 × P2 (`periodo_atual=2025-07/2026-06`, `periodo_comparacao=2022-07/2023-06`) e por município, bairro e classe. Fora disso — outras janelas ou filtro de alimentador — `ponte_receita` vem com todos os valores null e `drill_down` com a lista vazia, e `metadados.observacoes` diz o motivo; os KPIs e a série seguem calculados normalmente.
@@ -156,11 +329,11 @@ GET /unidades/UC-DEMO-001?periodo_atual=2025-07/2026-06
 
     | Ano anterior | Média acima | Média em linha | Média abaixo |
     | --- | --- | --- | --- |
-    | subiu | Consumo subiu | Consumo subindo ao longo do ano | Consumo caindo nos últimos meses |
+    | subiu | Consumo subiu | Consumo subindo ao longo do ano | Consumo maior que no mesmo mês do ano anterior |
     | em linha | Alta sazonal | **Consumo estável** | **Consumo caiu** |
-    | caiu | Consumo voltou a subir | **Consumo caiu** | **Consumo caiu** |
+    | caiu | Consumo menor que no mesmo mês do ano anterior | **Consumo caiu** | **Consumo caiu** |
 
-    Orientação: quando o consumo subiu contra as duas bases ou só contra uma com a outra em linha, o aumento do consumo explica a conta; nos casos em negrito (queda ou estabilidade), uma conta maior vem de tarifa, bandeira ou tributos, não do consumo; nos sinais opostos, diz contra qual base o consumo explica a conta. Sem ano anterior, usa só a média (Consumo acima da média, em linha com a média ou abaixo da média). Mês sem consumo válido ("Sem consumo válido") e mês sem ano anterior nem meses anteriores com consumo ("Sem base de comparação") não são avaliados e têm `orientacao` null. No veredito e no alerta o mês vem por extenso (`jun/2026`); nos indicadores segue `YYYY-MM`.
+    Orientação: quando o consumo subiu contra as duas bases ou só contra uma com a outra em linha, o aumento do consumo explica a conta; nos casos em negrito (queda ou estabilidade), uma conta maior vem do preço da energia (tarifa ou bandeira tarifária), não do consumo; os tributos ficam de fora porque são uma fração fixa do valor na Gold (25%). Nos sinais opostos, vale o mesmo mês do ano anterior, e a orientação explica por quê: a média dos 12 meses mistura meses de consumo alto e baixo, enquanto o mesmo mês do ano anterior desconta a época do ano. Subiu no ano e abaixo da média: o consumo subiu e pode explicar uma conta mais alta. Caiu no ano e acima da média: o consumo não explica uma conta mais alta; se o valor subiu, a causa é o preço da energia (tarifa ou bandeira tarifária). Sem ano anterior, usa só a média (Consumo acima da média, em linha com a média ou abaixo da média). Mês sem consumo válido ("Sem consumo válido") e mês sem ano anterior nem meses anteriores com consumo ("Sem base de comparação") não são avaliados e têm `orientacao` null. No veredito e no alerta o mês vem por extenso (`jun/2026`); nos indicadores segue `YYYY-MM`.
   - **Alerta** (`leitura_estimada`, `alerta`): o alerta não muda o veredito, só diz quanto confiar nele. `leitura_estimada` é true quando o mês analisado **ou** o mesmo mês do ano anterior tem leitura `ESTIMADA`. `alerta` junta uma frase para cada caso: leitura estimada no mês analisado, leitura estimada no ano anterior (comparação fraca) e **primeira leitura após troca de medidor** (`fato_uc_mes.flag_primeira_leitura_pos_troca`) em qualquer dos dois meses. Sem nenhum caso, null.
 - `faturas_abertas`: **todas** as faturas `EM ABERTO` da UC, de qualquer mês. São o estado atual do cliente, não um recorte de período. `faturas_pagas`: as `PAGA` com `mes_referencia` dentro da janela. `status` e `bandeira_tarifaria` seguem os domínios da Gold (`PAGA`/`EM ABERTO`; `VERDE`, `AMARELA`, `VERMELHA P1`, `VERMELHA P2`).
 - `interrupcoes_recentes`: até 10, as mais recentes da janela. `total_interrupcoes`: todas as da janela, em `interrupcoes`. Ambas seguem as regras do DEC/FEC (`gold_dec_fec`), para a Visão 360 bater com a Operação: sem oscilação (`flag_sem_interrupcao`: a energia não falta), sem ocorrências anteriores à ligação (`flag_antes_ligacao`), só com 3 minutos ou mais (PRODIST) e só com duração efetiva > 0 (a interrupção inteira dentro de outra da mesma UC é o mesmo apagão). `duracao_min` é a `duracao_efetiva_min` da Gold, a mesma que o DEC soma: desconta o trecho sobreposto, então pode ser menor que encerramento − abertura. Contagens são inteiros no JSON: `total_interrupcoes.valor` (ex.: `3`, nunca `3.0`) e `duracao_min` (minutos inteiros, como na Gold). O mês da ocorrência é o da hora registrada. As flags da Gold não aparecem cruas na resposta.
@@ -179,7 +352,7 @@ GET /inspecoes/candidatos?periodo_atual=2025-07/2026-06&page=1&page_size=50
 
 **200 — [JSON completo da resposta](../backend/app/services/fixtures/candidatos.json)**
 
-O padrão retorna todas as UCs com `status_triagem=ELEGIVEL` em `tb_fila_perdas`, incluindo as duas ações recomendadas. `page_size` é 50 por padrão e aceita de 1 a 200; `page` começa em 1. O único filtro próprio da fila é `sem_ordem_ativa` (booleano, padrão `false`): quando `true`, oculta as UCs com ordem `ABERTA` ou `EM_CAMPO`. O total e os indicadores de UCs priorizadas, potencial de recuperação e ordens ativas são calculados depois desse filtro e antes da paginação; `ucs_analisadas` continua representando o universo da auditoria após os filtros geográficos.
+O padrão retorna todas as UCs com `status_triagem=ELEGIVEL` em `tb_fila_perdas`, incluindo as duas ações recomendadas. UCs com ordem `CONCLUIDA` nos últimos 6 meses (pela `data_conclusao` no portal) ficam fora da fila, com ou sem irregularidade encontrada; passada a janela, voltam se a Gold ainda as priorizar. `page_size` é 50 por padrão e aceita de 1 a 200; `page` começa em 1. O único filtro próprio da fila é `sem_ordem_ativa` (booleano, padrão `false`): quando `true`, oculta as UCs com ordem `ABERTA` ou `EM_CAMPO`. O total e os indicadores de UCs priorizadas, potencial de recuperação e ordens ativas são calculados depois desses filtros e antes da paginação; `ucs_analisadas` continua representando o universo da auditoria após os filtros geográficos.
 
 Cada candidato inclui `acao_recomendada` (`INSPECAO_PRIORITARIA` ou `VALIDACAO_DOCUMENTAL`), além de ID, localização, classe, alimentador, posição, motivos[], energia estimada, score (0–100), `confianca_evidencia` (`ALTA`, `MEDIA`, `BAIXA` ou `INDETERMINADA`), ordem_ativa e id_ordem_ativa. Os filtros geográficos município, bairro, classe e alimentador são mantidos; não há filtros por motivo ou status nesta rota. Ordenar como `gold.tb_fila_perdas`: score decrescente, `energia_estimada` (`kwh_estimado`) decrescente e ID crescente; posição global após todos os filtros (na Gold, `posicao_fila`). `score` não é probabilidade de fraude e `energia_estimada` é uma estimativa, não energia comprovada.
 
@@ -205,7 +378,7 @@ Reutiliza os modelos e regras do Gabriel (`schemas/inspecao.py`), com adaptadore
 - Fluxo: ABERTA → EM_CAMPO → CONCLUIDA; cancelar em ABERTA ou EM_CAMPO. Status finais não reabrem.
 - `data_prevista` é campo, não status. Uma ordem ativa por UC.
 - Resposta usa id_ordem inteiro, id_uc, equipe_responsavel, datas, motivo, kwh_estimado, observacoes, resultado e historico[].
-- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado, observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
+- Resultado público: **irregularidade_detectada** (bool), tipo_irregularidade, kwh_recuperado (**kWh por mês** da irregularidade, estimado em campo; 0 sem irregularidade), observacoes obrigatórias, data_inspecao/inspetor opcionais. O alias interno `irregularidade` do modelo do Gabriel não é o nome de saída da API V2.
 - Com irregularidade: tipo obrigatório e kWh não negativo. Sem irregularidade: tipo null e kWh zero. Não há `classificacao` ou `INCONCLUSIVA` neste contrato, para corresponder ao modelo existente.
 - `historico[]`: id_historico, id_ordem, status_anterior, status_novo, data_mudanca, usuario, justificativa_ou_motivo e detalhes.
 
@@ -253,6 +426,42 @@ Content-Type: application/json
 
 **201 — [JSON completo da resposta](../backend/app/services/fixtures/ordem_criada.json)**
 
+### POST /inspecoes/lote
+
+Cria de 1 a 200 ordens de uma vez (seleção múltipla da Tela 4), **tudo ou nada**. Cada UC passa pelas mesmas validações do `POST /inspecoes` antes de qualquer gravação: UC inexistente, UC com ordem ABERTA/EM_CAMPO, UC em `VALIDACAO_DOCUMENTAL` ou UC repetida no lote. Se uma falhar, nenhuma ordem é criada e a resposta lista todas as falhas:
+
+```json
+{
+  "codigo": "LOTE_REJEITADO",
+  "mensagem": "Nenhuma ordem do lote foi criada: corrija as UCs listadas em detalhes.falhas.",
+  "detalhes": {
+    "falhas": [
+      {"id_uc": "UC-DEMO-002", "codigo": "ORDEM_ATIVA_EXISTENTE", "mensagem": "A Unidade Consumidora 'UC-DEMO-002' já possui a ordem ativa #1 com status 'ABERTA'."}
+    ]
+  }
+}
+```
+
+Com todas válidas, as ordens e seus eventos de histórico são gravados num único commit. Se uma ordem ativa for criada em paralelo entre a validação e a gravação, o índice único barra, o lote inteiro é desfeito e a resposta é 409 `ORDEM_ATIVA_EXISTENTE`.
+
+[Corpo de exemplo](../backend/app/services/fixtures/criar_inspecoes_lote.json) · **201 — [resposta](../backend/app/services/fixtures/ordens_criadas_lote.json)**: `{"items": [Ordem, ...], "total": n}`, na ordem do pedido.
+
+### GET /inspecoes/indicadores
+
+Resultado das inspeções concluídas, para saber se a fila está acertando. Calculado só sobre ordens `CONCLUIDA`; os filtros de região seguem o cadastro da UC e `periodo_conclusao` filtra pela data de conclusão (sem ele, todas as concluídas).
+
+| Campo | Cálculo |
+| --- | --- |
+| `concluidas` | Ordens concluídas no recorte |
+| `com_irregularidade` | Concluídas com `irregularidade_detectada = true` |
+| `taxa_acerto_pct` | `com_irregularidade ÷ concluidas × 100`, uma casa; `null` sem concluídas |
+| `ordens_comparadas` | Concluídas com `kwh_estimado`; só elas entram nas duas somas de kWh abaixo |
+| `kwh_mes_campo` | Σ `resultado.kwh_recuperado` dessas ordens, em kWh/mês (informado em campo) |
+| `kwh_mes_fila` | Σ `kwh_estimado` dessas ordens ÷ 3, em kWh/mês. O `kwh_estimado` da `tb_fila_perdas` é `queda_kwh_mensal × meses_atuais`, uma janela de 3 meses |
+| `por_motivo` | Para cada motivo da suspeita: concluídas, com irregularidade e taxa. O motivo vem do campo `motivo` da ordem, com os motivos da fila separados por ` · `; uma ordem com dois motivos conta nos dois. Ordenado por concluídas e depois pela taxa |
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/indicadores_ordens.json)**
+
 ### PATCH /inspecoes/{id}
 
 ```http
@@ -298,7 +507,7 @@ Cancelamento (ordem 1 ou 2):
 
 Resposta completa da ordem com histórico acrescentado. Campos não enviados permanecem; não permite trocar UC, ID ou data de criação. A equipe pode mudar ao iniciar campo. Combinações de campos inválidas: 422; transição inválida: 400.
 
-Persistência: `GET`, `POST` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
+Persistência: `GET`, `POST`, `POST /lote` e `PATCH /inspecoes` leem e gravam no schema `portal`. A ordem e o evento de histórico são gravados no mesmo commit. O índice único parcial `uq_ordens_inspecao_uc_ativa` impede duas ordens ABERTA/EM_CAMPO para a mesma UC; a segunda criação concorrente recebe 409 `ORDEM_ATIVA_EXISTENTE`. Ordens concluídas ou canceladas não bloqueiam uma nova ordem.
 
 ## 8. GET /operacao — Tela 6
 
@@ -413,7 +622,7 @@ Blocos de `detalhes_tecnicos`. Campos novos da telemetria são aceitos e o front
 | `consulta` | `sql_executado`, `tentativas` e `linhas` |
 | `tokens_tempo` | `tokens_entrada`, `tokens_saida`, `tokens_raciocinio`, `chamadas`, `latencia_total_ms`, `etapas_ms{}`, `modelo`, `provedor` e `cache` |
 | `verificacoes` | `sql_validado`, `numeros_conferidos` e `confianca` (`alta`, `media` ou `baixa`) |
-| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). |
+| `avaliacao` | Resumo do último run da avaliação (`avaliacao_ultima.json`, GENAI-27) ou `null` quando ainda não houve. Chaves esperadas: `executado_em`, `n_perguntas`, `configuracao`, `acuracia_execucao`, `taxa_invencao`, `bloqueio_ataques`, `f1_macro` e `por_status{ok, nao_sei, bloqueado}` com `precisao`, `recall` e `f1` (razões de 0 a 1). A Tela 7 mostra `taxa_invencao` como "Taxa de invenção" e `por_status.nao_sei.recall` como "Não sei correto" (das perguntas sem resposta possível, quantas o agente admitiu não saber). |
 
 As métricas de `avaliacao` medem o conjunto de perguntas com gabarito, não esta resposta. As verificações desta resposta ficam em `verificacoes`.
 
@@ -520,7 +729,9 @@ Para UC360:
 {"contexto":"unidade","id_uc":"UC-DEMO-001","filtros":{"periodo_atual":"2025-07/2026-06"},"indicadores":[]}
 ```
 
-**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
+O comportamento depende de `GOLD_SOURCE`, como no GET /unidades/{id}.
+
+**Com `GOLD_SOURCE=seed` (stub).** **200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade.json)**
 
 Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos nomes e valores de `diagnostico_conta` em GET /unidades/{id}:
 
@@ -532,6 +743,46 @@ Retorna título/texto e os quatro números do diagnóstico da UC, com os mesmos 
 | variacao_percentual | Variação sobre o ano anterior | % | mês analisado |
 
 `indicadores` pode ir vazio; se enviado, precisa conter esses quatro com os valores do cenário (senão 422 `DADOS_INVALIDOS`). A exigência de seis números pertence ao insight da receita. Front refaz a consulta ao mudar filtros e descarta respostas antigas; falha de insight não bloqueia indicadores/gráficos.
+
+**Com `GOLD_SOURCE=real` (V1c).** O resumo explica se o valor da conta do mês analisado está alto, normal ou baixo contra o mesmo mês do ano anterior, e por quê. Os números saem do mesmo diagnóstico e dos mesmos dados do GET /unidades/{id} (`backend/app/services/fatos_unidade.py`), mais o valor total e a bandeira das duas faturas (`fato_uc_mes`). O código decide os motivos (consumo, preço médio por kWh, os dois juntos ou GD conectada no período) e os avisos (leitura estimada, troca de medidor, faturas em aberto, preço por kWh fora do padrão; com a leitura do mês analisado estimada, o aviso diz que o consumo pode ser ajustado na próxima leitura real); o texto só redige a partir deles (`backend/app/services/texto_unidade.py`): até 4 frases, números sem sinal e direção em palavras. Nome, CPF, endereço, coordenadas e identificadores nunca entram nos fatos.
+
+- `filtros.periodo_atual` é a janela da Visão 360 e precisa ter 12 meses (como no GET); `periodo_comparacao` e os filtros de região são ignorados. Fora de 12 meses: 422 `DADOS_INVALIDOS`.
+- `indicadores` é **ignorado**: a resposta não usa nada do navegador, então enviá-los não muda nada.
+- `IA_MODO=real`: o modelo redige pelo mesmo agente de insight da receita (`escrever_insight`, com as instruções da unidade em `backend/app/services/redacao_ia_unidade.py`), no prazo de 20 s (ou `IA_TIMEOUT_S` − 5 s, se for menor): o texto por regra está pronto na hora, então o atendente não espera mais que isso pela IA. O chat e a receita seguem com `IA_TIMEOUT_S` − 5 s. Ele recebe o caso já decidido (situação, motivos, contexto e avisos, em palavras) e os valores como marcadores formatados; todo número do texto sai de marcador. O título é sempre o do código ("Valor da conta subiu", "… caiu", "… estável", "Sem base de comparação"). Depois, uma conferência de cobertura recusa o texto da IA se faltar o valor da conta do mês, o do mesmo mês do ano anterior e os dois meses no formato da tela, como "jun/2026" (quando houver ano anterior), ou o número-chave de algum motivo ou aviso, se houver avisos e o texto não disser "verificar" ou "verifique", se tiver número por extenso (de "dois" em diante, com as formas femininas, "por cento", "reais", "centavos" ou "quilowatt"; "um"/"uma" e o mês abreviado como "dez/2025" não contam), se repetir a unidade que o marcador já traz ("R$ R$", "kWh kWh", "% %"), se citar a geração própria conectada antes do período sem citar o ano anterior na mesma frase (para não sugerir que ela explica a mudança), se a leitura do mês analisado for estimada e o texto não disser que o consumo pode ser ajustado na "próxima leitura", se passar de 4 frases, se tiver sinal ou hífen, identificador interno ou chave sobrando, "bandeira" sem bandeira no caso (ou o contrário: bandeira no caso sem a palavra "bandeira"), geração própria/solar/painel sem GD no caso, média e geração própria na mesma frase, ou "a conta" sem "o valor da". As instruções pedem os dois valores em reais (o do mês e o do mesmo mês do ano anterior) na primeira frase, e o caso traz a frase de avisos inteira como molde ("Pontos a verificar: …"), com os itens separados por ponto e vírgula. Texto aceito: sem observação extra (selo "Gerado por IA"), e `numeros_utilizados` traz os números do caso que aparecem no texto da IA.
+- Qualquer falha vira o texto por regra, com uma observação começando por `Texto alternativo:` (o front usa o prefixo para o selo, como na receita): `o módulo de IA não respondeu; …` (prazo, erro do provedor, validador do agente insistindo no erro), `o texto da IA não passou na conferência; …` ou `sem valor da conta no mês para a IA redigir; …`. Nunca 503.
+- `IA_MODO=mock`: sempre o texto por regra, com `Texto alternativo: IA_MODO=mock; resumo montado por regra sobre os números da Gold.`
+- Erros iguais aos do GET /unidades/{id}: UC inexistente, 404 `UC_INEXISTENTE`; Gold não carregada, 503 `GOLD_NAO_CARREGADA`.
+
+**200 — [JSON completo da resposta](../backend/app/services/fixtures/resposta_insight_unidade_real.json)** (fictício: UC-DEMO-001, com o valor de jun/2025 inventado, em `IA_MODO=mock`, ou seja, o texto por regra; abaixo, um trecho)
+
+```json
+{
+  "titulo": "Valor da conta subiu",
+  "texto": "O valor da conta de jun/2026 foi de R$ 486,00, 42% acima de jun/2025 (R$ 342,70). O consumo subiu 38%, de 298 kWh para 412 kWh. A unidade tem geração própria desde fev/2025, já presente no mesmo mês do ano anterior. Pontos a verificar: a leitura de jun/2026 foi estimada (o consumo pode ser ajustado na próxima leitura real) e há 1 fatura em aberto, de R$ 486,00.",
+  "numeros_utilizados": [
+    {"nome": "valor_conta_mes", "rotulo": "Valor da conta", "valor": 486.0, "unidade": "BRL", "periodo_referencia": "2026-06"},
+    {"nome": "variacao_valor_conta", "rotulo": "Aumento do valor da conta", "valor": 41.81, "unidade": "%", "periodo_referencia": "2026-06"},
+    "…"
+  ]
+}
+```
+
+`numeros_utilizados` traz **só os números que aparecem no texto, na ordem do texto**, então a lista varia por caso. Todo valor vem sem sinal; a direção está no rótulo (ex.: "Aumento do valor da conta", "Queda do consumo", "Consumo abaixo da média"). Nomes possíveis:
+
+| nome | rótulo | unidade | período de referência |
+| --- | --- | --- | --- |
+| valor_conta_mes | Valor da conta | BRL | mês analisado |
+| variacao_valor_conta | Aumento / Queda do valor da conta | % | mês analisado |
+| valor_conta_ano_anterior | Valor da conta no mesmo mês do ano anterior | BRL | mesmo mês, ano anterior |
+| variacao_consumo_ano_anterior | Aumento / Queda do consumo | % | mês analisado |
+| consumo_ano_anterior | Consumo no mesmo mês do ano anterior | kWh | mesmo mês, ano anterior |
+| consumo_mes | Consumo do mês | kWh | mês analisado |
+| variacao_preco_kwh | Aumento / Queda do preço médio por kWh | % | mês analisado |
+| preco_kwh_ano_anterior | Preço médio por kWh no mesmo mês do ano anterior | BRL | mesmo mês, ano anterior |
+| preco_kwh_mes | Preço médio por kWh | BRL | mês analisado |
+| desvio_consumo_media | Consumo acima / abaixo da média | % | mês analisado |
+| media_consumo | Média de consumo | kWh | 12 meses anteriores ao mês analisado |
+| faturas_em_aberto_valor | Faturas em aberto (valor somado) | BRL | mês analisado (referência; as faturas podem ser de qualquer mês) |
 
 ## 10.1 GET /filtros — opções dos filtros de região
 

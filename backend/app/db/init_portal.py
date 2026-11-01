@@ -2,7 +2,8 @@
 from sqlalchemy import text
 from app.db.base import IABase, PortalBase
 from app.db.session import engine
-from app.models import ia, portal  # noqa: F401
+from app.models import ia, portal, usuario  # noqa: F401
+from app.db.init_auth import criar_tabela
 
 
 def main():
@@ -13,6 +14,7 @@ def main():
         conn.execute(text('CREATE SCHEMA IF NOT EXISTS ia'))
         IABase.metadata.create_all(conn)
         ia.atualizar_restricoes(conn)
+    criar_tabela()
 
 
 if __name__ == '__main__':
