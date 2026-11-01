@@ -190,3 +190,77 @@ def montar_detalhes_tecnicos(
         "verificacoes": telemetria.verificacoes,
         "avaliacao": carregar_resumo_avaliacao(),
     }
+
+
+def construir_detalhes_tecnicos_guia(
+    *,
+    pergunta: str,
+    status: str,
+    secoes_enviadas_ids: list[str],
+    secoes_usadas_ids: list[str],
+    resultado_run: Any | None,
+    modelo_nome: str,
+    provedor_nome: str,
+    latencia_total_ms: int,
+    etapas_ms: dict[str, int],
+    resposta_validada: bool = True,
+    justificativa: str | None = None,
+) -> dict[str, Any]:
+    """Empacota tokens, latência e verificações do agente do guia no contrato de DetalhesTecnicos (T5)."""
+    tokens_in = 0
+    tokens_out = 0
+    tokens_reasoning = 0
+    requests_count = 0
+    acoes: list[AcaoFerramenta] = []
+
+    if resultado_run is not None:
+        uso = extrair_uso_run(resultado_run)
+        if uso is not None:
+            tokens_in = int(getattr(uso, "input_tokens", 0) or 0)
+            tokens_out = int(getattr(uso, "output_tokens", 0) or 0)
+            tokens_reasoning = int(getattr(uso, "output_reasoning_tokens", 0) or 0)
+            requests_count = int(getattr(uso, "requests", 0) or 0)
+        acoes = extrair_acoes_do_run(resultado_run)
+
+    premissas = [
+        "Resposta elaborada exclusivamente a partir do Guia da Plataforma (sem acesso ao banco de dados).",
+    ]
+    if secoes_enviadas_ids:
+        premissas.append(f"Seções consultadas no guia: {', '.join(secoes_enviadas_ids)}.")
+    if secoes_usadas_ids:
+        premissas.append(f"Seções citadas na resposta: {', '.join(secoes_usadas_ids)}.")
+
+    return {
+        "estrutura_pensamento": {
+            "pergunta_interpretada": pergunta,
+            "plano": None,
+            "skills": ["guia_plataforma"],
+            "premissas": premissas,
+            "justificativa": justificativa,
+        },
+        "acoes": [acao.model_dump() for acao in acoes],
+        "consulta": {
+            "sql_executado": None,
+            "tentativas": 0,
+            "linhas": 0,
+        },
+        "tokens_tempo": {
+            "tokens_entrada": tokens_in,
+            "tokens_saida": tokens_out,
+            "tokens_raciocinio": tokens_reasoning,
+            "chamadas": requests_count,
+            "latencia_total_ms": latencia_total_ms,
+            "etapas_ms": etapas_ms,
+            "modelo": modelo_nome,
+            "provedor": provedor_nome,
+            "cache": False,
+        },
+        "verificacoes": {
+            "sql_validado": None,
+            "numeros_conferidos": resposta_validada,
+            "consumo_negativo_filtrado": True,
+            "confianca": 1.0 if status == "ok" and resposta_validada else None,
+        },
+        "avaliacao": carregar_resumo_avaliacao(),
+    }
+

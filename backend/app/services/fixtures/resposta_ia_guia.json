@@ -1,0 +1,23 @@
+{
+  "resposta": "A aba Assistente V-Energy fica no menu lateral, em IA & dados. Nela você pergunta em português sobre os dados da V-Energy (receita, consumo, falta de luz, perdas, atendimento e painel solar) e recebe a resposta na hora, em texto, tabela ou gráfico.\n\nComo usar:\n1. Escreva a pergunta no campo Sua pergunta, como falaria com um colega.\n2. Clique em Enviar.\n3. Para continuar, pergunte só o que muda, por exemplo \"E só comercial?\".\n\nSem saber o que perguntar? Abra a aba Sugestões. Em qualquer tela, o botão Pergunte à IA abre o assistente num painel ao lado.",
+  "sql": null,
+  "tabelas": [],
+  "dados": {
+    "colunas": [],
+    "linhas": []
+  },
+  "status": "ok",
+  "gerado_em": "2026-10-21T09:12:00-03:00",
+  "metadados": {
+    "dados_ficticios": true,
+    "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
+    "observacoes": [
+      "Resposta pré-definida do stub; não há agente conectado."
+    ],
+    "fonte": "guia",
+    "secoes_guia": [
+      { "id": "assistente", "titulo": "Assistente V-Energy" }
+    ]
+  },
+  "apresentacao": "texto"
+}

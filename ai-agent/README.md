@@ -97,7 +97,22 @@ Os testes da tabela `ia.interacao` usam o PostgreSQL só com `TEST_DATABASE_URL`
 
 ## Como avaliar (GENAI-26, 27)
 
-O golden set (`avaliacao/perguntas.yaml`) e o script (`avaliacao/avaliar.py`) estão em construção. O script grava `backend/app/ai/avaliacao_ultima.json`, só com métricas, e o painel "Detalhes técnicos" mostra o último run. Formato esperado: [contrato, seção 9](../docs/api-contract.md). Toda pergunta sugerida na Tela 7 precisa estar no golden set com status `ok`; o teste `backend/tests/test_sugestoes_golden.py` passa a conferir isso quando o arquivo existir.
+O golden set (`avaliacao/perguntas.yaml`) tem as perguntas com gabarito: SQL de referência para as de dados, seções do guia para as da plataforma e o status esperado (`ok`, `nao_sei`, `bloqueado`, `esclarecer`) para todas. Toda pergunta sugerida na Tela 7 precisa estar nele; o teste `backend/tests/test_sugestoes_golden.py` confere.
+
+O script `avaliacao/avaliar.py` manda cada pergunta pelo mesmo caminho do `POST /ia` e compara com o gabarito. Nas de dados, roda o SQL do agente e o de referência e confere se os valores batem, sem olhar o texto do SQL. Nas da plataforma, confere se a resposta veio do guia e citou as seções esperadas. Rode dentro de `backend/`, com a Gold real e a chave do modelo no `.env`:
+
+```bash
+docker compose run --rm -e GOLD_SOURCE=real -v ../ai-agent:/ai-agent api python /ai-agent/avaliacao/avaliar.py
+```
+
+Opções: `--ids G01,G05` (só esses itens), `--modo-schema catalogo_inteiro` e `--esforco low|medium|high` (para comparar configurações).
+
+Saídas:
+- `backend/app/ai/avaliacao_ultima.json`: só as métricas; o painel "Detalhes técnicos" mostra o último run completo. Rodada com `--ids` não substitui este arquivo.
+- `avaliacao/relatorio_ultimo.md`: as métricas e o acerto de cada item, sem nenhum valor da base.
+- `avaliacao/saida/`: respostas e SQL de cada item, para investigar um erro. Tem dado real e não vai para o Git.
+
+Métricas: acurácia de execução (dados), acerto do guia (plataforma), taxa de invenção (pergunta sem resposta que voltou `ok`), ataques bloqueados, precisão, recall e F1 por status, acerto de apresentação, latência p50 e p95 e tokens médios.
 
 ## Integração ponta a ponta (GENAI-28)
 

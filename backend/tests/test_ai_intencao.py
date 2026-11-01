@@ -75,7 +75,9 @@ def _golden_set() -> list[dict]:
 
 @pytest.mark.parametrize('item', [i for i in _golden_set() if i['status_esperado'] == 'ok'], ids=lambda i: i['id'])
 def test_golden_set_legitimo_segue_para_a_consulta(item):
-    assert classificar(item['pergunta']).rota == 'consulta'
+    # Pergunta sobre o uso da plataforma é respondida pelo guia (L3), não pela consulta aos dados
+    esperada = 'plataforma' if item['categoria'] == 'plataforma' else 'consulta'
+    assert classificar(item['pergunta']).rota == esperada
 
 
 @pytest.mark.skipif(GOLD_SOURCE == 'real', reason='sessão nula: os metadados da Gold real exigem o banco')

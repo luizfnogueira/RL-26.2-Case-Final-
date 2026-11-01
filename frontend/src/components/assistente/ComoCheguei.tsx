@@ -1,6 +1,6 @@
-import { ChevronRight, ChevronUp, Cpu, Database } from 'lucide-react'
+import { BookOpen, ChevronRight, ChevronUp, Cpu, Database } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
-import type { CelulaIA, RespostaIA } from '@/types/ia'
+import type { CelulaIA, RespostaIA, SecaoGuiaIA } from '@/types/ia'
 import DetalhesTecnicos from './DetalhesTecnicos'
 
 /** Linhas mostradas na minitabela; o resto fica indicado no rodapé. */
@@ -19,7 +19,10 @@ function rotulo(coluna: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
-type Props = { resposta: Pick<RespostaIA, 'sql' | 'tabelas' | 'dados' | 'detalhes_tecnicos'> }
+type Props = {
+  resposta: Pick<RespostaIA, 'sql' | 'tabelas' | 'dados' | 'detalhes_tecnicos'> &
+    Partial<Pick<RespostaIA, 'metadados'>>
+}
 type Aba = 'auditoria' | 'detalhes'
 
 function Alternar(props: {
@@ -55,7 +58,10 @@ export default function ComoCheguei({ resposta }: Props) {
   const idAuditoria = useId()
   const idDetalhes = useId()
   const { sql, tabelas, dados, detalhes_tecnicos: detalhes } = resposta
-  const temAuditoria = Boolean(sql) || tabelas.length > 0 || dados.linhas.length > 0
+  const secoesGuia =
+    resposta.metadados?.fonte === 'guia' ? (resposta.metadados.secoes_guia ?? []) : []
+  const temAuditoria =
+    Boolean(sql) || tabelas.length > 0 || dados.linhas.length > 0 || secoesGuia.length > 0
   if (!temAuditoria && !detalhes) return null
   const alternar = (qual: Aba) => setAba((atual) => (atual === qual ? null : qual))
 
@@ -67,7 +73,13 @@ export default function ComoCheguei({ resposta }: Props) {
             aberto={aba === 'auditoria'}
             controla={idAuditoria}
             aoClicar={() => alternar('auditoria')}
-            icone={<Database size={15} aria-hidden="true" />}
+            icone={
+              secoesGuia.length > 0 ? (
+                <BookOpen size={15} aria-hidden="true" />
+              ) : (
+                <Database size={15} aria-hidden="true" />
+              )
+            }
           >
             Como cheguei nisso
           </Alternar>
@@ -83,8 +95,42 @@ export default function ComoCheguei({ resposta }: Props) {
           </Alternar>
         )}
       </div>
-      {aba === 'auditoria' && <Auditoria id={idAuditoria} resposta={resposta} />}
+      {aba === 'auditoria' &&
+        (secoesGuia.length > 0 ? (
+          <AuditoriaGuia id={idAuditoria} secoes={secoesGuia} />
+        ) : (
+          <Auditoria id={idAuditoria} resposta={resposta} />
+        ))}
       {aba === 'detalhes' && detalhes && <DetalhesTecnicos id={idDetalhes} detalhes={detalhes} />}
+    </div>
+  )
+}
+
+/** Resposta sobre o uso da plataforma: veio do guia, não do banco; lista as seções em que se apoiou. */
+function AuditoriaGuia({ id, secoes }: { id: string; secoes: SecaoGuiaIA[] }) {
+  return (
+    <div
+      id={id}
+      className="mt-2 flex max-w-md flex-col gap-3 rounded-md border border-borda bg-surface-card p-3"
+    >
+      <p className="text-micro tracking-wider text-teal-escuro uppercase">Como cheguei nisso</p>
+      <p className="text-legenda text-ink">
+        Fonte: <span className="font-medium">Guia da plataforma</span>. Esta resposta explica como
+        usar o portal; nenhum dado foi consultado.
+      </p>
+      <div>
+        <p className="mb-1.5 text-legenda font-medium text-ink">Seções do guia usadas</p>
+        <ul className="flex flex-wrap gap-1.5">
+          {secoes.map((secao) => (
+            <li
+              key={secao.id}
+              className="rounded-full bg-azul-100 px-2.5 py-0.5 text-legenda text-teal-profundo"
+            >
+              {secao.titulo}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

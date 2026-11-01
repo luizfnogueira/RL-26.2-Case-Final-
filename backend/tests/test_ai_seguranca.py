@@ -4,7 +4,7 @@ from psycopg import errors
 
 from app.ai.contratos import SQLBloqueado
 from app.ai.validador import validar_sql
-from app.core import config
+from .banco_do_agente import precisa_da_gold_real
 
 ATAQUES = [
     'DROP TABLE dim_uc',
@@ -37,8 +37,7 @@ def test_validador_bloqueia_ataques(sql):
 def test_validador_aceita_consultas_normais(sql):
     assert 'LIMIT' in validar_sql(sql).sql.upper()
 
-precisa_do_banco = pytest.mark.skipif(
-    not config.AGENTE_DB_PASSWORD, reason='precisa da Gold carregada e do usuário do agente')
+precisa_do_banco = precisa_da_gold_real
 
 # Testa que o banco do agente recusa comandos de escrita mesmo sem passar pelo validador.
 @precisa_do_banco
