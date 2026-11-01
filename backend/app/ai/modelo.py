@@ -46,7 +46,7 @@ ProvedorLLM = Literal["google", "google-gla", "openrouter", "openai", "groq", "t
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 MODELO_PADRAO_OPENROUTER = "nvidia/nemotron-3.5-lightning:free"
-MODELO_PADRAO_GOOGLE = "gemini-2.5-flash-lite"
+MODELO_PADRAO_GOOGLE = "gemini-3.1-flash-lite"
 
 
 class ConfiguracaoLLMError(RuntimeError):

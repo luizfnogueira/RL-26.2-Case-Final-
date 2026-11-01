@@ -104,3 +104,53 @@ def test_texto_longo_demais_vira_texto_alternativo():
 def test_escrever_insight_falha_quando_o_modelo_insiste_no_erro():
     with pytest.raises(UnexpectedModelBehavior):
         escrever_insight({"efeito_preco": "R$ 1,0 milhões"}, modelo=modelo({"titulo": "T", "texto": "1 2 3"}))
+
+
+
+def test_receita_liquida_pede_nova_tentativa_ou_vira_alternativo():
+    com_liquida = {
+        "titulo": "Receita líquida subiu",
+        "texto": "{recorte}, a receita líquida foi de {receita_energia_base} para {receita_energia_atual}.",
+    }
+    usar(gerador(com_liquida, BOM))
+    dados = pedir().json()
+    assert "líquida" not in dados["texto"].lower() and not alternativo(dados)
+
+    usar(gerador(com_liquida))
+    dados_fallback = pedir().json()
+    assert alternativo(dados_fallback)
+
+
+def test_sinal_duplo_e_marcador_sem_rotulo_pedem_nova_tentativa():
+    sinal_duplo = {
+        "titulo": "Preço sustentou a receita",
+        "texto": "{recorte}, houve retração de {efeito_volume} no volume.",
+    }
+    sem_rotulo = {
+        "titulo": "Preço sustentou a receita",
+        "texto": "{recorte}, a alta foi impulsionada pelo {efeito_preco}.",
+    }
+    usar(gerador(sinal_duplo, BOM))
+    assert not alternativo(pedir().json())
+
+    usar(gerador(sem_rotulo, BOM))
+    assert not alternativo(pedir().json())
+
+
+def test_periodos_invertidos_pedem_nova_tentativa():
+    invertido = {
+        "titulo": "Evolução da receita",
+        "texto": "{recorte}, a receita de energia passou de {receita_energia_atual} para {receita_energia_base}.",
+    }
+    usar(gerador(invertido, BOM))
+    assert not alternativo(pedir().json())
+
+
+def test_escrever_insight_aceita_instrucoes_customizadas_para_v1c():
+    saida_uc = {"titulo": "Resumo da UC", "texto": "Consumo médio de {consumo_medio}."}
+    res = escrever_insight(
+        {"consumo_medio": "250 kWh"},
+        modelo=modelo(saida_uc),
+        instrucoes="Escreva o resumo da unidade consumidora usando os marcadores.",
+    )
+    assert res == {"titulo": "Resumo da UC", "texto": "Consumo médio de 250 kWh."}
