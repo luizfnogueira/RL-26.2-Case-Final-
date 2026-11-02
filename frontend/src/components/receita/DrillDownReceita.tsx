@@ -52,7 +52,7 @@ const MAIORES_PERDAS = 5
 function MaioresPerdas({ linhas }: { linhas: LinhaDrill[] }) {
   const perdas = linhas.filter((l) => (l.efeito_volume.valor ?? 0) < 0).slice(0, MAIORES_PERDAS)
   const titulo = (
-    <h3 id="maiores-perdas" className="mb-2 text-legenda text-ink-2">
+    <h3 id="maiores-perdas" className="mb-2 text-legenda font-medium text-ink-2">
       Maiores perdas de receita por volume
     </h3>
   )
@@ -241,7 +241,7 @@ export default function DrillDownReceita({
             <div
               role="group"
               aria-label="Ver por"
-              className="flex gap-1 rounded-full bg-surface-alt p-1"
+              className="flex gap-1 rounded-md border border-borda bg-surface-alt p-1"
             >
               {(
                 [
@@ -255,9 +255,9 @@ export default function DrillDownReceita({
                   aria-pressed={visao === valor}
                   onClick={() => aoMudarVisao(valor)}
                   className={cx(
-                    'cursor-pointer rounded-full px-3 py-1 text-legenda transition-colors',
+                    'cursor-pointer rounded-sm px-3 py-1.5 text-legenda font-medium transition-colors',
                     visao === valor
-                      ? 'bg-surface-card font-medium text-teal-profundo shadow-sm'
+                      ? 'bg-surface-card text-teal-profundo shadow-sm'
                       : 'text-ink-2 hover:text-ink',
                   )}
                 >

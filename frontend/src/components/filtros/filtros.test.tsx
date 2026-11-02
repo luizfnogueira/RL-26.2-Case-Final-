@@ -111,11 +111,7 @@ function Sonda({ aoLer }: { aoLer: (busca: string) => void }) {
 }
 
 describe('BarraDeFiltros', () => {
-  const renderizar = (
-    url: string,
-    campos: readonly CampoFiltro[] = CAMPOS,
-    opcoes = OPCOES,
-  ) => {
+  const renderizar = (url: string, campos: readonly CampoFiltro[] = CAMPOS, opcoes = OPCOES) => {
     let busca = ''
     const resultado = render(
       <MemoryRouter initialEntries={[url]}>
@@ -188,12 +184,14 @@ describe('BarraDeFiltros', () => {
     expect(lista('Período atual').value).toBe(ATUAL)
   })
 
-  it('"Limpar filtros" só aparece com filtro ativo e restaura os padrões', () => {
+  it('"Limpar filtros" fica visível e só habilita com filtro ativo', () => {
     renderizar('/receita')
-    expect(screen.queryByRole('button', { name: 'Limpar filtros' })).toBeNull()
+    const limpar = () => screen.getByRole('button', { name: 'Limpar filtros' }) as HTMLButtonElement
+    expect(limpar().disabled).toBe(true)
     fireEvent.change(lista('Classe'), { target: { value: 'Industrial' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(limpar().disabled).toBe(false)
+    fireEvent.click(limpar())
     expect(lista('Classe').value).toBe('')
-    expect(screen.queryByRole('button', { name: 'Limpar filtros' })).toBeNull()
+    expect(limpar().disabled).toBe(true)
   })
 })

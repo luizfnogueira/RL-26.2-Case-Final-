@@ -14,7 +14,13 @@ const NOME_DO_TIPO = { barras: 'barras', pizza: 'pizza', linhas: 'linhas' }
  * Gráfico da resposta (contrato, seção 9), quando a API devolve `apresentacao: "grafico"`. O
  * backend escolhe o tipo e já manda os valores do banco ordenados; aqui só se desenha.
  */
-export default function GraficoResposta({ grafico, dados }: { grafico: GraficoIA; dados: DadosIA }) {
+export default function GraficoResposta({
+  grafico,
+  dados,
+}: {
+  grafico: GraficoIA
+  dados: DadosIA
+}) {
   const [comoTabela, setComoTabela] = useState(false)
   const formatos = formatosDoGrafico(grafico)
   const descricao = `${grafico.titulo}. Gráfico de ${NOME_DO_TIPO[grafico.tipo]} com ${grafico.categorias.length} itens.`

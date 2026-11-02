@@ -8,6 +8,7 @@ import { tokenStorage } from '@/auth/tokenStorage'
 import { useRetornoAoLogin } from '@/auth/useRetornoAoLogin'
 import AcoesCabecalho from '@/layouts/AcoesCabecalho'
 import BarraSuperiorMobile from '@/layouts/BarraSuperiorMobile'
+import TemaProvider from '@/theme/TemaProvider'
 import AuthPage from './AuthPage'
 
 vi.mock('@/services/env', () => ({ API_URL: 'http://localhost:8000', USE_MOCKS: false }))
@@ -51,40 +52,42 @@ function sair() {
 }
 function abrir(url = '/login', protegido = false) {
   return render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/login" element={<AuthPage etapa="login" />} />
-          <Route path="/cadastro" element={<AuthPage etapa="cadastro" />} />
-          <Route path="/dev/auth/:etapa" element={<RedirecionarAuthLegado />} />
-          <Route
-            path="/painel"
-            element={
-              protegido ? (
-                <ExigirAutenticacao>
+    <TemaProvider>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[url]}>
+          <Routes>
+            <Route path="/login" element={<AuthPage etapa="login" />} />
+            <Route path="/cadastro" element={<AuthPage etapa="cadastro" />} />
+            <Route path="/dev/auth/:etapa" element={<RedirecionarAuthLegado />} />
+            <Route
+              path="/painel"
+              element={
+                protegido ? (
+                  <ExigirAutenticacao>
+                    <Portal />
+                  </ExigirAutenticacao>
+                ) : (
                   <Portal />
-                </ExigirAutenticacao>
-              ) : (
-                <Portal />
-              )
-            }
-          />
-          <Route
-            path="/receita"
-            element={
-              protegido ? (
-                <ExigirAutenticacao>
+                )
+              }
+            />
+            <Route
+              path="/receita"
+              element={
+                protegido ? (
+                  <ExigirAutenticacao>
+                    <Portal />
+                  </ExigirAutenticacao>
+                ) : (
                   <Portal />
-                </ExigirAutenticacao>
-              ) : (
-                <Portal />
-              )
-            }
-          />
-        </Routes>
-        <Endereco />
-      </MemoryRouter>
-    </AuthProvider>,
+                )
+              }
+            />
+          </Routes>
+          <Endereco />
+        </MemoryRouter>
+      </AuthProvider>
+    </TemaProvider>,
   )
 }
 function preencherLogin() {

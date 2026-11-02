@@ -54,7 +54,9 @@ describe('barras', () => {
     const nome = textos.find((t) => t.textContent === 'Efeito Volume') as SVGTextElement
     const valor = textos.find((t) => t.textContent?.includes('5,0 mi')) as SVGTextElement
     const larguraDoValor = (valor.textContent ?? '').length * 6.6
-    expect(Number(valor.getAttribute('x')) - larguraDoValor).toBeGreaterThan(Number(nome.getAttribute('x')))
+    expect(Number(valor.getAttribute('x')) - larguraDoValor).toBeGreaterThan(
+      Number(nome.getAttribute('x')),
+    )
   })
 
   it('barras agrupadas afastam as barras para os valores não se encostarem', () => {
@@ -68,7 +70,9 @@ describe('barras', () => {
         { nome: 'Receita energia', valores: [117830394.38, 127300000] },
       ],
     })
-    const valores = [...figura.querySelectorAll('text')].filter((t) => t.textContent?.startsWith('R$'))
+    const valores = [...figura.querySelectorAll('text')].filter((t) =>
+      t.textContent?.startsWith('R$'),
+    )
     const [total, energia] = valores.slice(0, 2).map((t) => Number(t.getAttribute('x')))
     const larguraDoTexto = (valores[0].textContent ?? '').length * 6.6
     expect(energia - total).toBeGreaterThanOrEqual(larguraDoTexto)
@@ -145,22 +149,33 @@ describe('tabela, notas e segurança', () => {
   })
 
   it('mostra a nota do backend antes do gráfico', () => {
-    const nota = 'O gráfico mostra os 4 municípios de maior valor; os outros 10 estão em “Ver como tabela”.'
+    const nota =
+      'O gráfico mostra os 4 municípios de maior valor; os outros 10 estão em “Ver como tabela”.'
     const figura = desenhar(resposta(exemploBarras), { nota, omitidos: 10 })
     const aviso = within(figura).getByText(nota)
-    expect(aviso.compareDocumentPosition(within(figura).getAllByRole('img')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      aviso.compareDocumentPosition(within(figura).getAllByRole('img')[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('sem nota, diz quantos itens ficaram de fora', () => {
     const figura = desenhar(resposta(exemploBarras), { nota: null, omitidos: 3 })
-    expect(within(figura).getByText(/Mais 3 itens ficaram de fora do gráfico; estão em “Ver como tabela”/)).toBeTruthy()
+    expect(
+      within(figura).getByText(
+        /Mais 3 itens ficaram de fora do gráfico; estão em “Ver como tabela”/,
+      ),
+    ).toBeTruthy()
   })
 
   it('rótulo vindo da resposta é texto, nunca HTML', () => {
     const ataque = '<img src=x onerror=alert(1)>'
     const r = resposta(exemploBarras)
     const grafico = r.grafico as GraficoIA
-    const figura = desenhar(r, { titulo: ataque, categorias: [ataque, ...grafico.categorias.slice(1)] })
+    const figura = desenhar(r, {
+      titulo: ataque,
+      categorias: [ataque, ...grafico.categorias.slice(1)],
+    })
     expect(figura.querySelector('img')).toBeNull()
     expect(within(figura).getByText(ataque)).toBeTruthy()
   })
@@ -181,7 +196,9 @@ describe('na conversa', () => {
     })
     fireEvent.click(within(painel).getByRole('button', { name: 'Enviar' }))
     await vi.waitFor(() => expect(within(painel).getByRole('figure')).toBeTruthy())
-    expect(within(painel).queryByRole('table', { name: 'Resposta do assistente em tabela' })).toBeNull()
+    expect(
+      within(painel).queryByRole('table', { name: 'Resposta do assistente em tabela' }),
+    ).toBeNull()
   })
 
   it.each([

@@ -40,8 +40,12 @@ describe('pedir esclarecimento', () => {
     perguntar.mockResolvedValueOnce(copia(exemploBairro))
     const painel = abrirPainel()
     await enviar(painel, 'Qual a receita do Centro?')
-    expect(within(painel).getByText('O bairro Centro existe em 3 municípios. De qual você quer saber?')).toBeTruthy()
-    const opcoes = within(within(painel).getByRole('list', { name: 'Opções de esclarecimento' })).getAllByRole('button')
+    expect(
+      within(painel).getByText('O bairro Centro existe em 3 municípios. De qual você quer saber?'),
+    ).toBeTruthy()
+    const opcoes = within(
+      within(painel).getByRole('list', { name: 'Opções de esclarecimento' }),
+    ).getAllByRole('button')
     expect(opcoes.map((b) => b.textContent)).toEqual([
       'Centro de Olinda',
       'Centro de Paulista',
@@ -51,7 +55,10 @@ describe('pedir esclarecimento', () => {
   })
 
   it('clicar numa opção reenvia a pergunta completa na mesma conversa', async () => {
-    const esclarecer = { ...copia(exemploBairro), conversa_id: '8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d' }
+    const esclarecer = {
+      ...copia(exemploBairro),
+      conversa_id: '8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d',
+    }
     perguntar.mockResolvedValueOnce(esclarecer).mockResolvedValueOnce(copia(exemploResposta))
     const painel = abrirPainel()
     await enviar(painel, 'Qual a receita do Centro?')
@@ -59,7 +66,9 @@ describe('pedir esclarecimento', () => {
     await vi.waitFor(() => expect(perguntar).toHaveBeenCalledTimes(2))
     expect(perguntar.mock.calls[1][0]).toBe('Qual a receita do Centro (bairro Centro, em Recife)?')
     expect(perguntar.mock.calls[1][2]).toBe(esclarecer.conversa_id)
-    expect(within(painel).getByText('Qual a receita do Centro (bairro Centro, em Recife)?')).toBeTruthy()
+    expect(
+      within(painel).getByText('Qual a receita do Centro (bairro Centro, em Recife)?'),
+    ).toBeTruthy()
   })
 })
 

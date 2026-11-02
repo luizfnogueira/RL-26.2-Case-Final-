@@ -116,10 +116,10 @@ export default function Tabela<T>({
 
   return (
     <div className={cx('flex flex-col gap-3', className)}>
-      <div className="overflow-x-auto rounded-md">
+      <div className="overflow-x-auto rounded-md border border-borda-leve">
         <table className="w-full border-collapse text-corpo" aria-busy={carregando || undefined}>
           <caption className="sr-only">{legenda}</caption>
-          <thead className="bg-azul-100 text-ink">
+          <thead className="bg-surface-alt text-ink-2">
             <tr>
               {colunas.map((coluna) => {
                 const emOrdem = ativa?.coluna === coluna.id ? ativa.direcao : null
@@ -139,7 +139,7 @@ export default function Tabela<T>({
                         : undefined
                     }
                     className={cx(
-                      'px-3 py-2.5 font-medium whitespace-nowrap first:rounded-l-md last:rounded-r-md',
+                      'px-3 py-2.5 text-legenda font-semibold tracking-wide uppercase whitespace-nowrap first:rounded-l-md last:rounded-r-md',
                       alinhamento,
                     )}
                   >
@@ -148,7 +148,7 @@ export default function Tabela<T>({
                         type="button"
                         onClick={() => ordenarPor(coluna.id)}
                         className={cx(
-                          'inline-flex items-center gap-1 rounded-sm font-medium hover:text-teal-profundo',
+                          'inline-flex items-center gap-1 rounded-sm font-semibold hover:text-teal-escuro',
                           coluna.alinhar === 'direita' && 'flex-row-reverse',
                         )}
                       >
@@ -187,8 +187,8 @@ export default function Tabela<T>({
                     onKeyDown={aoClicarLinha ? (e) => aoTeclarLinha(e, linha) : undefined}
                     tabIndex={aoClicarLinha ? 0 : undefined}
                     className={cx(
-                      'border-b border-borda-leve last:border-b-0',
-                      aoClicarLinha && 'cursor-pointer hover:bg-azul-50',
+                      'border-b border-borda-leve transition-colors last:border-b-0',
+                      aoClicarLinha && 'cursor-pointer hover:bg-surface-sutil',
                       carregando && 'opacity-60',
                     )}
                   >

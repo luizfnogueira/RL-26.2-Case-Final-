@@ -14,16 +14,16 @@ export default function ExplicacaoDoResultado({ pontos, atualizando }: Props) {
   return (
     <Card
       titulo="O que explica o resultado?"
-      className={atualizando ? 'opacity-70 transition-opacity' : 'transition-opacity'}
+      className={`h-full ${atualizando ? 'opacity-70 transition-opacity' : 'transition-opacity'}`}
     >
       {pontos.length === 0 ? (
         <p className="text-corpo text-ink-2">
           Sem decomposição de preço e volume para este recorte, não há o que explicar.
         </p>
       ) : (
-        <ol className="divide-y divide-borda-leve">
+        <ol className="flex h-full flex-col justify-between gap-1 divide-y divide-borda-leve">
           {pontos.map((ponto, i) => (
-            <li key={ponto.id} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+            <li key={ponto.id} className="flex flex-1 items-start gap-4 py-4 first:pt-0 last:pb-0">
               <span
                 aria-hidden="true"
                 className={cx(

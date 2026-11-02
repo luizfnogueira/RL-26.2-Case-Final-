@@ -8,7 +8,7 @@ type Props = {
   aoFechar: () => void
   titulo: string
   descricao?: string
-  /** Botões de ação, alinhados à direita (confirmar, cancelar). */
+  /** Ações do rodapé: só a ação principal e, quando houver o que confirmar, "Cancelar". */
   rodape?: ReactNode
   tamanho?: 'sm' | 'md' | 'lg'
   /** Clique no fundo escuro fecha. Desligue em formulários com dados a perder. */
@@ -25,6 +25,9 @@ const FOCAVEIS =
 /**
  * Janela modal: foco preso dentro dela, Esc fecha, a página atrás não rola e o foco volta ao
  * elemento que a abriu. Renderizada no `body` para não herdar `overflow` nem `z-index` do layout.
+ *
+ * O "X" do cabeçalho é o único jeito de fechar sem confirmar. O rodapé nunca repete "Voltar" ou
+ * "Fechar": nele ficam apenas a ação principal e "Cancelar", quando há uma ação a confirmar.
  */
 export default function Modal(props: Props) {
   return props.aberto ? <ModalAberto {...props} /> : null
@@ -81,7 +84,7 @@ function ModalAberto({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-surface-tinta/50 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-surface-tinta/60 p-4 backdrop-blur-[2px]"
       onMouseDown={(evento) => {
         if (fecharAoClicarFora && evento.target === evento.currentTarget) aoFechar()
       }}
@@ -95,13 +98,13 @@ function ModalAberto({
         tabIndex={-1}
         onKeyDown={aoTeclar}
         className={cx(
-          'flex max-h-[90dvh] w-full flex-col rounded-card bg-surface-card shadow-modal outline-none',
+          'flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-card border border-borda bg-surface-card shadow-modal outline-none',
           LARGURAS[tamanho],
         )}
       >
-        <header className="flex items-start justify-between gap-3 px-6 pt-6">
+        <header className="flex items-start justify-between gap-3 border-b border-borda-leve px-6 py-5">
           <div className="min-w-0">
-            <h2 id={idTitulo} className="text-titulo-lg font-normal">
+            <h2 id={idTitulo} className="text-titulo-lg font-medium">
               {titulo}
             </h2>
             {descricao && (
@@ -114,14 +117,14 @@ function ModalAberto({
             type="button"
             onClick={aoFechar}
             aria-label="Fechar"
-            className="-mt-1 -mr-2 grid size-10 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-surface-alt"
+            className="-mt-1 -mr-2 grid size-10 shrink-0 place-items-center rounded-md text-ink-2 transition-colors hover:bg-surface-alt hover:text-ink"
           >
-            <X size={20} strokeWidth={1.5} aria-hidden="true" />
+            <X size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </header>
-        <div className="overflow-y-auto px-6 py-4">{children}</div>
+        <div className="overflow-y-auto px-6 py-5">{children}</div>
         {rodape && (
-          <footer className="flex flex-wrap justify-end gap-2 border-t border-borda-leve px-6 py-4">
+          <footer className="flex flex-wrap justify-end gap-2 border-t border-borda-leve bg-surface-sutil px-6 py-4">
             {rodape}
           </footer>
         )}

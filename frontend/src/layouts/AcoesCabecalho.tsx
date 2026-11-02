@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Download } from 'lucide-react'
 import MenuConta from '@/auth/MenuConta'
 import { gerarAtualizacaoMock } from '@/data/usuario.mock'
+import BotaoTema from '@/theme/BotaoTema'
 import { formatarAtualizacao } from '@/utils/datas'
 
 /**
- * Canto direito do cabeçalho: frescor dos dados, exportar e usuário. Some no celular
- * (lá o avatar fica na barra superior).
+ * Canto direito do cabeçalho: frescor dos dados, tema e usuário. Some no celular
+ * (lá o tema e o avatar ficam na barra superior).
  */
 export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?: string | null }) {
   // Telas integradas fornecem a data da fonte; as demais preservam a demonstração.
@@ -19,11 +19,11 @@ export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?
         : null
 
   return (
-    <div className="hidden shrink-0 items-center gap-3 md:flex lg:gap-5">
+    <div className="hidden shrink-0 items-center gap-3 md:flex lg:gap-4">
       <p className="flex items-center gap-1.5 text-legenda text-ink-2">
         <span
           aria-hidden="true"
-          className={`size-2 rounded-full ${atualizadoEm ? 'bg-lima-escuro' : 'bg-ink-3'}`}
+          className={`size-2 rounded-full ${atualizadoEm ? 'bg-teal' : 'bg-ink-3'}`}
         />
         {atualizadoEm ? (
           <>
@@ -35,15 +35,7 @@ export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?
           <span>Atualização não informada</span>
         )}
       </p>
-      <button
-        type="button"
-        disabled
-        aria-label="Exportar"
-        title="Exportar (disponível nas telas com dados)"
-        className="grid size-10 place-items-center rounded-full border border-borda bg-surface-card text-ink disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <Download size={20} strokeWidth={1.5} aria-hidden="true" />
-      </button>
+      <BotaoTema />
       <MenuConta />
     </div>
   )

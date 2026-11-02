@@ -33,11 +33,11 @@ export default function ErrorState({
     >
       <span
         aria-hidden="true"
-        className="mb-1 grid size-14 place-items-center rounded-full bg-perigo-suave text-perigo-escuro"
+        className="mb-1 grid size-14 place-items-center rounded-card border border-perigo/20 bg-perigo-suave text-perigo-escuro"
       >
         <TriangleAlert size={26} strokeWidth={1.5} />
       </span>
-      <h3 className="text-titulo font-normal">{titulo}</h3>
+      <h3 className="text-titulo font-medium">{titulo}</h3>
       <p className="max-w-sm text-corpo text-ink-2">{texto}</p>
       {api && api.status !== 0 && (
         <p className="text-legenda text-ink-3">

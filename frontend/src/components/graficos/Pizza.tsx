@@ -6,7 +6,10 @@ import { angulosDasFatias } from './geometria'
 
 type Props = { grafico: GraficoIA; formatos: Formatos; descricao: string }
 
-const umaCasa = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const umaCasa = new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
 // Abaixo disso, os rótulos em volta da rosca não cabem: viram uma lista na mesma ordem das fatias
 const LARGURA_ROTULOS_EM_VOLTA = 420
 
@@ -14,7 +17,14 @@ function ponto(cx: number, cy: number, raio: number, angulo: number) {
   return [cx + raio * Math.cos(angulo), cy + raio * Math.sin(angulo)] as const
 }
 
-function fatia(cx: number, cy: number, externo: number, interno: number, de: number, ate: number): string {
+function fatia(
+  cx: number,
+  cy: number,
+  externo: number,
+  interno: number,
+  de: number,
+  ate: number,
+): string {
   const grande = ate - de > Math.PI ? 1 : 0
   const [x0, y0] = ponto(cx, cy, externo, de)
   const [x1, y1] = ponto(cx, cy, externo, ate)
@@ -52,12 +62,19 @@ export default function Pizza({ grafico, formatos, descricao }: Props) {
   })
   for (const lado of [true, false]) {
     const doLado = rotulos.filter((r) => r.direita === lado).sort((a, b) => a.y - b.y)
-    for (let k = 1; k < doLado.length; k++) doLado[k].y = Math.max(doLado[k].y, doLado[k - 1].y + 16)
+    for (let k = 1; k < doLado.length; k++)
+      doLado[k].y = Math.max(doLado[k].y, doLado[k - 1].y + 16)
   }
 
   return (
     <div ref={caixa} className="relative w-full">
-      <svg width={largura} height={altura} role="group" aria-label={descricao} className="block max-w-full">
+      <svg
+        width={largura}
+        height={altura}
+        role="group"
+        aria-label={descricao}
+        className="block max-w-full"
+      >
         {fatias.map((f) => (
           <path
             key={grafico.categorias[f.i]}
@@ -69,14 +86,23 @@ export default function Pizza({ grafico, formatos, descricao }: Props) {
             onPointerLeave={() => setAtivo(null)}
             onFocus={() => setAtivo(f.i)}
             onBlur={() => setAtivo(null)}
-            className={cx(cor(f.i), 'stroke-surface-card outline-none', ativo !== null && ativo !== f.i && 'opacity-60')}
+            className={cx(
+              cor(f.i),
+              'stroke-surface-card outline-none',
+              ativo !== null && ativo !== f.i && 'opacity-60',
+            )}
             strokeWidth={2}
           />
         ))}
         <text x={centroX} y={centroY - 6} textAnchor="middle" className="fill-ink-2 text-legenda">
           Total
         </text>
-        <text x={centroX} y={centroY + 12} textAnchor="middle" className="fill-ink text-corpo font-medium">
+        <text
+          x={centroX}
+          y={centroY + 12}
+          textAnchor="middle"
+          className="fill-ink text-corpo font-medium"
+        >
           {formatos.valor(total)}
         </text>
         {emVolta &&
@@ -85,8 +111,19 @@ export default function Pizza({ grafico, formatos, descricao }: Props) {
             const xTexto = r.direita ? r.x + 4 : r.x - 4
             return (
               <g key={`rotulo-${grafico.categorias[r.i]}`} aria-hidden="true">
-                <polyline points={`${lx},${ly} ${r.x},${r.y} ${xTexto},${r.y}`} fill="none" className="stroke-ink-3" strokeWidth={1} />
-                <text x={xTexto + (r.direita ? 2 : -2)} y={r.y} dy="0.32em" textAnchor={r.direita ? 'start' : 'end'} className="fill-ink text-legenda">
+                <polyline
+                  points={`${lx},${ly} ${r.x},${r.y} ${xTexto},${r.y}`}
+                  fill="none"
+                  className="stroke-ink-3"
+                  strokeWidth={1}
+                />
+                <text
+                  x={xTexto + (r.direita ? 2 : -2)}
+                  y={r.y}
+                  dy="0.32em"
+                  textAnchor={r.direita ? 'start' : 'end'}
+                  className="fill-ink text-legenda"
+                >
                   {formatos.categoria(grafico.categorias[r.i])}{' '}
                   <tspan className="font-medium">{pct(r.valor)}</tspan>
                 </text>
@@ -108,7 +145,11 @@ export default function Pizza({ grafico, formatos, descricao }: Props) {
         </ul>
       )}
       {ativo !== null && (
-        <div role="status" className={cx(CLASSE_TOOLTIP, '-translate-x-1/2')} style={{ left: centroX, top: 4 }}>
+        <div
+          role="status"
+          className={cx(CLASSE_TOOLTIP, '-translate-x-1/2')}
+          style={{ left: centroX, top: 4 }}
+        >
           <p className="text-legenda opacity-80">{formatos.categoria(grafico.categorias[ativo])}</p>
           <p className="text-corpo font-medium">
             {pct(valores[ativo])} · {formatos.valorCompleto(valores[ativo])}

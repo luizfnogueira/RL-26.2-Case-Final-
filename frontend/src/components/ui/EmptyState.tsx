@@ -23,11 +23,11 @@ export default function EmptyState({
     <div className={cx('flex flex-col items-center gap-2 px-4 py-10 text-center', className)}>
       <span
         aria-hidden="true"
-        className="mb-1 grid size-14 place-items-center rounded-full bg-azul-50 text-teal-escuro"
+        className="mb-1 grid size-14 place-items-center rounded-card border border-borda bg-surface-alt text-teal-escuro"
       >
         {icone ?? <Inbox size={26} strokeWidth={1.5} />}
       </span>
-      <h3 className="text-titulo font-normal">{titulo}</h3>
+      <h3 className="text-titulo font-medium">{titulo}</h3>
       <p className="max-w-sm text-corpo text-ink-2">{descricao}</p>
       {acao && <div className="mt-2">{acao}</div>}
     </div>

@@ -15,10 +15,10 @@ export default function BotaoIA() {
       aria-label="Pergunte à IA"
       aria-expanded={painelAberto}
       aria-controls={ID_PAINEL_ASSISTENTE}
-      className="fixed bottom-6 right-6 z-30 inline-flex size-14 items-center justify-center gap-2 rounded-full bg-azul-300 text-teal-profundo shadow-flutuante transition-colors hover:bg-azul-400 md:h-12 md:w-auto md:px-5"
+      className="fixed bottom-6 right-6 z-30 inline-flex size-14 items-center justify-center gap-2 rounded-full bg-azul-300 text-sobre-acao shadow-flutuante transition-colors hover:bg-azul-400 md:h-11 md:w-auto md:px-5"
     >
-      <Sparkles size={22} strokeWidth={1.5} aria-hidden="true" />
-      <span className="hidden text-titulo font-normal md:inline">Pergunte à IA</span>
+      <Sparkles size={21} strokeWidth={1.75} aria-hidden="true" />
+      <span className="hidden text-corpo font-semibold md:inline">Pergunte à IA</span>
     </button>
   )
 }

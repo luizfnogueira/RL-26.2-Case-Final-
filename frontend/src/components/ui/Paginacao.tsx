@@ -13,7 +13,7 @@ export interface PaginacaoProps {
 }
 
 const BOTAO =
-  'grid size-9 place-items-center rounded-full text-corpo transition-colors disabled:cursor-not-allowed disabled:opacity-40'
+  'grid size-9 place-items-center rounded-md text-corpo transition-colors disabled:cursor-not-allowed disabled:opacity-40'
 
 /** Navegação entre páginas de uma lista paginada no servidor ("21–40 de 134"). */
 export default function Paginacao({ page, pageSize, total, aoMudar, className }: PaginacaoProps) {
@@ -36,7 +36,7 @@ export default function Paginacao({ page, pageSize, total, aoMudar, className }:
           aria-label="Página anterior"
           disabled={atual <= 1}
           onClick={() => aoMudar(atual - 1)}
-          className={cx(BOTAO, 'text-ink hover:bg-azul-50')}
+          className={cx(BOTAO, 'text-ink hover:bg-surface-alt')}
         >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
@@ -54,7 +54,9 @@ export default function Paginacao({ page, pageSize, total, aoMudar, className }:
               onClick={() => aoMudar(pagina)}
               className={cx(
                 BOTAO,
-                pagina === atual ? 'bg-lima text-ink' : 'text-ink hover:bg-azul-50',
+                pagina === atual
+                  ? 'bg-lima font-semibold text-sobre-lima'
+                  : 'text-ink hover:bg-surface-alt',
               )}
             >
               {pagina}
@@ -66,7 +68,7 @@ export default function Paginacao({ page, pageSize, total, aoMudar, className }:
           aria-label="Próxima página"
           disabled={atual >= ultima}
           onClick={() => aoMudar(atual + 1)}
-          className={cx(BOTAO, 'text-ink hover:bg-azul-50')}
+          className={cx(BOTAO, 'text-ink hover:bg-surface-alt')}
         >
           <ChevronRight size={18} aria-hidden="true" />
         </button>

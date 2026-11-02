@@ -46,7 +46,13 @@ type Linha = { i: number; valores: CelulaIA[] }
  * Ordena todas as linhas e pagina de 10 em 10 aqui mesmo; a minitabela do "Como cheguei nisso" continua.
  * `embutida`: dentro do cartão do gráfico ("Ver como tabela"), sem moldura nem CSV próprios.
  */
-export default function TabelaResposta({ dados, embutida = false }: { dados: DadosIA; embutida?: boolean }) {
+export default function TabelaResposta({
+  dados,
+  embutida = false,
+}: {
+  dados: DadosIA
+  embutida?: boolean
+}) {
   const [ordenacao, setOrdenacao] = useState<Ordenacao | null>(null)
   const [pagina, setPagina] = useState(1)
 
@@ -83,7 +89,9 @@ export default function TabelaResposta({ dados, embutida = false }: { dados: Dad
   return (
     <div
       className={
-        embutida ? 'flex flex-col gap-2' : 'mt-3 flex flex-col gap-2 rounded-md border border-borda bg-surface-card p-2'
+        embutida
+          ? 'flex flex-col gap-2'
+          : 'mt-3 flex flex-col gap-2 rounded-md border border-borda bg-surface-card p-2'
       }
     >
       <Tabela

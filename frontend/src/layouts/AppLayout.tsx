@@ -45,7 +45,7 @@ function Casca() {
     <div className="min-h-dvh bg-filo font-sans text-ink">
       <a
         href="#conteudo"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-surface-card focus:px-4 focus:py-2"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface-card focus:px-4 focus:py-2 focus:shadow-flutuante"
       >
         Ir para o conteúdo
       </a>
@@ -57,7 +57,7 @@ function Casca() {
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
           <main
             id="conteudo"
-            className="flex-1 px-4 pt-1 md:pl-3 md:pr-6 md:pt-7 lg:pl-0 lg:pr-[43px] lg:pt-[34px]"
+            className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-5 md:px-6 md:py-7 lg:px-8 lg:py-8"
           >
             <Outlet />
           </main>

@@ -24,7 +24,8 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
   const pontos = grafico.categorias.length
   const larguraPlot = largura - margem.esq - margem.dir
   const alturaPlot = altura - margem.topo - margem.base
-  const x = (i: number) => margem.esq + (pontos === 1 ? larguraPlot / 2 : (larguraPlot * i) / (pontos - 1))
+  const x = (i: number) =>
+    margem.esq + (pontos === 1 ? larguraPlot / 2 : (larguraPlot * i) / (pontos - 1))
   const y = (valor: number) => margem.topo + alturaPlot * (1 - (valor - inicio) / (fim - inicio))
   const salto = Math.max(1, Math.ceil(pontos / Math.max(1, Math.floor(larguraPlot / 64))))
   const faixa = larguraPlot / Math.max(1, pontos - 1)
@@ -32,7 +33,9 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
   // Mês sem dado (null) interrompe a linha: cada trecho contínuo vira um "M ... L ..."
   const caminho = (valores: (number | null)[]) =>
     valores
-      .map((v, i) => (v === null ? null : `${i === 0 || valores[i - 1] === null ? 'M' : 'L'}${x(i)},${y(v)}`))
+      .map((v, i) =>
+        v === null ? null : `${i === 0 || valores[i - 1] === null ? 'M' : 'L'}${x(i)},${y(v)}`,
+      )
       .filter(Boolean)
       .join(' ')
 
@@ -48,7 +51,13 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
 
   return (
     <div ref={caixa} className="relative w-full">
-      <svg width={largura} height={altura} role="group" aria-label={descricao} className="block max-w-full">
+      <svg
+        width={largura}
+        height={altura}
+        role="group"
+        aria-label={descricao}
+        className="block max-w-full"
+      >
         {marcas.map((marca) => (
           <g key={marca}>
             <line
@@ -59,7 +68,13 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
               className={marca === 0 ? 'stroke-borda' : 'stroke-borda-leve'}
               strokeWidth={1}
             />
-            <text x={margem.esq - 8} y={y(marca)} dy="0.32em" textAnchor="end" className="fill-ink-2 text-legenda">
+            <text
+              x={margem.esq - 8}
+              y={y(marca)}
+              dy="0.32em"
+              textAnchor="end"
+              className="fill-ink-2 text-legenda"
+            >
               {marca === 0 ? '0' : formatos.valor(marca)}
             </text>
           </g>
@@ -67,23 +82,48 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
         {/* Um rótulo a cada `salto` meses, sempre alinhado a uma marca (nunca dois encostados no fim) */}
         {grafico.categorias.map((categoria, i) =>
           i % salto === 0 ? (
-            <text key={categoria} x={x(i)} y={altura - margem.base + 18} textAnchor="middle" className="fill-ink-2 text-legenda">
+            <text
+              key={categoria}
+              x={x(i)}
+              y={altura - margem.base + 18}
+              textAnchor="middle"
+              className="fill-ink-2 text-legenda"
+            >
               {formatos.categoria(categoria)}
             </text>
           ) : null,
         )}
         {ativo !== null && (
-          <line x1={x(ativo)} x2={x(ativo)} y1={margem.topo} y2={altura - margem.base} className="stroke-ink-3" strokeWidth={1} />
+          <line
+            x1={x(ativo)}
+            x2={x(ativo)}
+            y1={margem.topo}
+            y2={altura - margem.base}
+            className="stroke-ink-3"
+            strokeWidth={1}
+          />
         )}
         {grafico.series.map((serie, k) => {
           const cor = corDaSerie(serie.nome, k, n)
           return (
             <g key={serie.nome}>
-              <path d={caminho(serie.valores)} fill="none" className={cor.traco} strokeWidth={2.5} strokeLinejoin="round" />
+              <path
+                d={caminho(serie.valores)}
+                fill="none"
+                className={cor.traco}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+              />
               {pontos <= 24 &&
                 serie.valores.map((v, i) =>
                   v === null ? null : (
-                    <circle key={i} cx={x(i)} cy={y(v)} r={ativo === i ? 4 : 2.5} className={cor.preenchimento} />
+                    <circle
+                      key={i}
+                      cx={x(i)}
+                      cy={y(v)}
+                      r={ativo === i ? 4 : 2.5}
+                      className={cor.preenchimento}
+                    />
                   ),
                 )}
             </g>
@@ -96,7 +136,10 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
               x={x(f.ultimo) + 8}
               y={f.y}
               dy="0.32em"
-              className={cx('text-legenda font-medium', corDaSerie(f.serie.nome, f.k, n).preenchimento)}
+              className={cx(
+                'text-legenda font-medium',
+                corDaSerie(f.serie.nome, f.k, n).preenchimento,
+              )}
             >
               {formatos.serie(f.serie.nome)}
             </text>
@@ -112,7 +155,10 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
             tabIndex={0}
             role="img"
             aria-label={`${formatos.categoria(categoria)}: ${grafico.series
-              .map((s) => `${n > 1 ? `${formatos.serie(s.nome)} ` : ''}${s.valores[i] === null ? 'sem dado' : formatos.valorCompleto(s.valores[i] as number)}`)
+              .map(
+                (s) =>
+                  `${n > 1 ? `${formatos.serie(s.nome)} ` : ''}${s.valores[i] === null ? 'sem dado' : formatos.valorCompleto(s.valores[i] as number)}`,
+              )
               .join(', ')}`}
             onPointerEnter={() => setAtivo(i)}
             onPointerLeave={() => setAtivo(null)}
@@ -132,7 +178,9 @@ export default function Linhas({ grafico, formatos, descricao }: Props) {
           {grafico.series.map((serie) => (
             <p key={serie.nome} className="text-corpo font-medium">
               {n > 1 && `${formatos.serie(serie.nome)}: `}
-              {serie.valores[ativo] === null ? 'sem dado' : formatos.valorCompleto(serie.valores[ativo] as number)}
+              {serie.valores[ativo] === null
+                ? 'sem dado'
+                : formatos.valorCompleto(serie.valores[ativo] as number)}
             </p>
           ))}
         </div>

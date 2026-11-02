@@ -78,7 +78,10 @@ export function escalaDasLinhas(valores: number[], series: number): number[] {
   const passo = tetoDoEixo(Math.max(maximo - piso, 1e-9) / 4)
   const inicio = Math.floor(piso / passo) * passo
   const fim = Math.max(Math.ceil(maximo / passo) * passo, inicio + passo)
-  return Array.from({ length: Math.round((fim - inicio) / passo) + 1 }, (_, i) => inicio + i * passo)
+  return Array.from(
+    { length: Math.round((fim - inicio) / passo) + 1 },
+    (_, i) => inicio + i * passo,
+  )
 }
 
 /** Ângulos de cada fatia, no sentido horário a partir do topo (12 h). */

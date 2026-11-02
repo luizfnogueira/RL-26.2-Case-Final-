@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import AuthProvider from '@/auth/AuthProvider'
+import TemaProvider from '@/theme/TemaProvider'
 import ExigirAutenticacao from '@/auth/ExigirAutenticacao'
 import AuthPage from '@/pages/auth/AuthPage'
 import RedirecionarAuthLegado from '@/auth/RedirecionarAuthLegado'
@@ -53,8 +54,10 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <TemaProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </TemaProvider>
   )
 }

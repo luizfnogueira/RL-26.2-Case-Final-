@@ -1,11 +1,22 @@
-import { ClipboardPlus, Download, LockKeyhole, Search, ShieldAlert } from 'lucide-react'
+import {
+  Check,
+  ClipboardPlus,
+  Download,
+  LockKeyhole,
+  Plus,
+  Search,
+  ShieldAlert,
+  X,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
+import Aviso from '@/components/ui/Aviso'
 import Badge, { type VarianteBadge } from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
 import ErrorState from '@/components/ui/ErrorState'
+import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
 import Paginacao from '@/components/ui/Paginacao'
 import SeloFicticio from '@/components/ui/SeloFicticio'
@@ -15,7 +26,7 @@ import { useFiltrosUrl } from '@/hooks/useFiltrosUrl'
 import { useOpcoesFiltros } from '@/hooks/useOpcoesFiltros'
 import Pagina from '@/layouts/Pagina'
 import { buscarCandidatos, criarInspecoesEmLote, falhasDoLote, normalizarErro } from '@/services'
-import type { Candidato, ConfiancaEvidencia } from '@/types/inspecoes'
+import type { Candidato, ConfiancaEvidencia, Ordem } from '@/types/inspecoes'
 import type { CampoFiltro, FiltrosUrl } from '@/types/filtros'
 import { formatarAtualizacao } from '@/utils/datas'
 import { formatarEnergia, formatarNome } from '@/utils/formatacao'
@@ -49,7 +60,7 @@ function formatarMotivos(motivos: string[]) {
   return motivos.map((motivo) => (
     <span
       key={motivo}
-      className="inline-flex rounded-full bg-azul-50 px-2.5 py-0.5 text-[10px] font-medium text-teal-profundo"
+      className="inline-flex rounded-full border border-teal/20 bg-azul-50 px-2 py-0.5 text-micro font-medium text-teal-profundo"
     >
       {motivo}
     </span>
@@ -58,7 +69,6 @@ function formatarMotivos(motivos: string[]) {
 
 export default function FilaPage() {
   const opcoesFiltros = useOpcoesFiltros()
-  const navigate = useNavigate()
   const { filtros, limpar } = useFiltrosUrl(CAMPOS, PADROES)
   const [params, setParams] = useSearchParams()
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '', 10) || 1)
@@ -78,6 +88,7 @@ export default function FilaPage() {
   const [criando, setCriando] = useState(false)
   const [exportando, setExportando] = useState(false)
   const [toast, setToast] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null)
+  const [criadas, setCriadas] = useState<Ordem[] | null>(null)
 
   const candidatos = useConsulta(
     (sinal) =>
@@ -99,7 +110,7 @@ export default function FilaPage() {
 
   useEffect(() => {
     if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), 3000)
+    const timer = window.setTimeout(() => setToast(null), 4000)
     return () => window.clearTimeout(timer)
   }, [toast])
 
@@ -111,6 +122,7 @@ export default function FilaPage() {
   const selecionadas = selecao.chave === chaveRecorte ? selecao.itens : {}
   const quantidadeSelecionada = Object.keys(selecionadas).length
   const dados = candidatos.dados
+
   const alternarSelecao = (candidato: Candidato) => {
     if (candidato.ordem_ativa || candidato.acao_recomendada !== 'INSPECAO_PRIORITARIA') return
     setSelecao((atual) => {
@@ -121,6 +133,8 @@ export default function FilaPage() {
       return { chave: chaveRecorte, itens: proximo }
     })
   }
+
+  const limparSelecao = () => setSelecao({ chave: chaveRecorte, itens: {} })
 
   const abrirModal = () => {
     setErroCriacao(null)
@@ -241,7 +255,7 @@ export default function FilaPage() {
 
     try {
       // Um lote, tudo ou nada. Cada ordem nasce com o contexto da Gold: motivos e kWh estimado da fila.
-      const criadas = await criarInspecoesEmLote(
+      const resposta = await criarInspecoesEmLote(
         Object.values(selecionadas).map((candidato) => ({
           id_uc: candidato.id_uc,
           equipe_responsavel: equipe.trim(),
@@ -250,10 +264,18 @@ export default function FilaPage() {
           kwh_estimado: candidato.energia_estimada.valor ?? null,
         })),
       )
-      setToast({ tipo: 'sucesso', texto: `${criadas.total} ordens geradas` })
-      setSelecao({ chave: chaveRecorte, itens: {} })
+      setCriadas(resposta.items)
+      setToast({
+        tipo: 'sucesso',
+        texto:
+          resposta.total === 1
+            ? 'Ordem de inspeção criada.'
+            : `${resposta.total} ordens de inspeção criadas.`,
+      })
+      limparSelecao()
       setModalAberto(false)
-      navigate('/perdas/ordens')
+      // Permanece na fila: a confirmação acima aponta para a ordem recém-criada.
+      candidatos.recarregar()
     } catch (erro: unknown) {
       const falhas = falhasDoLote(erro)
       const mensagem =
@@ -273,7 +295,6 @@ export default function FilaPage() {
 
   const carregandoInicial = candidatos.carregando && dados === null
   const atualizando = candidatos.carregando && dados !== null
-
   const tabelarows = dados?.items ?? []
 
   const resumoCards = dados && [
@@ -296,301 +317,431 @@ export default function FilaPage() {
   ]
 
   return (
-    <Pagina titulo="Fila de perdas" subtitulo="UCs elegíveis e ação recomendada">
-      <div className="relative">
-        {toast && (
-          <div
-            aria-live="polite"
-            className={[
-              'absolute right-0 top-0 z-20 flex items-center gap-3 rounded-full border px-4 py-2 text-sm shadow-lg',
-              toast.tipo === 'sucesso'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-rose-200 bg-rose-50 text-rose-800',
-            ].join(' ')}
-          >
-            <span className="inline-flex size-2 rounded-full bg-current" aria-hidden="true" />
-            {toast.texto}
-          </div>
-        )}
+    <Pagina
+      titulo="Fila de perdas"
+      subtitulo="UCs elegíveis, motivos da suspeita e ação recomendada"
+    >
+      <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros.opcoes} />
 
-        <div className="overflow-hidden rounded-[18px] border border-[#dfeaf0] bg-[#edf3f5] shadow-card">
-          <BarraDeFiltros
-            campos={CAMPOS}
-            padroes={PADROES}
-            opcoes={opcoesFiltros.opcoes}
-            mostrarLimparSempre
-            className="rounded-none border-b border-[#dfeaf0] bg-[#edf3f5] p-4 shadow-none"
-          />
+      {opcoesFiltros.erro && (
+        <Aviso variante="alerta">
+          Não foi possível carregar as opções de filtro da Gold. A fila continua disponível, mas os
+          filtros de região ficam sem valores.
+        </Aviso>
+      )}
 
-          {opcoesFiltros.erro && (
-            <p
-              role="status"
-              className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-[12px] text-amber-900"
-            >
-              Não foi possível carregar as opções de filtro da Gold. A fila continua disponível, mas
-              os filtros de região ficam sem valores.
+      {toast && (
+        <Aviso variante={toast.tipo === 'sucesso' ? 'sucesso' : 'perigo'} anunciar>
+          {toast.texto}
+        </Aviso>
+      )}
+
+      {criadas && criadas.length > 0 && (
+        <Aviso
+          variante="sucesso"
+          titulo={
+            criadas.length === 1
+              ? `Ordem criada para a UC ${criadas[0].id_uc}`
+              : `${criadas.length} ordens de inspeção criadas`
+          }
+          acao={
+            criadas.length === 1 ? (
+              <Link
+                to={`/perdas/ordens?destaque=${criadas[0].id_ordem}`}
+                className="inline-flex h-9 items-center rounded-md bg-azul-300 px-3 text-corpo font-semibold text-sobre-acao hover:bg-azul-400"
+              >
+                Ver ordem
+              </Link>
+            ) : (
+              <Link
+                to={`/perdas/ordens?destaque=${criadas.map((o) => o.id_ordem).join(',')}`}
+                className="inline-flex h-9 items-center rounded-md bg-azul-300 px-3 text-corpo font-semibold text-sobre-acao hover:bg-azul-400"
+              >
+                Ver ordens
+              </Link>
+            )
+          }
+        >
+          {criadas.length === 1 ? (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>A ordem #{criadas[0].id_ordem} está na fila de ordens de inspeção.</span>
+              <button
+                type="button"
+                onClick={() => setCriadas(null)}
+                className="text-legenda font-medium underline underline-offset-2"
+              >
+                Dispensar
+              </button>
             </p>
-          )}
-
-          {candidatos.erro && !dados ? (
-            <ErrorState
-              erro={candidatos.erro}
-              titulo="Não foi possível carregar a fila"
-              aoTentarNovamente={candidatos.recarregar}
-              className="min-h-[320px] bg-white/50"
-            />
-          ) : dados ? (
-            <>
-              <div className="mt-4 mb-4 grid grid-cols-4 gap-0 overflow-hidden rounded-[16px] bg-[#36465f] text-white">
-                {resumoCards?.map((card) => (
-                  <div
-                    key={card.label}
-                    className="border-r border-white/10 px-5 py-4 last:border-r-0"
-                  >
-                    <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-blue-100/70">
-                      {card.label}
-                    </p>
-                    <p className="mt-2 text-[18px] font-semibold text-white">{card.value}</p>
-                  </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <p>Cada UC selecionada recebeu uma ordem. Abra a lista para acompanhar:</p>
+              <ul className="flex flex-wrap gap-x-3 gap-y-1 text-legenda">
+                {criadas.map((ordem) => (
+                  <li key={ordem.id_ordem}>
+                    <Link
+                      to={`/perdas/ordens?destaque=${ordem.id_ordem}`}
+                      className="font-medium underline underline-offset-2"
+                    >
+                      #{ordem.id_ordem} · {ordem.id_uc}
+                    </Link>
+                  </li>
                 ))}
+              </ul>
+            </div>
+          )}
+        </Aviso>
+      )}
+
+      {candidatos.erro && !dados ? (
+        <ErrorState
+          erro={candidatos.erro}
+          titulo="Não foi possível carregar a fila"
+          aoTentarNovamente={candidatos.recarregar}
+          className="rounded-card border border-borda bg-surface-card shadow-card"
+        />
+      ) : dados ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {resumoCards?.map((card, i) => (
+              <div
+                key={card.label}
+                className={`rounded-card border p-4 shadow-card ${
+                  i === 2 ? 'border-teal/30 bg-azul-50' : 'border-borda bg-surface-card'
+                }`}
+              >
+                <p className="text-legenda font-semibold tracking-wide text-ink-2 uppercase">
+                  {card.label}
+                </p>
+                <p
+                  className={`mt-1.5 text-numero font-semibold tracking-tight ${
+                    i === 2 ? 'text-teal-profundo' : 'text-ink'
+                  }`}
+                >
+                  {card.value}
+                </p>
               </div>
+            ))}
+          </div>
 
-              <div className="bg-[#f4f6f7] p-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-[20px] font-medium text-[#2e2e2e]">Ranking priorizado</h2>
-                      <SeloFicticio metadados={dados.metadados} />
-                    </div>
-                    <p className="text-[12px] text-[#68737b]">
-                      Score combina potencial de recuperação, anomalias e histórico de inspeção. Não
-                      é probabilidade de fraude; o kWh é uma estimativa, não energia comprovada.
-                    </p>
-                    {dados.metadados.gold_atualizada_em && (
-                      <p className="text-[12px] text-[#68737b]">
-                        Gold atualizada em {formatarAtualizacao(dados.metadados.gold_atualizada_em)}
-                      </p>
-                    )}
-                    {atualizando && (
-                      <p role="status" className="mt-1 text-[12px] text-teal-profundo">
-                        Atualizando resultados…
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {quantidadeSelecionada > 0 && (
-                      <span className="text-[12px] font-medium text-teal-profundo">
-                        {quantidadeSelecionada}{' '}
-                        {quantidadeSelecionada === 1 ? 'selecionada' : 'selecionadas'}
-                      </span>
-                    )}
-                    <Button
-                      variante="secundario"
-                      icone={<Download size={18} aria-hidden="true" />}
-                      onClick={exportarFila}
-                      carregando={exportando}
-                      disabled={dados.total === 0 || atualizando}
-                    >
-                      Exportar CSV
-                    </Button>
-                    <label className="flex items-center gap-2 whitespace-nowrap text-[12px] text-[#48555d]">
-                      <input
-                        type="checkbox"
-                        checked={semOrdemAtiva}
-                        onChange={(evento) => mudarFiltroSemOrdem(evento.target.checked)}
-                        aria-label="Ocultar UCs com ordem ativa"
-                        className="h-4 w-4 rounded border-[#c5d0d8] accent-[#2d6a80]"
-                      />
-                      Ocultar UCs com ordem ativa
-                    </label>
-                    <Button
-                      icone={<ClipboardPlus size={18} aria-hidden="true" />}
-                      onClick={abrirModal}
-                      disabled={quantidadeSelecionada === 0 || atualizando}
-                    >
-                      Gerar ordem de inspeção
-                    </Button>
-                  </div>
+          <section
+            aria-label="Ranking priorizado de UCs"
+            className="overflow-hidden rounded-card border border-borda bg-surface-card shadow-card"
+          >
+            <div className="flex flex-col gap-3 border-b border-borda-leve p-4 md:flex-row md:items-start md:justify-between md:px-5">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-titulo-lg font-medium">Ranking priorizado</h2>
+                  <SeloFicticio metadados={dados.metadados} />
                 </div>
-
-                {carregandoInicial ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                    ))}
-                  </div>
-                ) : tabelarows.length === 0 ? (
-                  <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[#dfeaf0] bg-white/50">
-                    <EmptyState
-                      titulo="Nenhuma UC respeita os filtros"
-                      descricao="Nenhuma unidade consumidora foi encontrada para o critério informado. Ajuste os filtros e tente novamente."
-                      icone={<Search size={28} strokeWidth={1.5} />}
-                      acao={
-                        <Button variante="secundario" tamanho="sm" onClick={limpar}>
-                          Limpar filtros
-                        </Button>
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="overflow-hidden rounded-xl border border-[#dfeaf0] bg-white">
-                    <div className="overflow-x-auto">
-                      <table
-                        aria-busy={atualizando}
-                        className={`w-full min-w-[1220px] table-fixed border-collapse text-left text-[12px] ${atualizando ? 'opacity-60' : ''}`}
-                      >
-                        <colgroup>
-                          <col className="w-10" />
-                          <col className="w-10" />
-                          <col className="w-[108px]" />
-                          <col className="w-[146px]" />
-                          <col className="w-[112px]" />
-                          <col className="w-[88px]" />
-                          <col className="w-[118px]" />
-                          <col />
-                          <col className="w-[104px]" />
-                          <col className="w-[108px]" />
-                          <col className="w-[132px]" />
-                        </colgroup>
-                        <thead className="bg-[#2d425a] text-white">
-                          <tr>
-                            <th className="px-2 py-3 text-center" aria-label="Seleção" />
-                            <th className="px-2 py-3 text-center">#</th>
-                            <th className="px-3 py-3">UC</th>
-                            <th className="px-3 py-3">Ação recomendada</th>
-                            <th className="px-3 py-3">Localização</th>
-                            <th className="px-3 py-3">Classe</th>
-                            <th className="px-3 py-3">Alimentador</th>
-                            <th className="px-3 py-3">Motivos da suspeita</th>
-                            <th className="px-3 py-3">Confiança</th>
-                            <th className="px-3 py-3 text-right">kWh estimado</th>
-                            <th className="px-3 py-3 text-center">Prioridade</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {tabelarows.map((linha, index) => (
-                            <tr
-                              key={linha.id_uc}
-                              className={index % 2 === 0 ? 'bg-white' : 'bg-[#f3f7f9]'}
-                            >
-                              <td className="border-b border-[#edf2f5] px-3 py-3 text-center">
-                                {linha.ordem_ativa ? (
-                                  <LockKeyhole
-                                    size={14}
-                                    className="mx-auto text-[#9aa3a9]"
-                                    aria-label="Ordem em andamento"
-                                  />
-                                ) : (
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(selecionadas[linha.id_uc])}
-                                    disabled={
-                                      atualizando ||
-                                      linha.acao_recomendada !== 'INSPECAO_PRIORITARIA'
-                                    }
-                                    aria-label={`Selecionar ${linha.id_uc}`}
-                                    onChange={() => alternarSelecao(linha)}
-                                    className="h-4 w-4 rounded border-[#c5d0d8] text-[#2d6a80] accent-[#2d6a80]"
-                                  />
-                                )}
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-2 py-3 text-center text-[#59656d]">
-                                {linha.posicao}
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3">
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-[#2c2d2d]">
-                                    {linha.id_uc}
-                                  </span>
-                                  {linha.ordem_ativa && (
-                                    <span className="text-[10px] text-[#6f7c84]">
-                                      Ordem em andamento
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3">
-                                <Badge variante={ACAO_RECOMENDADA[linha.acao_recomendada].variante}>
-                                  {ACAO_RECOMENDADA[linha.acao_recomendada].rotulo}
-                                </Badge>
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3">
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-[#2c2d2d]">
-                                    {formatarNome(linha.municipio)}
-                                  </span>
-                                  <span className="text-[10px] text-[#7d858d]">
-                                    {formatarNome(linha.bairro)}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3 text-[#4b5156]">
-                                {formatarNome(linha.classe)}
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3 font-medium text-[#4b5156]">
-                                {linha.alimentador}
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3">
-                                <div className="flex flex-wrap gap-1.5">
-                                  {formatarMotivos(linha.motivos)}
-                                </div>
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-3 py-3">
-                                <Badge
-                                  variante={CONFIANCA[linha.confianca_evidencia].variante}
-                                  ponto
-                                >
-                                  {CONFIANCA[linha.confianca_evidencia].rotulo}
-                                </Badge>
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-2 py-3 text-center font-medium tabular-nums text-[#2d425a]">
-                                {formatarEnergia(Number(linha.energia_estimada.valor ?? 0))}
-                              </td>
-                              <td className="border-b border-[#edf2f5] px-2 py-3">
-                                <div className="flex items-center justify-center gap-2">
-                                  <span className="text-[#2d425a] font-semibold">
-                                    {linha.score.toFixed(1)}
-                                  </span>
-                                  <div className="h-2 w-20 overflow-hidden rounded-full bg-[#dfeaf0]">
-                                    <div
-                                      className="h-full rounded-full bg-[#7bbfd0]"
-                                      style={{
-                                        width: `${Math.min(100, Number(linha.score ?? 0))}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {dados.total > LINHAS_POR_PAGINA && (
-                      <div className="border-t border-[#dfeaf0] bg-white p-4">
-                        <Paginacao
-                          page={page}
-                          pageSize={LINHAS_POR_PAGINA}
-                          total={dados.total}
-                          aoMudar={mudarPagina}
-                        />
-                      </div>
-                    )}
-                  </div>
+                <p className="mt-1 max-w-2xl text-legenda leading-5 text-ink-2">
+                  O score combina potencial de recuperação, anomalias e histórico de inspeção. Não é
+                  probabilidade de fraude; o kWh é uma estimativa, não energia comprovada.
+                </p>
+                {dados.metadados.gold_atualizada_em && (
+                  <p className="mt-1 text-legenda text-ink-3">
+                    Gold atualizada em {formatarAtualizacao(dados.metadados.gold_atualizada_em)}
+                  </p>
+                )}
+                {atualizando && (
+                  <p role="status" className="mt-1 text-legenda text-teal-profundo">
+                    Atualizando resultados…
+                  </p>
                 )}
               </div>
-            </>
-          ) : null}
-        </div>
-      </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-borda bg-surface-card px-3 text-legenda font-medium text-ink-2">
+                  <input
+                    type="checkbox"
+                    checked={semOrdemAtiva}
+                    onChange={(evento) => mudarFiltroSemOrdem(evento.target.checked)}
+                    aria-label="Ocultar UCs com ordem ativa"
+                    className="size-4 rounded-sm accent-teal-escuro"
+                  />
+                  Ocultar UCs com ordem ativa
+                </label>
+                <Button
+                  variante="secundario"
+                  icone={<Download size={17} aria-hidden="true" />}
+                  onClick={exportarFila}
+                  carregando={exportando}
+                  disabled={dados.total === 0 || atualizando}
+                  motivoDesabilitado={
+                    dados.total === 0
+                      ? 'Não há UCs para exportar neste recorte.'
+                      : 'Aguarde a atualização da fila.'
+                  }
+                >
+                  Exportar CSV
+                </Button>
+              </div>
+            </div>
+
+            {carregandoInicial ? (
+              <div className="flex flex-col gap-2 p-5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-md" />
+                ))}
+              </div>
+            ) : tabelarows.length === 0 ? (
+              <EmptyState
+                titulo="Nenhuma UC respeita os filtros"
+                descricao="Nenhuma unidade consumidora foi encontrada para o critério informado. Ajuste os filtros e tente novamente."
+                icone={<Search size={28} strokeWidth={1.5} />}
+                acao={
+                  <Button variante="secundario" tamanho="sm" onClick={limpar}>
+                    Limpar filtros
+                  </Button>
+                }
+                className="min-h-[260px]"
+              />
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table
+                    aria-busy={atualizando}
+                    className={`w-full min-w-[1320px] border-collapse text-left text-legenda ${
+                      atualizando ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <caption className="sr-only">
+                      Ranking de unidades consumidoras priorizadas para inspeção
+                    </caption>
+                    <colgroup>
+                      <col className="w-12" />
+                      <col className="w-[120px]" />
+                      <col className="w-[140px]" />
+                      <col className="w-[150px]" />
+                      <col className="w-[110px]" />
+                      <col className="w-[112px]" />
+                      <col />
+                      <col className="w-[112px]" />
+                      <col className="w-[104px]" />
+                      <col className="w-[132px]" />
+                      <col className="w-[190px]" />
+                    </colgroup>
+                    <thead className="bg-surface-alt text-ink-2">
+                      <tr>
+                        <th scope="col" className="px-2 py-3 text-center">
+                          #
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          UC
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          Ação recomendada
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          Localização
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          Classe
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          Alimentador
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          Motivos da suspeita
+                        </th>
+                        <th scope="col" className="px-3 py-3">
+                          Confiança
+                        </th>
+                        <th scope="col" className="px-3 py-3 text-right">
+                          kWh estimado
+                        </th>
+                        <th scope="col" className="px-3 py-3 text-center">
+                          Prioridade
+                        </th>
+                        <th scope="col" className="px-3 py-3 text-center">
+                          Seleção
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tabelarows.map((linha) => {
+                        const selecionado = Boolean(selecionadas[linha.id_uc])
+                        const podeSelecionar =
+                          !linha.ordem_ativa && linha.acao_recomendada === 'INSPECAO_PRIORITARIA'
+                        return (
+                          <tr
+                            key={linha.id_uc}
+                            className={`border-b border-borda-leve transition-colors last:border-b-0 ${
+                              selecionado ? 'bg-lima-suave' : 'hover:bg-surface-sutil'
+                            }`}
+                          >
+                            <td className="px-2 py-3 text-center text-ink-3">{linha.posicao}</td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-ink">{linha.id_uc}</span>
+                                {linha.ordem_ativa && (
+                                  <span className="text-micro text-ink-2">Ordem em andamento</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variante={ACAO_RECOMENDADA[linha.acao_recomendada].variante}>
+                                {ACAO_RECOMENDADA[linha.acao_recomendada].rotulo}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-ink">
+                                  {formatarNome(linha.municipio)}
+                                </span>
+                                <span className="text-micro text-ink-2">
+                                  {formatarNome(linha.bairro)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 text-ink-2">{formatarNome(linha.classe)}</td>
+                            <td className="px-3 py-3 font-medium text-ink-2">
+                              {linha.alimentador}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap gap-1.5">
+                                {formatarMotivos(linha.motivos)}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variante={CONFIANCA[linha.confianca_evidencia].variante} ponto>
+                                {CONFIANCA[linha.confianca_evidencia].rotulo}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-3 text-right font-medium tabular-nums text-ink">
+                              {formatarEnergia(Number(linha.energia_estimada.valor ?? 0))}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="font-semibold text-ink">
+                                  {linha.score.toFixed(1)}
+                                </span>
+                                <div className="h-2 w-16 overflow-hidden rounded-full bg-surface-alt">
+                                  <div
+                                    className="h-full rounded-full bg-teal"
+                                    style={{
+                                      width: `${Math.min(100, Number(linha.score ?? 0))}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {linha.ordem_ativa ? (
+                                <span className="inline-flex items-center gap-1.5 text-legenda text-ink-2">
+                                  <LockKeyhole size={14} aria-hidden="true" />
+                                  Em andamento
+                                </span>
+                              ) : !podeSelecionar ? (
+                                <Button
+                                  variante="secundario"
+                                  tamanho="sm"
+                                  disabled
+                                  aria-label={`Selecionar para inspeção ${linha.id_uc}`}
+                                  motivoDesabilitado="Esta UC pede validação documental antes de uma ordem de campo."
+                                  className="w-full"
+                                >
+                                  Selecionar
+                                </Button>
+                              ) : (
+                                <Button
+                                  variante={selecionado ? 'primario' : 'secundario'}
+                                  tamanho="sm"
+                                  aria-label={
+                                    selecionado
+                                      ? `Remover seleção de ${linha.id_uc}`
+                                      : `Selecionar para inspeção ${linha.id_uc}`
+                                  }
+                                  aria-pressed={selecionado}
+                                  onClick={() => alternarSelecao(linha)}
+                                  disabled={atualizando}
+                                  motivoDesabilitado="Aguarde a atualização da fila."
+                                  icone={
+                                    selecionado ? (
+                                      <Check size={14} aria-hidden="true" />
+                                    ) : (
+                                      <Plus size={14} aria-hidden="true" />
+                                    )
+                                  }
+                                  className="w-full"
+                                >
+                                  {selecionado ? 'Selecionada' : 'Selecionar para inspeção'}
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="sticky bottom-0 z-10 border-t border-borda bg-surface-card/95 backdrop-blur">
+                  {quantidadeSelecionada > 0 ? (
+                    <div
+                      role="region"
+                      aria-label="Seleção para inspeção"
+                      className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                    >
+                      <p className="text-corpo text-ink" aria-live="polite">
+                        <strong className="font-semibold">{quantidadeSelecionada}</strong>{' '}
+                        {quantidadeSelecionada === 1
+                          ? 'UC selecionada para inspeção'
+                          : 'UCs selecionadas para inspeção'}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variante="fantasma"
+                          tamanho="sm"
+                          onClick={limparSelecao}
+                          icone={<X size={14} aria-hidden="true" />}
+                        >
+                          Limpar seleção
+                        </Button>
+                        <Button
+                          tamanho="sm"
+                          onClick={abrirModal}
+                          disabled={atualizando}
+                          motivoDesabilitado="Aguarde a atualização da fila."
+                          icone={<ClipboardPlus size={16} aria-hidden="true" />}
+                        >
+                          Gerar ordem de inspeção
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="px-5 py-3 text-legenda text-ink-2">
+                      Use “Selecionar para inspeção” em cada UC para montar o lote. UCs com ordem em
+                      andamento ou validação documental não entram no lote.
+                    </p>
+                  )}
+                </div>
+
+                {dados.total > LINHAS_POR_PAGINA && (
+                  <div className="border-t border-borda-leve p-4">
+                    <Paginacao
+                      page={page}
+                      pageSize={LINHAS_POR_PAGINA}
+                      total={dados.total}
+                      aoMudar={mudarPagina}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </>
+      ) : null}
 
       <Modal
         aberto={modalAberto}
         aoFechar={fecharModal}
         titulo="Gerar ordem de inspeção"
-        descricao={`Serão geradas ${quantidadeSelecionada} ordem(ns) de inspeção para as UCs selecionadas.`}
+        descricao={
+          quantidadeSelecionada === 1
+            ? 'Será gerada 1 ordem de inspeção para a UC selecionada.'
+            : `Serão geradas ${quantidadeSelecionada} ordens de inspeção para as UCs selecionadas.`
+        }
         tamanho="md"
         fecharAoClicarFora={!criando}
         rodape={
@@ -599,19 +750,19 @@ export default function FilaPage() {
               Cancelar
             </Button>
             <Button onClick={gerarOrdens} carregando={criando}>
-              Gerar ordens
+              Gerar {quantidadeSelecionada === 1 ? 'ordem' : 'ordens'}
             </Button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
           <div>
-            <p className="mb-2 text-sm font-medium text-[#2d425a]">UCs selecionadas</p>
+            <p className="mb-2 text-corpo font-medium text-ink">UCs selecionadas</p>
             <div className="flex flex-wrap gap-2">
               {Object.keys(selecionadas).map((idUc) => (
                 <span
                   key={idUc}
-                  className="rounded-full bg-[#eef3f6] px-2.5 py-1 text-[11px] text-[#3b3f42]"
+                  className="rounded-full border border-borda bg-surface-alt px-2.5 py-1 text-legenda text-ink"
                 >
                   {idUc}
                 </span>
@@ -619,42 +770,35 @@ export default function FilaPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="equipe" className="text-sm font-medium text-[#2d425a]">
-              Equipe responsável *
-            </label>
-            <input
-              id="equipe"
-              value={equipe}
-              onChange={(e) => setEquipe(e.target.value)}
-              placeholder="Ex.: Equipe Norte 02"
-              className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-            />
-          </div>
+          <Input
+            rotulo="Equipe responsável"
+            value={equipe}
+            onChange={(e) => setEquipe(e.target.value)}
+            placeholder="Ex.: Equipe Norte 02"
+            ajuda="Campo obrigatório: identifica a equipe que fará a vistoria."
+            required
+          />
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="data-prevista" className="text-sm font-medium text-[#2d425a]">
-              Data prevista
-            </label>
-            <input
-              id="data-prevista"
-              type="date"
-              value={dataPrevista}
-              onChange={(e) => setDataPrevista(e.target.value)}
-              className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-            />
-          </div>
+          <Input
+            rotulo="Data prevista"
+            type="date"
+            value={dataPrevista}
+            onChange={(e) => setDataPrevista(e.target.value)}
+            ajuda="Opcional. Pode ser ajustada depois, no despacho para campo."
+          />
 
-          <p className="text-[11px] text-[#68737b]">
+          <p className="text-legenda leading-5 text-ink-2">
             O motivo e o kWh estimado de cada UC serão copiados da fila da Gold para a ordem. A API
             bloqueia UCs com validação documental pendente.
           </p>
 
           {erroCriacao && (
-            <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              <ShieldAlert size={16} aria-hidden="true" />
-              {erroCriacao}
-            </div>
+            <Aviso variante="perigo">
+              <span className="flex items-start gap-2">
+                <ShieldAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+                {erroCriacao}
+              </span>
+            </Aviso>
           )}
         </div>
       </Modal>

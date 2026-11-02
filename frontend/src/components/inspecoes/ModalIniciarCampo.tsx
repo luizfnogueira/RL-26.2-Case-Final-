@@ -1,7 +1,10 @@
-import { ShieldAlert, Truck } from 'lucide-react'
+import { Truck } from 'lucide-react'
 import { useState } from 'react'
+import Aviso from '@/components/ui/Aviso'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
+import Textarea from '@/components/ui/Textarea'
 import { iniciarCampo, normalizarErro } from '@/services'
 import type { Ordem } from '@/types/inspecoes'
 
@@ -15,13 +18,7 @@ interface Props {
 export default function ModalIniciarCampo({ ordem, aberto, aoFechar, aoSucesso }: Props) {
   if (!aberto || !ordem) return null
 
-  return (
-    <ModalIniciarCampoForm
-      ordem={ordem}
-      aoFechar={aoFechar}
-      aoSucesso={aoSucesso}
-    />
-  )
+  return <ModalIniciarCampoForm ordem={ordem} aoFechar={aoFechar} aoSucesso={aoSucesso} />
 }
 
 function ModalIniciarCampoForm({
@@ -66,13 +63,13 @@ function ModalIniciarCampoForm({
       aberto
       aoFechar={aoFechar}
       titulo={`Iniciar vistoria em campo · Ordem #${ordem.id_ordem}`}
-      descricao={`A ordem da UC ${ordem.id_uc} avançará para o status EM CAMPO.`}
+      descricao={`A ordem da UC ${ordem.id_uc} avançará para o status Em campo.`}
       tamanho="md"
       fecharAoClicarFora={!salvando}
       rodape={
         <>
           <Button variante="secundario" onClick={aoFechar} disabled={salvando}>
-            Voltar
+            Cancelar
           </Button>
           <Button
             onClick={handleConfirmar}
@@ -85,51 +82,35 @@ function ModalIniciarCampoForm({
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="rounded-lg bg-[#f0f4f7] p-3 text-xs text-[#3b4752]">
-          <p className="font-semibold text-[#2d425a]">Unidade Consumidora: {ordem.id_uc}</p>
-          {ordem.motivo && <p className="mt-1 text-[#65737e]">{ordem.motivo}</p>}
+        <div className="rounded-md border border-borda-leve bg-surface-alt px-4 py-3 text-corpo">
+          <p className="font-medium text-ink">Unidade Consumidora: {ordem.id_uc}</p>
+          {ordem.motivo && <p className="mt-1 text-legenda text-ink-2">{ordem.motivo}</p>}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="equipe-campo" className="text-sm font-medium text-[#2d425a]">
-            Equipe responsável *
-          </label>
-          <input
-            id="equipe-campo"
-            value={equipe}
-            onChange={(e) => setEquipe(e.target.value)}
-            placeholder="Ex.: Equipe Norte 02"
-            disabled={salvando}
-            className="h-10 rounded-md border border-[#cfd9e0] bg-white px-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-          />
-          <span className="text-[11px] text-[#7d858d]">
-            Confirme ou altere a equipe antes do despacho.
-          </span>
-        </div>
+        <Input
+          rotulo="Equipe responsável"
+          value={equipe}
+          onChange={(e) => setEquipe(e.target.value)}
+          placeholder="Ex.: Equipe Norte 02"
+          ajuda="Confirme ou altere a equipe antes do despacho."
+          disabled={salvando}
+          required
+        />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="obs-despacho" className="text-sm font-medium text-[#2d425a]">
-            Observações de despacho (opcional)
-          </label>
-          <textarea
-            id="obs-despacho"
-            rows={3}
-            value={observacoes}
-            onChange={(e) => setObservacoes(e.target.value)}
-            placeholder="Instruções operacionais para a equipe em campo..."
-            disabled={salvando}
-            className="rounded-md border border-[#cfd9e0] bg-white p-3 text-sm text-[#242b32] outline-none focus:border-[#6aa5b4]"
-          />
-        </div>
+        <Textarea
+          rotulo="Observações de despacho (opcional)"
+          value={observacoes}
+          onChange={(e) => setObservacoes(e.target.value)}
+          placeholder="Instruções operacionais para a equipe em campo..."
+          disabled={salvando}
+        />
 
         {erro && (
-          <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            <ShieldAlert size={16} aria-hidden="true" />
+          <Aviso variante="perigo" anunciar>
             {erro}
-          </div>
+          </Aviso>
         )}
       </div>
     </Modal>
   )
 }
-

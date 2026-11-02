@@ -3,6 +3,9 @@
 Thumbs.db
 .idea/
 
+# Ferramentas de design (arquivos locais, não entram no repositório)
+.impeccable/
+
 # Python (data-engineering e scripts fora do backend)
 __pycache__/
 *.py[cod]

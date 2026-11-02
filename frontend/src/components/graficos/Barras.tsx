@@ -50,12 +50,18 @@ function Tooltip({
   topo: number
 }) {
   return (
-    <div role="status" className={cx(CLASSE_TOOLTIP, '-translate-x-1/2')} style={{ left: esquerda, top: topo }}>
+    <div
+      role="status"
+      className={cx(CLASSE_TOOLTIP, '-translate-x-1/2')}
+      style={{ left: esquerda, top: topo }}
+    >
       <p className="text-legenda opacity-80">{formatos.categoria(grafico.categorias[indice])}</p>
       {grafico.series.map((serie) => (
         <p key={serie.nome} className="text-corpo font-medium">
           {grafico.series.length > 1 && `${formatos.serie(serie.nome)}: `}
-          {serie.valores[indice] === null ? '—' : formatos.valorCompleto(serie.valores[indice] as number)}
+          {serie.valores[indice] === null
+            ? '—'
+            : formatos.valorCompleto(serie.valores[indice] as number)}
         </p>
       ))}
     </div>
@@ -84,7 +90,13 @@ function BarrasHorizontais({ grafico, formatos, descricao }: Props) {
   return (
     <div ref={caixa} className="relative w-full">
       <Legenda grafico={grafico} formatos={formatos} />
-      <svg width={largura} height={altura} role="group" aria-label={descricao} className="block max-w-full">
+      <svg
+        width={largura}
+        height={altura}
+        role="group"
+        aria-label={descricao}
+        className="block max-w-full"
+      >
         <line x1={x(0)} x2={x(0)} y1={0} y2={altura - 4} className="stroke-borda" strokeWidth={1} />
         {grafico.categorias.map((categoria, i) => {
           const topo = 4 + i * passo
@@ -96,7 +108,10 @@ function BarrasHorizontais({ grafico, formatos, descricao }: Props) {
               tabIndex={0}
               role="img"
               aria-label={`${rotulo}: ${grafico.series
-                .map((s) => `${n > 1 ? `${formatos.serie(s.nome)} ` : ''}${s.valores[i] === null ? 'sem dado' : formatos.valorCompleto(s.valores[i] as number)}`)
+                .map(
+                  (s) =>
+                    `${n > 1 ? `${formatos.serie(s.nome)} ` : ''}${s.valores[i] === null ? 'sem dado' : formatos.valorCompleto(s.valores[i] as number)}`,
+                )
                 .join(', ')}`}
               onPointerEnter={() => setAtivo(i)}
               onPointerLeave={() => setAtivo(null)}
@@ -127,7 +142,10 @@ function BarrasHorizontais({ grafico, formatos, descricao }: Props) {
                       y={y}
                       width={Math.max(1, ate - de)}
                       height={alturaBarra}
-                      className={cx(corDaSerie(serie.nome, k, n).preenchimento, ativo !== null && ativo !== i && 'opacity-60')}
+                      className={cx(
+                        corDaSerie(serie.nome, k, n).preenchimento,
+                        ativo !== null && ativo !== i && 'opacity-60',
+                      )}
                     />
                     <text
                       x={valor < 0 ? de - 4 : ate + 4}
@@ -169,7 +187,12 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
   const faixaEstimada = (largura - 16) / Math.max(1, quantidade)
   // Largura do maior valor escrito ("R$ 157,1 mi"): cada barra do grupo precisa desse espaço
   const larguraTexto =
-    Math.max(0, ...grafico.series.flatMap((s) => s.valores.map((v) => (v === null ? 0 : formatos.valor(v).length)))) *
+    Math.max(
+      0,
+      ...grafico.series.flatMap((s) =>
+        s.valores.map((v) => (v === null ? 0 : formatos.valor(v).length)),
+      ),
+    ) *
       6.6 +
     8
   // Valor escrito na barra quando cabe; se não couber, o eixo com linhas de grade volta
@@ -180,7 +203,9 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
   const faixa = larguraPlot / Math.max(1, quantidade)
   const larguraBarra = Math.min(LARGURA_MAX_BARRA, (faixa * 0.7) / n)
   // Distância entre as barras de um grupo: com rótulo, a do texto, para um valor não cobrir o vizinho
-  const passoBarra = comRotulos ? Math.max(larguraBarra, Math.min(larguraTexto, (faixa * 0.9) / n)) : larguraBarra
+  const passoBarra = comRotulos
+    ? Math.max(larguraBarra, Math.min(larguraTexto, (faixa * 0.9) / n))
+    : larguraBarra
   const [minimo, maximoBruto] = dominioComZero(grafico.series.flatMap((s) => s.valores))
   const maximo = comRotulos ? maximoBruto : tetoDoEixo(maximoBruto)
   const y = (valor: number) => margem.topo + alturaPlot * (1 - (valor - minimo) / (maximo - minimo))
@@ -190,7 +215,13 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
   return (
     <div ref={caixa} className="relative w-full">
       <Legenda grafico={grafico} formatos={formatos} />
-      <svg width={largura} height={ALTURA_VERTICAL} role="group" aria-label={descricao} className="block max-w-full">
+      <svg
+        width={largura}
+        height={ALTURA_VERTICAL}
+        role="group"
+        aria-label={descricao}
+        className="block max-w-full"
+      >
         {!comRotulos &&
           marcasDoEixo(maximo).map((marca) => (
             <g key={marca}>
@@ -202,7 +233,13 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
                 className="stroke-borda-leve"
                 strokeWidth={1}
               />
-              <text x={margem.esq - 8} y={y(marca)} dy="0.32em" textAnchor="end" className="fill-ink-2 text-legenda">
+              <text
+                x={margem.esq - 8}
+                y={y(marca)}
+                dy="0.32em"
+                textAnchor="end"
+                className="fill-ink-2 text-legenda"
+              >
                 {marca === 0 ? '0' : formatos.valor(marca)}
               </text>
             </g>
@@ -221,7 +258,10 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
             tabIndex={0}
             role="img"
             aria-label={`${formatos.categoria(categoria)}: ${grafico.series
-              .map((s) => `${n > 1 ? `${formatos.serie(s.nome)} ` : ''}${s.valores[i] === null ? 'sem dado' : formatos.valorCompleto(s.valores[i] as number)}`)
+              .map(
+                (s) =>
+                  `${n > 1 ? `${formatos.serie(s.nome)} ` : ''}${s.valores[i] === null ? 'sem dado' : formatos.valorCompleto(s.valores[i] as number)}`,
+              )
               .join(', ')}`}
             onPointerEnter={() => setAtivo(i)}
             onPointerLeave={() => setAtivo(null)}
@@ -229,11 +269,18 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
             onBlur={() => setAtivo(null)}
             className="outline-none"
           >
-            <rect x={margem.esq + faixa * i} y={0} width={faixa} height={ALTURA_VERTICAL} fill="transparent" />
+            <rect
+              x={margem.esq + faixa * i}
+              y={0}
+              width={faixa}
+              height={ALTURA_VERTICAL}
+              fill="transparent"
+            />
             {grafico.series.map((serie, k) => {
               const valor = serie.valores[i]
               if (valor === null) return null
-              const esquerda = centro(i) - (n * passoBarra) / 2 + k * passoBarra + (passoBarra - larguraBarra) / 2
+              const esquerda =
+                centro(i) - (n * passoBarra) / 2 + k * passoBarra + (passoBarra - larguraBarra) / 2
               const topo = Math.min(y(0), y(valor))
               return (
                 <g key={serie.nome}>
@@ -242,7 +289,10 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
                     y={topo}
                     width={Math.max(1, larguraBarra - 2)}
                     height={Math.max(1, Math.abs(y(valor) - y(0)))}
-                    className={cx(corDaSerie(serie.nome, k, n).preenchimento, ativo !== null && ativo !== i && 'opacity-60')}
+                    className={cx(
+                      corDaSerie(serie.nome, k, n).preenchimento,
+                      ativo !== null && ativo !== i && 'opacity-60',
+                    )}
                   />
                   {comRotulos && (
                     <text
@@ -258,14 +308,20 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
               )
             })}
             {i % salto === 0 && (
-              <text x={centro(i)} y={ALTURA_VERTICAL - margem.base + 16} textAnchor="middle" className="fill-ink-2 text-legenda">
-                {quebrarRotulo(formatos.categoria(categoria), Math.max(8, Math.floor((faixa * salto) / 7))).map(
-                  (linha, k) => (
-                    <tspan key={linha} x={centro(i)} dy={k === 0 ? 0 : 14}>
-                      {linha}
-                    </tspan>
-                  ),
-                )}
+              <text
+                x={centro(i)}
+                y={ALTURA_VERTICAL - margem.base + 16}
+                textAnchor="middle"
+                className="fill-ink-2 text-legenda"
+              >
+                {quebrarRotulo(
+                  formatos.categoria(categoria),
+                  Math.max(8, Math.floor((faixa * salto) / 7)),
+                ).map((linha, k) => (
+                  <tspan key={linha} x={centro(i)} dy={k === 0 ? 0 : 14}>
+                    {linha}
+                  </tspan>
+                ))}
               </text>
             )}
           </g>

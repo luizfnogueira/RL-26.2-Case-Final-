@@ -32,14 +32,26 @@ export interface Cor {
 }
 
 // Classes escritas por inteiro: o Tailwind só gera o que encontra literalmente no código.
-const PRINCIPAL: Cor = { preenchimento: 'fill-teal-escuro', traco: 'stroke-teal-escuro', fundo: 'bg-teal-escuro' }
+const PRINCIPAL: Cor = {
+  preenchimento: 'fill-teal-escuro',
+  traco: 'stroke-teal-escuro',
+  fundo: 'bg-teal-escuro',
+}
 const CORES: Cor[] = [
   PRINCIPAL,
   { preenchimento: 'fill-alerta', traco: 'stroke-alerta-escuro', fundo: 'bg-alerta' },
-  { preenchimento: 'fill-surface-escuro', traco: 'stroke-surface-escuro', fundo: 'bg-surface-escuro' },
+  {
+    preenchimento: 'fill-surface-escuro',
+    traco: 'stroke-surface-escuro',
+    fundo: 'bg-surface-escuro',
+  },
   { preenchimento: 'fill-azul-400', traco: 'stroke-azul-400', fundo: 'bg-azul-400' },
 ]
-const CLARA: Cor = { preenchimento: 'fill-azul-400', traco: 'stroke-azul-400', fundo: 'bg-azul-400' }
+const CLARA: Cor = {
+  preenchimento: 'fill-azul-400',
+  traco: 'stroke-azul-400',
+  fundo: 'bg-azul-400',
+}
 
 /** Uma cor por série só quando há mais de uma; P1 mais clara e P2 (o período atual) na cor principal. */
 export function corDaSerie(nome: string, indice: number, total: number): Cor {

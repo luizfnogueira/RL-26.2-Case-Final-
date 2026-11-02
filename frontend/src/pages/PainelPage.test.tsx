@@ -44,7 +44,7 @@ describe('Tela 1 — Painel executivo', () => {
     expect(within(resumo).getAllByRole('heading', { level: 3 })).toHaveLength(6)
     expect(within(resumo).getByRole('heading', { name: 'Valor em aberto' })).toBeTruthy()
     expect(
-      within(screen.getByRole('region', { name: 'DEC médio' })).getByText('11,46'),
+      within(screen.getByRole('region', { name: 'DEC médio' })).getByTitle('11,46'),
     ).toBeTruthy()
     expect(screen.getByText('4,5% da receita')).toBeTruthy()
     expect(screen.getByText('+0,7 p.p.')).toBeTruthy()
@@ -66,10 +66,12 @@ describe('Tela 1 — Painel executivo', () => {
     )
     expect(aviso).toHaveLength(2)
     expect(
-      within(screen.getByRole('region', { name: 'DEC médio' })).getAllByText('—'),
+      within(screen.getByRole('region', { name: 'DEC médio' }))
+        .getAllByText('—')
+        .filter((elemento) => !elemento.closest('details')),
     ).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
-    await screen.findByText('11,46')
+    await screen.findByTitle('11,46')
     expect(screen.getByLabelText('Endereço atual').textContent).toBe('')
   })
 
@@ -154,7 +156,7 @@ describe('Tela 1 — Painel executivo', () => {
     abrir()
     await screen.findByLabelText('Seis indicadores executivos')
     const card = screen.getByRole('region', { name: 'Valor em aberto' })
-    expect(within(card).getByText('R$ 0,00')).toBeTruthy()
+    expect(within(card).getByTitle('R$ 0,00')).toBeTruthy()
     expect(within(card).getByText('0,0% da receita')).toBeTruthy()
     expect(within(card).getByText('Sem comparação')).toBeTruthy()
     expect(screen.queryByText('Dado fictício')).toBeNull()
