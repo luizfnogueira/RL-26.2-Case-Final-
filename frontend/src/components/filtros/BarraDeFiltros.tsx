@@ -48,12 +48,7 @@ const comoOpcoes = (valores: readonly string[] = [], nomes = false): OpcaoSelect
  * em Fila de perdas, Receita, Ordens e Painel. Os valores vivem na URL, então recarregar a página
  * preserva o recorte.
  */
-export default function BarraDeFiltros({
-  campos,
-  padroes,
-  opcoes = {},
-  className,
-}: Props) {
+export default function BarraDeFiltros({ campos, padroes, opcoes = {}, className }: Props) {
   const { filtros, definir, limpar, alterados } = useFiltrosUrl(campos, padroes)
   const visiveis = ORDEM.filter((campo) => campos.includes(campo))
 
@@ -123,7 +118,9 @@ export default function BarraDeFiltros({
               aoMudar={(valor) => definir({ [campo]: valor })}
               vazio={ehPeriodo ? (padroes?.[campo] ? undefined : 'Selecione') : 'Todos'}
               disabled={bairroSemMunicipio}
-              title={bairroSemMunicipio ? 'Escolha um município para filtrar por bairro' : undefined}
+              title={
+                bairroSemMunicipio ? 'Escolha um município para filtrar por bairro' : undefined
+              }
               className="lg:w-48"
             />
           )

@@ -68,7 +68,10 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
                   : formatarPercentual(variacao, { sinal: true })}
               </Badge>
             </div>
-            <p className="mt-3 text-legenda leading-5 text-ink-2" title={valorExecutivo(kpi.comparacao, true)}>
+            <p
+              className="mt-3 text-legenda leading-5 text-ink-2"
+              title={valorExecutivo(kpi.comparacao, true)}
+            >
               Comparação · {formatarPeriodo(periodoComparacao)}
               <br />
               <span className="font-medium text-ink">{valorExecutivo(kpi.comparacao)}</span>
@@ -115,7 +118,9 @@ export default function IndicadoresExecutivos({ indicadores }: Props) {
                 <dl className="flex flex-col gap-1">
                   <div className="flex justify-between gap-2">
                     <dt>Período atual</dt>
-                    <dd className="text-right font-medium text-ink">{formatarPeriodo(periodoAtual)}</dd>
+                    <dd className="text-right font-medium text-ink">
+                      {formatarPeriodo(periodoAtual)}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-2">
                     <dt>Período comparado</dt>

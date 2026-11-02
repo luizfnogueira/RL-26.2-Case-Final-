@@ -1,4 +1,13 @@
-import { Check, ClipboardPlus, Download, LockKeyhole, Plus, Search, ShieldAlert, X } from 'lucide-react'
+import {
+  Check,
+  ClipboardPlus,
+  Download,
+  LockKeyhole,
+  Plus,
+  Search,
+  ShieldAlert,
+  X,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import BarraDeFiltros from '@/components/filtros/BarraDeFiltros'
@@ -308,7 +317,10 @@ export default function FilaPage() {
   ]
 
   return (
-    <Pagina titulo="Fila de perdas" subtitulo="UCs elegíveis, motivos da suspeita e ação recomendada">
+    <Pagina
+      titulo="Fila de perdas"
+      subtitulo="UCs elegíveis, motivos da suspeita e ação recomendada"
+    >
       <BarraDeFiltros campos={CAMPOS} padroes={PADROES} opcoes={opcoesFiltros.opcoes} />
 
       {opcoesFiltros.erro && (
@@ -395,9 +407,7 @@ export default function FilaPage() {
               <div
                 key={card.label}
                 className={`rounded-card border p-4 shadow-card ${
-                  i === 2
-                    ? 'border-teal/30 bg-azul-50'
-                    : 'border-borda bg-surface-card'
+                  i === 2 ? 'border-teal/30 bg-azul-50' : 'border-borda bg-surface-card'
                 }`}
               >
                 <p className="text-legenda font-semibold tracking-wide text-ink-2 uppercase">
@@ -552,8 +562,7 @@ export default function FilaPage() {
                       {tabelarows.map((linha) => {
                         const selecionado = Boolean(selecionadas[linha.id_uc])
                         const podeSelecionar =
-                          !linha.ordem_ativa &&
-                          linha.acao_recomendada === 'INSPECAO_PRIORITARIA'
+                          !linha.ordem_ativa && linha.acao_recomendada === 'INSPECAO_PRIORITARIA'
                         return (
                           <tr
                             key={linha.id_uc}
@@ -586,15 +595,16 @@ export default function FilaPage() {
                               </div>
                             </td>
                             <td className="px-3 py-3 text-ink-2">{formatarNome(linha.classe)}</td>
-                            <td className="px-3 py-3 font-medium text-ink-2">{linha.alimentador}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-1.5">{formatarMotivos(linha.motivos)}</div>
+                            <td className="px-3 py-3 font-medium text-ink-2">
+                              {linha.alimentador}
                             </td>
                             <td className="px-3 py-3">
-                              <Badge
-                                variante={CONFIANCA[linha.confianca_evidencia].variante}
-                                ponto
-                              >
+                              <div className="flex flex-wrap gap-1.5">
+                                {formatarMotivos(linha.motivos)}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variante={CONFIANCA[linha.confianca_evidencia].variante} ponto>
                                 {CONFIANCA[linha.confianca_evidencia].rotulo}
                               </Badge>
                             </td>

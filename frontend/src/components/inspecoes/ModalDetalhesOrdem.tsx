@@ -145,7 +145,9 @@ export default function ModalDetalhesOrdem({ ordem, aberto, aoFechar }: Props) {
               {ordem.resultado.data_inspecao && (
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-ink-2">Data da vistoria</span>
-                  <span className="text-ink">{formatarDataHora(ordem.resultado.data_inspecao)}</span>
+                  <span className="text-ink">
+                    {formatarDataHora(ordem.resultado.data_inspecao)}
+                  </span>
                 </div>
               )}
 

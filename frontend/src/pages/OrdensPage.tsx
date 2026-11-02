@@ -45,13 +45,15 @@ const CAMPOS: readonly CampoFiltro[] = [
 ]
 const LINHAS_POR_PAGINA = 10
 
-const STATUS_CONFIG: Record<StatusOrdem, { label: string; variante: VarianteBadge; ponto: string }> =
-  {
-    ABERTA: { label: 'Aberta', variante: 'info', ponto: 'bg-teal' },
-    EM_CAMPO: { label: 'Em campo', variante: 'alerta', ponto: 'bg-alerta' },
-    CONCLUIDA: { label: 'Concluída', variante: 'sucesso', ponto: 'bg-sucesso-texto' },
-    CANCELADA: { label: 'Cancelada', variante: 'neutro', ponto: 'bg-ink-3' },
-  }
+const STATUS_CONFIG: Record<
+  StatusOrdem,
+  { label: string; variante: VarianteBadge; ponto: string }
+> = {
+  ABERTA: { label: 'Aberta', variante: 'info', ponto: 'bg-teal' },
+  EM_CAMPO: { label: 'Em campo', variante: 'alerta', ponto: 'bg-alerta' },
+  CONCLUIDA: { label: 'Concluída', variante: 'sucesso', ponto: 'bg-sucesso-texto' },
+  CANCELADA: { label: 'Cancelada', variante: 'neutro', ponto: 'bg-ink-3' },
+}
 
 const ORDEM_STATUS: readonly StatusOrdem[] = ['ABERTA', 'EM_CAMPO', 'CONCLUIDA', 'CANCELADA']
 
@@ -439,7 +441,10 @@ export default function OrdensPage() {
         />
       ) : (
         <>
-          <section aria-label="Filtrar ordens por status" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <section
+            aria-label="Filtrar ordens por status"
+            className="grid grid-cols-2 gap-3 lg:grid-cols-5"
+          >
             {cardsStatus.map((card) => {
               const ativo = statusFiltro === card.status
               return (

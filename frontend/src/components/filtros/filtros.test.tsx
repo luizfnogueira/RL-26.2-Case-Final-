@@ -111,11 +111,7 @@ function Sonda({ aoLer }: { aoLer: (busca: string) => void }) {
 }
 
 describe('BarraDeFiltros', () => {
-  const renderizar = (
-    url: string,
-    campos: readonly CampoFiltro[] = CAMPOS,
-    opcoes = OPCOES,
-  ) => {
+  const renderizar = (url: string, campos: readonly CampoFiltro[] = CAMPOS, opcoes = OPCOES) => {
     let busca = ''
     const resultado = render(
       <MemoryRouter initialEntries={[url]}>

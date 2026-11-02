@@ -23,9 +23,18 @@ function compacto(valor: number): string {
 
 const VALORES: Record<string, Pick<Formatos, 'valor' | 'valorCompleto'>> = {
   brl: { valor: (v) => formatarReais(v), valorCompleto: formatarReaisCompleto },
-  kwh: { valor: (v) => formatarEnergia(v), valorCompleto: (v) => menos(`${duasCasas.format(v)} kWh`) },
-  pct: { valor: (v) => formatarPercentual(v), valorCompleto: (v) => menos(`${duasCasas.format(v)}%`) },
-  h: { valor: (v) => menos(`${umaCasa.format(v)} h`), valorCompleto: (v) => menos(`${duasCasas.format(v)} h`) },
+  kwh: {
+    valor: (v) => formatarEnergia(v),
+    valorCompleto: (v) => menos(`${duasCasas.format(v)} kWh`),
+  },
+  pct: {
+    valor: (v) => formatarPercentual(v),
+    valorCompleto: (v) => menos(`${duasCasas.format(v)}%`),
+  },
+  h: {
+    valor: (v) => menos(`${umaCasa.format(v)} h`),
+    valorCompleto: (v) => menos(`${duasCasas.format(v)} h`),
+  },
 }
 
 /** Mês da Gold (2025-07), ano/mês (2025/7), período (P1, 2025-07/2026-06) ou nome em maiúsculas. */

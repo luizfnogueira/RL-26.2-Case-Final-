@@ -195,7 +195,10 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
           role="tabpanel"
           id={`${idAbas}-sugestoes-painel`}
           aria-labelledby={`${idAbas}-sugestoes`}
-          className={cx('relative flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
+          className={cx(
+            'relative flex min-h-0 flex-1 flex-col overflow-y-auto',
+            pagina && 'min-h-[360px]',
+          )}
         >
           <div className={cx('flex w-full flex-col gap-4', pagina && 'mx-auto max-w-[760px]')}>
             {SUGESTOES_POR_CATEGORIA.map(({ categoria, perguntas }) => (
@@ -228,7 +231,10 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
         aria-live="polite"
         id={`${idAbas}-conversa-painel`}
         hidden={aba !== 'conversa'}
-        className={cx('relative flex min-h-0 flex-1 flex-col overflow-y-auto', pagina && 'min-h-[360px]')}
+        className={cx(
+          'relative flex min-h-0 flex-1 flex-col overflow-y-auto',
+          pagina && 'min-h-[360px]',
+        )}
       >
         <div className={cx('flex w-full flex-col gap-6', pagina && 'mx-auto max-w-[760px]')}>
           {vazia ? (
