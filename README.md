@@ -11,35 +11,6 @@ A solução unifica **48 meses de histórico operacional e comercial** (`jul/202
 
 ---
 
-## Sumário
-
-- [01. Demonstração Visual & Funcionalidades da Plataforma](#01-demonstração-visual--funcionalidades-da-plataforma)
-  - [1.1 Painel Executivo & Comparador Lado a Lado (`Tela 1`)](#11-painel-executivo--comparador-lado-a-lado-tela-1)
-  - [1.2 Diagnóstico da Receita: Ponte Preço × Volume & Insight por IA (`Tela 2`)](#12-diagnóstico-da-receita-ponte-preço--volume--insight-por-ia-tela-2)
-  - [1.3 Visão 360 da Unidade Consumidora & Diagnóstico de Conta Alta (`Tela 3`)](#13-visão-360-da-unidade-consumidora--diagnóstico-de-conta-alta-tela-3)
-  - [1.4 Inteligência de Perdas: Fila Priorizada & Gestão de Ordens de Inspeção (`Telas 4 e 5`)](#14-inteligência-de-perdas-fila-priorizada--gestão-de-ordens-de-inspeção-telas-4-e-5)
-  - [1.5 Continuidade Operacional DEC / FEC & Efeito do Dia Crítico (`Tela 6`)](#15-continuidade-operacional-dec--fec--efeito-do-dia-crítico-tela-6)
-  - [1.6 Assistente V-Energy: Text-to-SQL, Gráficos no Chat, Auditoria & Guia da Plataforma (`Tela 7`)](#16-assistente-v-energy-text-to-sql-gráficos-no-chat-auditoria--guia-da-plataforma-tela-7)
-  - [1.7 Execução do Pipeline de Dados no Databricks (Workflow Medallion)](#17-execução-do-pipeline-de-dados-no-databricks-workflow-medallion)
-- [02. Arquitetura, Casos Atípicos, Dicionário de Dados & Diferenciais Técnicos](#02-arquitetura-casos-atípicos-dicionário-de-dados--diferenciais-técnicos)
-  - [2.1 Decisões Arquiteturais do Time](#21-decisões-arquiteturais-do-time)
-  - [2.2 Diagnóstico Executivo da Receita (`P1 × P2`)](#22-diagnóstico-executivo-da-receita-p1--p2)
-  - [2.3 Tratamento de Casos Atípicos, Anomalias e Flags de Qualidade (Bronze → Silver → Gold → IA)](#23-tratamento-de-casos-atípicos-anomalias-e-flags-de-qualidade-bronze--silver--gold--ia)
-  - [2.4 Arquitetura GenAI: Padrão CHESS / CHASE-SQL & Blindagem em 7 Camadas](#24-arquitetura-genai-padrão-chess--chase-sql--blindagem-em-7-camadas)
-  - [2.5 Catálogo de Features Extras e Diferenciais do Projeto (Dev, Dados & GenAI)](#25-catálogo-de-features-extras-e-diferenciais-do-projeto-dev-dados--genai)
-  - [2.6 Dicionário de Dados da Camada Gold (`14 Tabelas Oficiais`)](#26-dicionário-de-dados-da-camada-gold-14-tabelas-oficiais)
-  - [2.7 Suposições e Premissas Adotadas pelo Time](#27-suposições-e-premissas-adotadas-pelo-time)
-  - [2.8 Estrutura do Repositório & Convenção de Commits](#28-estrutura-do-repositório--convenção-de-commits)
-- [03. Instruções de Configuração, Autenticação e Execução Local](#03-instruções-de-configuração-autenticação-e-execução-local)
-  - [3.1 Pré-requisitos](#31-pré-requisitos)
-  - [3.2 Autenticação Obrigatória (`JWT_SECRET`, `AUTH_INVITE_CODE` e `portal.usuarios`)](#32-autenticação-obrigatória-jwt_secret-auth_invite_code-e-portalusuarios)
-  - [3.3 Carga de Dados com Docker Compose (Modo `real` ou `seed`)](#33-carga-de-dados-com-docker-compose-modo-real-ou-seed)
-  - [3.4 Execução Local do Backend e Configuração do Agente GenAI (`.env`)](#34-execução-local-do-backend-e-configuração-do-agente-genai-env)
-  - [3.5 Execução Local e Arquitetura do Frontend (React + Vite)](#35-execução-local-e-arquitetura-do-frontend-react--vite)
-  - [3.6 Suíte de Testes Automatizados e Avaliação (Golden Set)](#36-suíte-de-testes-automatizados-e-avaliação-golden-set)
-
----
-
 ## 01. Demonstração Visual & Funcionalidades da Plataforma
 
 ### 1.1 Painel Executivo & Comparador Lado a Lado (`Tela 1`)
