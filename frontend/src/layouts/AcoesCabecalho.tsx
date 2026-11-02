@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import MenuConta from '@/auth/MenuConta'
 import { gerarAtualizacaoMock } from '@/data/usuario.mock'
-import BotaoTema from '@/theme/BotaoTema'
 import { formatarAtualizacao } from '@/utils/datas'
 
 /**
- * Canto direito do cabeçalho: frescor dos dados, tema e usuário. Some no celular
- * (lá o tema e o avatar ficam na barra superior).
+ * Canto direito do cabeçalho: frescor dos dados e usuário. O tema fica só no menu lateral.
+ * Some no celular (lá o tema e o avatar ficam na barra superior).
  */
 export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?: string | null }) {
   // Telas integradas fornecem a data da fonte; as demais preservam a demonstração.
@@ -35,7 +34,6 @@ export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?
           <span>Atualização não informada</span>
         )}
       </p>
-      <BotaoTema />
       <MenuConta />
     </div>
   )
