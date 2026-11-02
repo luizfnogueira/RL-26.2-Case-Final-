@@ -142,10 +142,14 @@ describe('FilaPage', () => {
     await screen.findByText('UC-DEMO-003')
     expect(screen.getAllByText('Validação documental').length).toBeGreaterThan(0)
     expect(
-      screen.getByRole('checkbox', { name: 'Selecionar UC-DEMO-003' }).hasAttribute('disabled'),
+      screen
+        .getByRole('button', { name: 'Selecionar para inspeção UC-DEMO-003' })
+        .hasAttribute('disabled'),
     ).toBe(true)
     expect(
-      screen.getByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }).hasAttribute('disabled'),
+      screen
+        .getByRole('button', { name: 'Selecionar para inspeção UC-DEMO-001' })
+        .hasAttribute('disabled'),
     ).toBe(false)
   })
 
@@ -218,12 +222,14 @@ describe('FilaPage', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Selecionar para inspeção UC-DEMO-001' }),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem de inspeção' }))
-    fireEvent.change(screen.getByLabelText('Equipe responsável *'), {
+    fireEvent.change(screen.getByLabelText(/Equipe responsável/i), {
       target: { value: 'Equipe Norte 02' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem' }))
 
     await waitFor(() =>
       expect(mocks.criarInspecoesEmLote).toHaveBeenCalledWith([
@@ -251,12 +257,14 @@ describe('FilaPage', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar UC-DEMO-001' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Selecionar para inspeção UC-DEMO-001' }),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem de inspeção' }))
-    fireEvent.change(screen.getByLabelText('Equipe responsável *'), {
+    fireEvent.change(screen.getByLabelText(/Equipe responsável/i), {
       target: { value: 'Equipe Norte 02' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordens' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ordem' }))
 
     const avisos = await screen.findAllByText(
       'Nenhuma ordem foi criada. Revise: UC-DEMO-001 (já possui ordem ativa)',

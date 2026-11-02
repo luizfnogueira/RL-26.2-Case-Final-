@@ -14,10 +14,10 @@ describe('apresentação dos indicadores', () => {
   it('trata redução de continuidade como favorável e aumento do valor em aberto como desfavorável', () => {
     render(<IndicadoresExecutivos indicadores={exemplo().indicadores} />)
     const dec = within(screen.getByRole('region', { name: 'DEC médio' })).getByTitle(
-      'Variação percentual em relação à comparação',
+      'Variação percentual em relação ao período de comparação',
     )
     const aberto = within(screen.getByRole('region', { name: 'Valor em aberto' })).getByTitle(
-      'Variação percentual em relação à comparação',
+      'Variação percentual em relação ao período de comparação',
     )
     expect(dec.className).toContain('bg-sucesso-suave')
     expect(dec.textContent).toContain('−13,6%')

@@ -627,6 +627,7 @@ export default function FilaPage() {
                                   variante="secundario"
                                   tamanho="sm"
                                   disabled
+                                  aria-label={`Selecionar para inspeção ${linha.id_uc}`}
                                   motivoDesabilitado="Esta UC pede validação documental antes de uma ordem de campo."
                                   className="w-full"
                                 >
@@ -636,6 +637,11 @@ export default function FilaPage() {
                                 <Button
                                   variante={selecionado ? 'primario' : 'secundario'}
                                   tamanho="sm"
+                                  aria-label={
+                                    selecionado
+                                      ? `Remover seleção de ${linha.id_uc}`
+                                      : `Selecionar para inspeção ${linha.id_uc}`
+                                  }
                                   aria-pressed={selecionado}
                                   onClick={() => alternarSelecao(linha)}
                                   disabled={atualizando}

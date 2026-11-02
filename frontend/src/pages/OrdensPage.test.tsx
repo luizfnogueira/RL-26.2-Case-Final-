@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import indicadoresFixture from '@/data/mocks/indicadores_ordens.json'
@@ -160,7 +160,7 @@ describe('OrdensPage', () => {
     expect(screen.getByRole('button', { name: /Cancelada/i })).toBeTruthy()
   })
 
-  it('mostra um botão de ações centralizado por ordem e abre as opções disponíveis', async () => {
+  it('mostra a ação principal por ordem e abre o menu de ações secundárias', async () => {
     const fixture = inspecoesFixture as unknown as Ordens
     vi.mocked(listarInspecoes).mockResolvedValue(fixture)
 
@@ -172,20 +172,25 @@ describe('OrdensPage', () => {
 
     await screen.findByText('UC-DEMO-002')
 
-    const botoesAcoes = screen.getAllByRole('button', { name: /Ações da ordem/i })
-    expect(botoesAcoes).toHaveLength(fixture.items.length)
-    expect(botoesAcoes[0].getAttribute('aria-expanded')).toBe('false')
+    // Ordens abertas/em campo expõem a ação que faz o fluxo avançar e escondem as secundárias no menu.
+    const botoesMenu = screen.getAllByRole('button', { name: /Mais ações da ordem/i })
+    expect(botoesMenu).toHaveLength(2)
+    expect(botoesMenu[0].getAttribute('aria-expanded')).toBe('false')
+    // Ordens concluídas/canceladas não têm ação principal: "Ver detalhes" aparece direto.
+    expect(screen.getAllByRole('button', { name: 'Ver detalhes' })).toHaveLength(2)
 
-    fireEvent.click(botoesAcoes[0])
+    fireEvent.click(botoesMenu[0])
 
-    expect(botoesAcoes[0].getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Iniciar campo' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Cancelar ordem' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Ver detalhes' })).toBeTruthy()
+    expect(botoesMenu[0].getAttribute('aria-expanded')).toBe('true')
+    const menu = screen.getByRole('group', { name: 'Mais ações da ordem #1' })
+    expect(within(menu).getByRole('button', { name: 'Cancelar ordem' })).toBeTruthy()
+    expect(within(menu).getByRole('button', { name: 'Ver detalhes' })).toBeTruthy()
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Iniciar campo' }), { key: 'Escape' })
-    expect(botoesAcoes[0].getAttribute('aria-expanded')).toBe('false')
-    expect(document.activeElement).toBe(botoesAcoes[0])
+    fireEvent.keyDown(within(menu).getByRole('button', { name: 'Cancelar ordem' }), {
+      key: 'Escape',
+    })
+    expect(botoesMenu[0].getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(botoesMenu[0])
   })
 
   it('permite filtrar por status através das abas', async () => {
@@ -306,10 +311,8 @@ describe('OrdensPage', () => {
 
     await screen.findByText('UC-DEMO-002')
 
-    // Ordem #1 está ABERTA, possui botão "Iniciar campo"
-    fireEvent.click(screen.getByRole('button', { name: 'Ações da ordem #1' }))
-    const botaoIniciar = screen.getByRole('button', { name: /Iniciar campo/i })
-    fireEvent.click(botaoIniciar)
+    // Ordem #1 está ABERTA: a ação principal fica visível na linha
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar campo' }))
 
     // Modal aberto
     expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -345,10 +348,8 @@ describe('OrdensPage', () => {
 
     await screen.findByText('UC-DEMO-005')
 
-    // Ordem #2 está EM_CAMPO, possui botão "Registrar resultado"
-    fireEvent.click(screen.getByRole('button', { name: 'Ações da ordem #2' }))
-    const botaoRegistrar = screen.getByRole('button', { name: /Registrar resultado/i })
-    fireEvent.click(botaoRegistrar)
+    // Ordem #2 está EM_CAMPO: a ação principal fica visível na linha
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar resultado' }))
 
     // Modal aberto
     expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -403,8 +404,7 @@ describe('OrdensPage', () => {
       </MemoryRouter>,
     )
     await screen.findByText('UC-DEMO-005')
-    fireEvent.click(screen.getByRole('button', { name: 'Ações da ordem #2' }))
-    fireEvent.click(screen.getByRole('button', { name: /Registrar resultado/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar resultado' }))
     await screen.findByRole('dialog')
 
     fireEvent.click(screen.getByRole('button', { name: /Sem irregularidade/i }))
@@ -441,8 +441,8 @@ describe('OrdensPage', () => {
 
     await screen.findByText('UC-DEMO-002')
 
-    // Clica no primeiro botão "Cancelar"
-    fireEvent.click(screen.getByRole('button', { name: 'Ações da ordem #1' }))
+    // Abre o menu de ações secundárias da Ordem #1
+    fireEvent.click(screen.getByRole('button', { name: 'Mais ações da ordem #1' }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar ordem' }))
 
     expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -472,9 +472,9 @@ describe('OrdensPage', () => {
 
     await screen.findByText('UC-DEMO-003')
 
-    // Abre as ações da Ordem #3 e seleciona os detalhes
-    fireEvent.click(screen.getByRole('button', { name: 'Ações da ordem #3' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalhes' }))
+    // Ordem #3 está concluída: "Ver detalhes" aparece direto na linha
+    const linha = screen.getByText('UC-DEMO-003').closest('tr') as HTMLElement
+    fireEvent.click(within(linha).getByRole('button', { name: 'Ver detalhes' }))
 
     expect(await screen.findByRole('dialog')).toBeTruthy()
     expect(screen.getByText(/Ordem de inspeção #3/i)).toBeTruthy()

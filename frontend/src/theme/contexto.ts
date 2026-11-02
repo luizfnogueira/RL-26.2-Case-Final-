@@ -12,11 +12,18 @@ export type ContextoTema = {
 
 export const TemaContexto = createContext<ContextoTema | null>(null)
 
-/** Tema atual e como alterná-lo. Precisa estar dentro de <TemaProvider>. */
+const TEMA_SEM_PROVIDER: ContextoTema = {
+  tema: 'claro',
+  alternarTema: () => {},
+  definirTema: () => {},
+}
+
+/**
+ * Tema atual e como alterná-lo. Fora de <TemaProvider> devolve o tema claro sem efeitos, para que
+ * componentes isolados (como o BotaoTema no cabeçalho) possam ser renderizados em testes.
+ */
 export function useTema(): ContextoTema {
-  const contexto = useContext(TemaContexto)
-  if (!contexto) throw new Error('useTema precisa estar dentro de <TemaProvider>')
-  return contexto
+  return useContext(TemaContexto) ?? TEMA_SEM_PROVIDER
 }
 
 /** Preferência salva pelo usuário, se houver. */

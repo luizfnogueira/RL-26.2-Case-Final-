@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Download } from 'lucide-react'
 import MenuConta from '@/auth/MenuConta'
 import { gerarAtualizacaoMock } from '@/data/usuario.mock'
 import BotaoTema from '@/theme/BotaoTema'
 import { formatarAtualizacao } from '@/utils/datas'
 
 /**
- * Canto direito do cabeçalho: frescor dos dados, tema, exportar e usuário. Some no celular
+ * Canto direito do cabeçalho: frescor dos dados, tema e usuário. Some no celular
  * (lá o tema e o avatar ficam na barra superior).
  */
 export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?: string | null }) {
@@ -37,15 +36,6 @@ export default function AcoesCabecalho({ goldAtualizadaEm }: { goldAtualizadaEm?
         )}
       </p>
       <BotaoTema />
-      <button
-        type="button"
-        disabled
-        aria-label="Exportar"
-        title="Exportar (disponível nas telas com dados)"
-        className="grid size-9 place-items-center rounded-md border border-borda bg-surface-card text-ink-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:saturate-0"
-      >
-        <Download size={18} strokeWidth={1.75} aria-hidden="true" />
-      </button>
       <MenuConta />
     </div>
   )
