@@ -159,7 +159,8 @@ def test_algarismo_fora_de_marcador_pede_nova_tentativa_e_a_segunda_vale(ia):
 
 
 def test_algarismo_fora_de_marcador_persistente_vira_texto_por_regra(ia):
-    ia(ok(texto=TEXTO_IA.replace('{variacao_consumo_ano_anterior}', '38%')))
+    # Número errado digitado: o insights.py devolve ao marcador só o valor que bate exatamente com um marcador
+    ia(ok(texto=TEXTO_IA.replace('{variacao_consumo_ano_anterior}', '39%')))
     corpo = pedir()
     assert corpo['texto'] == regra()['texto']
     assert alternativo(corpo) == [OBSERVACAO_FALHA]

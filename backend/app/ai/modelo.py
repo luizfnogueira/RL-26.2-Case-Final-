@@ -46,7 +46,7 @@ ProvedorLLM = Literal["google", "google-gla", "openrouter", "openai", "groq", "t
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 MODELO_PADRAO_OPENROUTER = "nvidia/nemotron-3.5-lightning:free"
-MODELO_PADRAO_GOOGLE = "gemini-2.5-flash-lite"
+MODELO_PADRAO_GOOGLE = "gemini-3.1-flash-lite"
 
 
 class ConfiguracaoLLMError(RuntimeError):
@@ -182,7 +182,7 @@ def obter_model_settings(
     # Em provedores OpenAI/OpenRouter (como Nemotron), tokens de raciocínio contam dentro de max_tokens.
     # O OpenRouter não aceita combinar `openai_reasoning_effort` com `max_tokens`/`enabled` na mesma chamada.
     # Por padrão, desabilitamos o raciocínio verboso (`enabled: False`) para responder rápido sem estourar max_tokens.
-    max_tokens_or = 4096 if perfil == "sql" else 1536
+    max_tokens_or = 4096 if perfil == "sql" else 2048
     esforco = _ler_env("LLM_REASONING_EFFORT")
     if esforco:
         return OpenAIChatModelSettings(
@@ -195,7 +195,7 @@ def obter_model_settings(
         temperature=temperatura,
         max_tokens=max_tokens_or,
         timeout=timeout_s,
-        extra_body={"reasoning": {"max_tokens": 256 if perfil == "sql" else 64}},
+        extra_body={"reasoning": {"max_tokens": 256}},
     )
 
 

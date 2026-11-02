@@ -556,13 +556,18 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | `detalhes_tecnicos` | objeto | Painel “Detalhes técnicos” da resposta. |
 | `grafico` | objeto ou `null` | Gráfico da resposta; presente se, e só se, `apresentacao` for `"grafico"`. |
 | `esclarecimento` | objeto ou `null` | Pergunta e opções; presente se, e só se, `status` for `"esclarecer"`. |
+| `metadados.fonte` | `"dados"` (padrão) ou `"guia"` | De onde veio a resposta. Ausente vale como `"dados"`. |
+| `metadados.secoes_guia` | lista de `{id, titulo}` | Seções do guia da plataforma em que a resposta se apoiou; vazia em resposta de dados. |
 
-**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta dois casos:
+**Pergunta sobre a plataforma.** Perguntas sobre o uso do portal ("O que é a aba Assistente V-Energy?", "Como gero uma ordem de inspeção?") são respondidas pelo [guia da plataforma](../backend/app/ai/guia/plataforma.md), não pela Gold. A resposta vem com `metadados.fonte: "guia"`, `sql: null`, `tabelas` e `dados` vazios, sem gráfico, e `status` `ok` ou `nao_sei`. Com `ok`, `metadados.secoes_guia` lista as seções usadas, e o bloco "Como cheguei nisso" mostra essas seções no lugar do SQL. O agente do guia só recebe as seções de nível público. O que não estiver no guia volta `nao_sei`. [Exemplo](../backend/app/services/fixtures/resposta_ia_guia.json).
+
+**Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta três casos:
 
 | Caso | Exemplo | Opções |
 | --- | --- | --- |
 | Bairro que existe em 2 municípios ou mais, sem nenhum município na pergunta. A troca anterior só resolve numa continuação ("E no Centro?") logo depois de uma pergunta com um município só | "Qual a receita do Centro?" (o Centro existe em 10 municípios da Gold) | Um botão por município (até 10) e "Todos os municípios juntos". Um município citado resolve, mesmo sem esse bairro: aí o agente responde que não há dados |
 | "Este ano", "deste ano", "no ano atual" sem ano nem P1/P2 | "Quais bairros tiveram mais falta de luz este ano?" | "2026 (jan a jun)" e "P2 (jul/2025 a jun/2026)", porque a base termina em jun/2026 |
+| "Último ano", "ano passado" sem ano nem P1/P2 | "Qual bairro mais perdeu volume residencial no último ano?" | "2025 (jan a dez)" e "Últimos 12 meses (jul/2025 a jun/2026)": a base tem 2025 inteiro, e 2026 só até junho |
 
 ```json
 {
@@ -630,6 +635,7 @@ Cenários demonstrativos:
 | DROP TABLE clientes | [bloqueado](../backend/app/services/fixtures/resposta_ia_bloqueado.json) |
 | Pergunta com "gráfico", "barras", "pizza" ou "linhas" | ok — um exemplo de cada tipo (links acima) |
 | Qual a receita do Centro? / Qual foi a receita deste ano? | esclarecer — exemplos acima (no mock, "Centro" é um bairro fictício de Recife, Olinda e Paulista) |
+| O que é a aba Assistente V-Energy? | [ok pelo guia](../backend/app/services/fixtures/resposta_ia_guia.json) — `metadados.fonte: "guia"`, sem SQL |
 
 A API é a ponte com o agente de IA da Equipe 3, escolhido pela variável `IA_MODO` do `.env`:
 

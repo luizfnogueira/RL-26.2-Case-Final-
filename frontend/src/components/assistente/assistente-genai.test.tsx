@@ -179,8 +179,8 @@ describe('GENAI-18/19 — detalhes técnicos', () => {
 describe('GENAI-16 — aba de sugestões', () => {
   const todas = SUGESTOES_POR_CATEGORIA.flatMap((c) => c.perguntas)
 
-  it('tem de 12 a 16 perguntas em 5 categorias, com as 3 do case', () => {
-    expect(SUGESTOES_POR_CATEGORIA).toHaveLength(5)
+  it('tem de 12 a 16 perguntas em 6 categorias, com as 3 do case e as da plataforma', () => {
+    expect(SUGESTOES_POR_CATEGORIA).toHaveLength(6)
     expect(todas.length).toBeGreaterThanOrEqual(12)
     expect(todas.length).toBeLessThanOrEqual(16)
     expect(todas).toEqual(
@@ -188,6 +188,8 @@ describe('GENAI-16 — aba de sugestões', () => {
         'Quantas unidades com painel solar em Olinda tiveram queda de consumo acima de 30%?',
         'Qual bairro mais perdeu volume residencial no último ano?',
         'Quanto a receita comercial cresceu em Jaboatão?',
+        'O que é a aba Assistente V-Energy?',
+        'Como gero uma ordem de inspeção?',
       ]),
     )
   })

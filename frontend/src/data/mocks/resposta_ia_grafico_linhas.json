@@ -67,7 +67,9 @@
     "gold_atualizada_em": "2026-10-21T06:15:00-03:00",
     "observacoes": [
       "Resposta pré-definida do stub; não há agente conectado nem SQL executado."
-    ]
+    ],
+    "fonte": "dados",
+    "secoes_guia": []
   },
   "conversa_id": "8f14e45f-ceea-4b67-9c2a-5d3f1a2b6c7d",
   "apresentacao": "grafico",

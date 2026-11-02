@@ -104,3 +104,51 @@ def test_texto_longo_demais_vira_texto_alternativo():
 def test_escrever_insight_falha_quando_o_modelo_insiste_no_erro():
     with pytest.raises(UnexpectedModelBehavior):
         escrever_insight({"efeito_preco": "R$ 1,0 milhões"}, modelo=modelo({"titulo": "T", "texto": "1 2 3"}))
+
+
+
+def test_receita_liquida_e_corrigida_para_receita_de_energia():
+    com_liquida = {
+        "titulo": "Receita líquida subiu",
+        "texto": "{recorte}, a receita líquida foi de {receita_energia_base} para {receita_energia_atual}.",
+    }
+    usar(gerador(com_liquida))
+    dados = pedir().json()
+    assert not alternativo(dados)
+    assert "líquida" not in dados["titulo"].lower()
+    assert "líquida" not in dados["texto"].lower()
+    assert "receita de energia" in dados["texto"].lower()
+
+
+def test_sinal_duplo_e_marcador_sem_rotulo_sao_corrigidos():
+    com_defeitos = {
+        "titulo": "Preço sustentou a receita",
+        "texto": "{recorte}, a alta foi impulsionada pelo {efeito_preco}, com retração de {efeito_volume}.",
+    }
+    usar(gerador(com_defeitos))
+    dados = pedir().json()
+    assert not alternativo(dados)
+    assert "efeito-preço de R$ 17,0 milhões" in dados["texto"]
+    assert "retração de R$ 5,0 milhões" in dados["texto"]
+    assert "retração de −" not in dados["texto"]
+
+
+def test_periodos_invertidos_sao_corrigidos():
+    invertido = {
+        "titulo": "Evolução da receita",
+        "texto": "{recorte}, a receita de energia passou de {receita_energia_atual} para {receita_energia_base}.",
+    }
+    usar(gerador(invertido))
+    dados = pedir().json()
+    assert not alternativo(dados)
+    assert "de R$ 150,0 milhões para R$ 162,0 milhões" in dados["texto"]
+
+
+def test_escrever_insight_aceita_instrucoes_customizadas_para_v1c():
+    saida_uc = {"titulo": "Resumo da UC", "texto": "Consumo médio de {consumo_medio}."}
+    res = escrever_insight(
+        {"consumo_medio": "250 kWh"},
+        modelo=modelo(saida_uc),
+        instrucoes="Escreva o resumo da unidade consumidora usando os marcadores.",
+    )
+    assert res == {"titulo": "Resumo da UC", "texto": "Consumo médio de 250 kWh."}

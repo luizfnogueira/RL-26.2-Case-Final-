@@ -46,7 +46,7 @@ from app.ai.resposta import (
     substituir_marcadores_pt_br,
     validar_fidelidade_saida,
 )
-from app.ai.roteador import ModoSchema, montar_contexto_schema
+from app.ai.roteador import ModoSchema, e_pergunta_da_plataforma, montar_contexto_schema
 from app.ai.telemetria import construir_telemetria, montar_detalhes_tecnicos
 from app.db.gold_contract import COLUMNS
 
@@ -86,6 +86,7 @@ REGRAS_CRITICAS_TOPO = """
    - No campo `texto`, referencie os números retornados pelo banco usando marcadores `{v1}`, `{v2}` e preencha o dicionário `marcadores` com os valores exatos das células retornadas (ex.: `{"v1": 169680000.0, "v2": -2.09}`).
    - Não escreva números soltos fora dos marcadores que não estejam nos dados da consulta.
    - Se a consulta retornar vazio, se o período for fora de jul/2022 a jun/2026 ou se a pergunta for fora do escopo da V-Energy, devolva `status="nao_sei"` explicando o motivo.
+   - Se uma dúvida sobre o uso da interface, telas, abas ou navegação da plataforma escapar do roteador e cair aqui no agente de dados, NÃO execute `consultar_gold` (não gere SQL) e devolva `status="nao_sei"` indicando que a dúvida é sobre o uso da plataforma.
 4. CORREÇÃO DE PREMISSA FALSA (GENAI-10.4):
    - Se a pergunta contiver uma premissa contrária aos dados (ex.: "Quanto a receita comercial cresceu em Jaboatão?", quando na verdade caiu 2,09% de P1 para P2), corrija a premissa de forma explícita no texto informando que houve queda/redução.
 5. CONTINUAÇÃO DE CONVERSA / FOLLOW-UP (GENAI-13):
@@ -226,6 +227,13 @@ _SOMA_SIMPLES_DEC_FEC = re.compile(r"\bsum\s*\(\s*(?:\w+\.)?(?:dec|fec)(?:_sem_d
 # Uma linha por alimentador: agrupar ou filtrar por alimentador mantém a soma dos meses de um alimentador só
 _POR_ALIMENTADOR = re.compile(
     r"\bgroup\s+by\b[^;]*\balimentador\b|\balimentador\s*(?:=|\bin\b)|^\s*select\s+(?:\w+\.)?alimentador\b")
+# Ponderação pelas UCs: SUM(dec * ucs_atendidas) dividido por SUM(ucs_atendidas), aceitando NULLIF e casts
+_INDICE = r"(?:\w+\.)?(?:dec|fec)(?:_sem_dia_critico)?(?:\s*::\s*\w+)?"
+_UCS = r"(?:\w+\.)?ucs_atendidas(?:\s*::\s*\w+)?"
+_NUMERADOR_PONDERADO = rf"\bsum\s*\(\s*(?:{_INDICE}\s*\*\s*{_UCS}|{_UCS}\s*\*\s*{_INDICE})\s*\)"
+_RAZAO_PONDERADA = re.compile(
+    rf"{_NUMERADOR_PONDERADO}[^/;]{{0,40}}/\s*(?:(?:nullif|cast)?\s*\(\s*)*sum\s*\(\s*{_UCS}\s*\)")
+_NUMERADOR_PONDERADO = re.compile(_NUMERADOR_PONDERADO)
 
 
 def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
@@ -242,14 +250,70 @@ def validar_regra_dec_fec_no_sql(sql: str, pergunta: str) -> None:
             "O DEC mensal já é uma média por UC. Para um grupo de alimentadores, pondere pelas UCs em cada mês "
             "(`SUM(dec * ucs_atendidas) / SUM(ucs_atendidas)`) e depois some os meses."
         )
-    if ("agg_dec_fec_mensal" in sql_lower and _SOMA_SIMPLES_DEC_FEC.search(sql_lower)
-            and "ucs_atendidas" not in sql_lower and not _POR_ALIMENTADOR.search(sql_lower)):
+    if "agg_dec_fec_mensal" not in sql_lower:
+        return
+    razoes = len(_RAZAO_PONDERADA.findall(sql_lower))
+    # Basta a coluna aparecer não serve: SUM(dec) ao lado de SUM(ucs_atendidas), ou SUM(dec * ucs) / COUNT(*)
+    if len(_NUMERADOR_PONDERADO.findall(sql_lower)) > razoes:
+        raise ErroConsulta(
+            "Regra de negócio violada: a ponderação do DEC/FEC pelas UCs divide pela soma das UCs do mesmo mês: "
+            "`SUM(dec * ucs_atendidas) / NULLIF(SUM(ucs_atendidas), 0)`, agrupando por `mes_referencia`; "
+            "depois some os meses."
+        )
+    if _SOMA_SIMPLES_DEC_FEC.search(sql_lower) and not razoes and not _POR_ALIMENTADOR.search(sql_lower):
         raise ErroConsulta(
             "Regra de negócio violada: em `agg_dec_fec_mensal` cada linha é um alimentador, e `SUM(dec)` por "
             "município, bairro ou sem agrupar soma o DEC de alimentadores diferentes. Pondere pelas UCs em cada "
             "mês e depois some os meses: `SELECT municipio, SUM(dec_mes) FROM (SELECT municipio, mes_referencia, "
             "SUM(dec * ucs_atendidas) / SUM(ucs_atendidas) AS dec_mes FROM agg_dec_fec_mensal WHERE ... GROUP BY "
             "municipio, mes_referencia) m GROUP BY municipio`."
+        )
+
+
+_COL = r"(?:\w+\.)?"
+_FILTROS_INTERRUPCAO = {
+    "flag_sem_interrupcao = FALSE": re.compile(
+        rf"{_COL}flag_sem_interrupcao\s*(?:=\s*false|is\s+false|<>\s*true)|\bnot\s+{_COL}flag_sem_interrupcao\b"),
+    "flag_antes_ligacao = FALSE": re.compile(
+        rf"{_COL}flag_antes_ligacao\s*(?:=\s*false|is\s+false|<>\s*true)|\bnot\s+{_COL}flag_antes_ligacao\b"),
+}
+# Qualquer corte a partir de 3 min serve: "interrupções acima de 30 min" já deixa a oscilação de fora
+_CORTE_DURACAO = re.compile(rf"{_COL}duracao_efetiva_min\s*>=?\s*(\d+(?:\.\d+)?)")
+
+
+def _corta_oscilacao(sql_lower: str) -> bool:
+    return any(float(minutos) >= 3 for minutos in _CORTE_DURACAO.findall(sql_lower))
+_AGREGA = re.compile(r"\b(?:count|sum|avg)\s*\(")
+_DURACAO_BRUTA = re.compile(rf"\b(?:sum|avg)\s*\([^)]*\b{_COL}duracao_min\b")
+# Quem pergunta pelas oscilações ou por todas as ocorrências quer justamente o que o filtro tira
+PEDIDO_OSCILACAO = re.compile(
+    r"oscila|piscad|pisca|sem\s+interrup|antes\s+da\s+liga|todas\s+as\s+ocorr|ocorr[eê]ncias\s+brutas",
+    re.IGNORECASE)
+
+
+def validar_regra_interrupcoes_no_sql(sql: str, pergunta: str) -> None:
+    """Contar ou somar interrupções em `uc_interrupcoes` segue a regra do DEC (skill de continuidade, regra 5).
+
+    Oscilação (menos de 3 min), ocorrência sem interrupção e ocorrência antes da ligação da UC não são
+    interrupção; a duração é a efetiva, sem o tempo sobreposto. Sem os filtros, a contagem infla.
+    """
+    sql_lower = (sql or "").lower()
+    if "uc_interrupcoes" not in sql_lower or PEDIDO_OSCILACAO.search(pergunta or ""):
+        return
+    if _DURACAO_BRUTA.search(sql_lower):
+        raise ErroConsulta(
+            "Regra de negócio violada: em `uc_interrupcoes`, some a duração por `duracao_efetiva_min` "
+            "(sem o tempo sobreposto), nunca por `duracao_min`."
+        )
+    if not _AGREGA.search(sql_lower):
+        return
+    faltando = [nome for nome, padrao in _FILTROS_INTERRUPCAO.items() if not padrao.search(sql_lower)]
+    if not _corta_oscilacao(sql_lower):
+        faltando.append("duracao_efetiva_min >= 3")
+    if faltando:
+        raise ErroConsulta(
+            "Regra de negócio violada: ao contar ou somar interrupções em `uc_interrupcoes`, oscilação não é "
+            f"interrupção. Inclua no WHERE: {' AND '.join(faltando)}."
         )
 
 
@@ -368,10 +432,16 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
     @agente.tool
     def consultar_gold(ctx: RunContext[DepsAgente], sql: str) -> dict[str, Any]:
         """Executa uma consulta SQL SELECT somente leitura na camada Gold e devolve colunas e linhas."""
+        if e_pergunta_da_plataforma(ctx.deps.pergunta_original):
+            raise ModelRetry(
+                "Esta pergunta é sobre o uso da plataforma e não sobre os dados da Gold. "
+                "Não execute SQL; finalize com status='nao_sei' indicando que a dúvida é sobre a plataforma."
+            )
         ctx.deps.tentativas_sql += 1
         try:
             validar_regra_consumo_negativo_no_sql(sql, ctx.deps.consumo_negativo_solicitado)
             validar_regra_dec_fec_no_sql(sql, ctx.deps.pergunta_original)
+            validar_regra_interrupcoes_no_sql(sql, ctx.deps.pergunta_original)
             validar_regra_periodo_no_sql(sql, ctx.deps.pergunta_original)
             if ctx.deps.executar_sql_fn is None:
                 raise ErroConsulta("Função de consulta ao banco não configurada.")
@@ -620,6 +690,54 @@ def responder(
     """Função principal do agente do Théo: recebe a pergunta e devolve o dicionário compatível com RespostaIA."""
     inicio_total = time.perf_counter()
     etapas_ms: dict[str, int] = {}
+
+    # 0. Defesa de escopo (T4): se uma pergunta sobre o uso da plataforma escapar do roteador e cair
+    # direto no agente de dados, não executa SQL e devolve status="nao_sei" indicando que é sobre a plataforma.
+    if e_pergunta_da_plataforma(pergunta):
+        latencia_ms = int((time.perf_counter() - inicio_total) * 1000)
+        saida_plat = RespostaAgente(
+            pergunta_interpretada=pergunta,
+            plano=None,
+            sql=None,
+            texto=(
+                "Esta dúvida é sobre como usar a plataforma V-Energy Grid 360 (atendida pelo Guia da Plataforma) "
+                "e não requer consulta SQL aos dados da camada Gold."
+            ),
+            marcadores={},
+            premissas=["Pergunta identificada como dúvida de uso da plataforma; nenhuma consulta SQL foi executada."],
+            status="nao_sei",
+            confianca="alta",
+            justificativa="Regra 3 (T4): perguntas sobre a plataforma não executam SQL no agente de dados.",
+        )
+        deps_plat = DepsAgente(pergunta_original=pergunta)
+        telemetria_plat = construir_telemetria(
+            resultado_run=None,
+            deps=deps_plat,
+            saida=saida_plat,
+            modelo_nome=obter_nome_modelo("sql"),
+            provedor_nome=obter_provedor_configurado(),
+            latencia_total_ms=latencia_ms,
+            etapas_ms={"ss_ms": 0, "agente_ms": 0, "validacao_ms": 0},
+            numeros_conferidos=True,
+        )
+        payload_plat: dict[str, Any] = {
+            "resposta": saida_plat.texto,
+            "sql": None,
+            "tabelas": [],
+            "dados": {"colunas": [], "linhas": []},
+            "status": "nao_sei",
+            "gerado_em": datetime.now(timezone.utc),
+            "metadados": {
+                "dados_ficticios": False,
+                "gold_atualizada_em": gold_atualizada_em,
+                "observacoes": list(saida_plat.premissas),
+            },
+            "apresentacao": "texto",
+            "detalhes_tecnicos": montar_detalhes_tecnicos(saida_plat, telemetria_plat, n_linhas=0),
+        }
+        if conversa_id is not None:
+            payload_plat["conversa_id"] = conversa_id
+        return payload_plat
 
     tem_historico = bool(historico)
     if usar_cache is not None:

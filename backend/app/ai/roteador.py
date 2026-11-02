@@ -1,9 +1,11 @@
-"""Schema Selector (SS do CHESS): roteador determinístico de skills vs. catálogo inteiro (GENAI-23).
+"""Schema Selector (SS do CHESS) e Detector de Intenção Plataforma vs. Dados (GENAI-23, T1).
 
-Seleciona até 2 skills de domínio com base nas palavras-chave e no glossário do setor elétrico,
-sem gastar chamadas ao modelo. Quando nenhuma skill específica é reconhecida, entrega o núcleo
-comum acompanhado do catálogo resumido das 14 views da Gold. Também suporta o modo
-`catalogo_inteiro` para comparação experimental no golden set (GENAI-23.3 / GENAI-27.3).
+1. `e_pergunta_da_plataforma(pergunta, guia)`: decide deterministicamente se a pergunta é sobre
+   o uso/funcionamento da plataforma (vai para o guia) ou sobre os dados operacionais/comerciais
+   (vai para o agente Text-to-SQL). Perguntas mistas ("o que é DEC e qual o DEC de Recife?")
+   vão para dados.
+2. `selecionar_skills` / `montar_contexto_schema`: seleciona até 2 skills de domínio com base nas
+   palavras-chave e no glossário do setor elétrico, sem gastar chamadas ao modelo.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from app.db.gold_contract import COLUMNS, KEYS
+from app.services.guia_plataforma import Guia, carregar_guia
 
 ModoSchema = Literal["skills", "catalogo_inteiro"]
 SKILLS_DIR = Path(__file__).resolve().parent / "skills"
@@ -151,6 +154,50 @@ COLUNAS_CONFIDENCIAIS_OCULTAS = {
     "longitude",
 }
 
+# Expressões de interface, navegação, funcionamento da plataforma e conceitos do glossário (T1)
+_PADROES_INTENCAO_PLATAFORMA = re.compile(
+    r"\b("
+    r"ajuda|me ajude|como funciona|como o assistente|como a ia|como o agente|inteligencia artificial funciona|"
+    r"o que voce faz|o que vc faz|para que serve|pra que serve|como usar|como uso|como eu uso|"
+    r"como abrir|como abro|onde fica|onde vejo|onde encontro|onde olho|onde consulto|onde acesso|"
+    r"como acessar|como acesso|como navegar|como navego|como filtrar|como filtro|como limpar|"
+    r"como gero|como gerar|como criar|como crio|como cancelo|como cancelar|como registrar|como registro|"
+    r"como concluir|como concluo|como exportar|como exporto|como baixar|como baixo|exportar csv|"
+    r"como comparar|como comparo|como buscar|como busco|como pesquisar|como ordeno|como ordenar|"
+    r"como pedir|como peco|conversa do assistente|o assistente pode|a ia pode|"
+    r"aba|abas|tela|telas|menu|menus|botao|botoes|painel lateral|barra de filtros|limpar filtros|"
+    r"pergunte a ia|assistente v-?energy|aba v-?energy|v-?energy grid 360|grid 360|visao 360|"
+    r"painel executivo|diagnostico da receita|fila de inspecao|ordens de inspecao|ordem de inspecao|"
+    r"como cheguei nisso|ver como tabela|sugestoes|primeiros passos|glossario|"
+    r"o que significa|qual o significado|qual a diferenca entre|o que quer dizer|"
+    r"ate quando vao os dados|qual o periodo da base|o que a plataforma|esta plataforma|este portal|este site|este sistema"
+    r")\b"
+)
+
+# Perguntas conceituais ("o que é X?", "o que são X?") que apontam para o guia ou glossário
+_PADRAO_PERGUNTA_CONCEITUAL = re.compile(
+    r"^\s*(?:o que (?:e|eh|sao|significa|significam)|qual (?:e |eh )?(?:o significado|a definicao|a funcao) d[eoas]+|"
+    r"para que serve[m]?|pra que serve[m]?|como funciona[m]?)\b"
+)
+
+# Sinais claros de consulta quantitativa/analítica aos dados da camada Gold (se presentes, ou em pergunta mista -> dados)
+_PADROES_PEDIDO_DADOS = re.compile(
+    r"\b("
+    r"qual foi|quais foram|quanto foi|quanto cresceu|quanto caiu|quanto subiu|quanto variou|quanto a gente faturou|"
+    r"quantos|quantas|quais os \d+|quais as \d+|top \d+|ranking|"
+    r"quais bairros|quais municipios|quais alimentadores|quais ucs|quais unidades|quais canais|quais assuntos|"
+    r"qual bairro|qual municipio|qual alimentador|qual canal|qual uc|qual unidade|"
+    r"menor consumo|maior consumo|maior dec|maior fec|pior nota|maior risco|maior receita|"
+    r"em recife|em olinda|em jaboatao|em paulista|em camaragibe|em igarassu|em ipojuca|em moreno|"
+    r"em abreu e lima|em aracoiaba|em itapissuma|em itamaraca|em cabo de santo agostinho|em sao lourenco|"
+    r"de recife|de olinda|de jaboatao|de paulista|de camaragibe|de igarassu|de ipojuca|"
+    r"em p1|em p2|de p1|de p2|entre p1 e p2|comparada a p1|comparado a p1|"
+    r"em 202[2-7]|de 202[2-7]|no ultimo ano|nos ultimos 12 meses|deste ano|desse ano|"
+    r"janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|"
+    r"uc\d{4,}|alm-[a-z]{3}-\d{3}|acima de \d+|abaixo de \d+"
+    r")\b"
+)
+
 
 def normalizar_texto_roteamento(texto: str) -> str:
     """Remove acentos, converte para minúsculas e colapsa espaços para casamento determinístico."""
@@ -161,6 +208,76 @@ def normalizar_texto_roteamento(texto: str) -> str:
     )
     limpo = re.sub(r"[^a-z0-9\s_-]", " ", sem_acento.lower())
     return " ".join(limpo.split())
+
+
+def e_pergunta_da_plataforma(pergunta: str, guia: Guia | None = None) -> bool:
+    """Decide se a pergunta é sobre a plataforma/guia (`True`) ou sobre os dados da Gold (`False`) — T1.
+
+    Regras:
+    - Sem chamar o modelo (100% determinístico).
+    - Pergunta mista (ex.: 'O que é DEC e qual o DEC de Recife?') ou com recorte de dados vai para `dados` (`False`).
+    - Na dúvida, retorna `False` (vai para `dados`).
+    """
+    texto_norm = normalizar_texto_roteamento(pergunta)
+    if not texto_norm:
+        return False
+
+    tem_sinal_dados = bool(_PADROES_PEDIDO_DADOS.search(texto_norm))
+    # Exceção: perguntas sobre o próprio conceito de P1/P2 ou limite temporal da base ("o que é P1 e P2?",
+    # "até quando vão os dados de 2026?") não são consultas de dados se não pedirem métrica/ranking
+    if tem_sinal_dados:
+        pede_metrica_ou_recorte = bool(
+            re.search(
+                r"\b(qual foi|quais foram|quanto|quantos|quantas|quais os \d+|quais as \d+|top \d+|ranking|"
+                r"quais bairros|quais municipios|quais alimentadores|quais ucs|qual bairro|qual municipio|"
+                r"qual canal|qual o dec|qual a receita|qual o consumo|menor consumo|maior consumo|"
+                r"recife|olinda|jaboatao|paulista|camaragibe|igarassu|ipojuca|moreno|abreu e lima|uc\d{4,}|alm-)\b",
+                texto_norm,
+            )
+        )
+        if pede_metrica_ou_recorte:
+            return False
+
+    if _PADROES_INTENCAO_PLATAFORMA.search(texto_norm):
+        return True
+
+    if _PADRAO_PERGUNTA_CONCEITUAL.search(texto_norm):
+        return True
+
+    # Verifica também se casa diretamente com títulos ou expressões multi-palavra exclusivas das seções do guia
+    guia_efetivo = guia or carregar_guia()
+    for secao in guia_efetivo.secoes:
+        titulo_norm = normalizar_texto_roteamento(secao.titulo)
+        if titulo_norm and len(titulo_norm) >= 6 and titulo_norm in texto_norm:
+            return True
+        for expr in secao.palavras:
+            expr_norm = normalizar_texto_roteamento(expr)
+            if " " in expr_norm and expr_norm in {
+                "aba v energy",
+                "aba venergy",
+                "pergunte a ia",
+                "como funciona o assistente",
+                "como a ia funciona",
+                "como o agente funciona",
+                "inteligencia artificial funciona",
+                "de onde vem a resposta",
+                "como cheguei nisso",
+                "resumo automatico",
+                "texto da ia na tela",
+                "painel executivo",
+                "buscar unidade",
+                "gerar ordem",
+                "exportar fila",
+                "ordem de inspecao",
+                "registrar resultado",
+                "cancelar ordem",
+                "primeira vez",
+                "como usar",
+            }:
+                if expr_norm in texto_norm:
+                    return True
+
+    return False
 
 
 def obter_modo_schema(modo_explicito: ModoSchema | None = None) -> ModoSchema:

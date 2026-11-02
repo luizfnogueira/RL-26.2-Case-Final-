@@ -139,6 +139,18 @@ class EsclarecimentoIA(Schema):
     opcoes: list[OpcaoEsclarecimento] = Field(min_length=2, max_length=11)
 
 
+class SecaoGuiaIA(Schema):
+    id: str
+    titulo: str
+
+
+class MetadadosIA(Metadados):
+    # De onde veio a resposta: dos dados da Gold ou do guia da plataforma
+    fonte: Literal['dados', 'guia'] = 'dados'
+    # Seções do guia em que a resposta se apoiou; vazia em resposta de dados
+    secoes_guia: list[SecaoGuiaIA] = Field(default_factory=list)
+
+
 class RespostaIA(Schema):
     resposta: str
     sql: str | None
@@ -146,7 +158,7 @@ class RespostaIA(Schema):
     dados: DadosIA
     status: StatusIA
     gerado_em: AwareDatetime
-    metadados: Metadados
+    metadados: MetadadosIA
     # Campos da sprint de GenAI, todos opcionais: o mock e respostas antigas continuam válidos (GENAI-3).
     conversa_id: UUID | None = None
     apresentacao: Literal['texto', 'tabela', 'grafico'] | None = None
@@ -160,6 +172,17 @@ class RespostaIA(Schema):
             raise ValueError('apresentacao "grafico" e o campo grafico andam juntos')
         if (self.status == 'esclarecer') != (self.esclarecimento is not None):
             raise ValueError('status "esclarecer" e o campo esclarecimento andam juntos')
+        guia = self.metadados.fonte == 'guia'
+        if self.metadados.secoes_guia and not guia:
+            raise ValueError('secoes_guia só vem com metadados.fonte "guia"')
+        if guia:
+            # Resposta do guia não consulta o banco: sem SQL, tabelas, dados nem gráfico
+            if self.sql or self.tabelas or self.dados.colunas or self.dados.linhas or self.grafico:
+                raise ValueError('resposta do guia não traz sql, tabelas, dados nem gráfico')
+            if self.status not in ('ok', 'nao_sei'):
+                raise ValueError('resposta do guia tem status "ok" ou "nao_sei"')
+            if self.status == 'ok' and not self.metadados.secoes_guia:
+                raise ValueError('resposta ok do guia cita as seções usadas em secoes_guia')
         return self
 
 
