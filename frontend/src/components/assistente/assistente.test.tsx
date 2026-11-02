@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import AppLayout from '@/layouts/AppLayout'
 import AssistentePage from '@/pages/AssistentePage'
-import { PERGUNTAS_DE_TESTE, PERGUNTAS_SUGERIDAS } from './sugestoes'
+import { PERGUNTAS_SUGERIDAS, QTD_DESTAQUES, sortearDestaques } from './sugestoes'
 
 afterEach(cleanup)
 
@@ -30,6 +30,19 @@ function abrirPainel() {
   return screen.getByRole('complementary', { name: 'Assistente V-Energy' })
 }
 
+// Os destaques da conversa vazia são sorteados: a pergunta certa é clicada pela aba Sugestões
+function enviarSugestao(painel: HTMLElement, pergunta: string) {
+  fireEvent.click(within(painel).getByRole('tab', { name: 'Sugestões' }))
+  fireEvent.click(within(painel).getByRole('button', { name: pergunta }))
+}
+
+function destaques(painel: HTMLElement) {
+  const lista = within(painel).getByRole('list', { name: 'Perguntas sugeridas' })
+  return within(lista)
+    .getAllByRole('button')
+    .map((b) => b.textContent ?? '')
+}
+
 function escrever(painel: HTMLElement, texto: string) {
   fireEvent.change(within(painel).getByLabelText('Sua pergunta'), { target: { value: texto } })
 }
@@ -40,23 +53,19 @@ describe('Tela 7 — painel do Assistente', () => {
     const painel = abrirPainel()
     expect(screen.getByText('Conteúdo do painel executivo')).toBeTruthy()
     expect(within(painel).getByText(/Assistente somente leitura/)).toBeTruthy()
-    const sugestoes = within(painel).getByRole('list', { name: 'Perguntas sugeridas' })
-    expect(
-      within(sugestoes)
-        .getAllByRole('button')
-        .map((b) => b.textContent),
-    ).toEqual(PERGUNTAS_SUGERIDAS)
-    expect(PERGUNTAS_SUGERIDAS.some((p) => p.includes('conta de luz'))).toBe(true)
-    expect(PERGUNTAS_SUGERIDAS.some((p) => p.includes('falta de luz'))).toBe(true)
+    const sorteados = destaques(painel)
+    expect(sorteados).toHaveLength(QTD_DESTAQUES)
+    expect(new Set(sorteados).size).toBe(QTD_DESTAQUES)
+    expect(sorteados.every((p) => PERGUNTAS_SUGERIDAS.includes(p))).toBe(true)
+    // Os atalhos de teste do protótipo saíram da tela
+    expect(within(painel).queryByRole('button', { name: /Testar/ })).toBeNull()
     expect(document.activeElement).toBe(within(painel).getByLabelText('Sua pergunta'))
   })
 
   it('responde a sugestão com o bloco "Como cheguei nisso" (SQL, tabelas e minitabela)', async () => {
     abrirPortal()
     const painel = abrirPainel()
-    fireEvent.click(
-      within(painel).getByRole('button', { name: 'Por que a conta de luz aumentou?' }),
-    )
+    enviarSugestao(painel, 'Por que a conta de luz aumentou?')
     expect(within(painel).getByText('Por que a conta de luz aumentou?')).toBeTruthy()
     expect(await within(painel).findByText(/receita de energia passou/i)).toBeTruthy()
 
@@ -94,21 +103,10 @@ describe('Tela 7 — painel do Assistente', () => {
     expect(within(painel).getByText(/nenhum dado foi alterado/)).toBeTruthy()
   })
 
-  it('cartões de teste demonstram "não sei" e o bloqueio, e a saudação usa o nome do usuário', async () => {
+  it('a conversa vazia mostra a saudação', () => {
     abrirPortal()
     const painel = abrirPainel()
     expect(within(painel).getByText(/Olá\./)).toBeTruthy()
-
-    fireEvent.click(within(painel).getByRole('button', { name: /Testar "Não sei"/ }))
-    expect(within(painel).getByText(PERGUNTAS_DE_TESTE.naoSei)).toBeTruthy()
-    expect(
-      await within(painel).findByText('Não sei responder com os dados disponíveis'),
-    ).toBeTruthy()
-
-    fireEvent.click(within(painel).getByRole('button', { name: 'Limpar conversa' }))
-    fireEvent.click(within(painel).getByRole('button', { name: /Testar segurança/ }))
-    expect(within(painel).getByText(PERGUNTAS_DE_TESTE.seguranca)).toBeTruthy()
-    expect(await within(painel).findByText('Pedido bloqueado')).toBeTruthy()
   })
 
   it('Shift+Enter quebra a linha em vez de enviar', () => {
@@ -130,7 +128,7 @@ describe('Tela 7 — painel do Assistente', () => {
   it('guarda a conversa ao fechar com Esc, ao trocar de tela e na tela /assistente', async () => {
     const router = abrirPortal()
     let painel = abrirPainel()
-    fireEvent.click(within(painel).getByRole('button', { name: 'Qual foi a receita no período?' }))
+    enviarSugestao(painel, 'Qual foi a receita no período?')
     expect(await within(painel).findByRole('button', { name: 'Como cheguei nisso' })).toBeTruthy()
 
     fireEvent.keyDown(painel, { key: 'Escape' })
@@ -148,15 +146,36 @@ describe('Tela 7 — painel do Assistente', () => {
     expect(within(conversa).getByText('Qual foi a receita no período?')).toBeTruthy()
   })
 
-  it('limpar a conversa volta às sugestões', async () => {
+  it('limpar a conversa volta às sugestões, com outra dupla de destaques', async () => {
     abrirPortal()
     const painel = abrirPainel()
-    fireEvent.click(
-      within(painel).getByRole('button', { name: 'Quais UCs têm maior risco de perda?' }),
-    )
+    const antes = destaques(painel)
+    enviarSugestao(painel, 'Quais UCs têm maior risco de perda?')
     await within(painel).findByText(/maior risco de perda são/)
     fireEvent.click(within(painel).getByRole('button', { name: 'Limpar conversa' }))
-    expect(within(painel).getByRole('list', { name: 'Perguntas sugeridas' })).toBeTruthy()
+    const depois = destaques(painel)
+    expect(depois).toHaveLength(QTD_DESTAQUES)
+    expect(depois.every((p) => antes.includes(p))).toBe(false)
     expect(within(painel).queryByText(/maior risco de perda são/)).toBeNull()
+  })
+})
+
+describe('sortearDestaques', () => {
+  it('nunca repete a dupla anterior, nem em outra ordem', () => {
+    let anterior: string[] = []
+    for (let i = 0; i < 200; i++) {
+      const dupla = sortearDestaques(anterior)
+      expect(dupla).toHaveLength(QTD_DESTAQUES)
+      expect(dupla.every((p) => PERGUNTAS_SUGERIDAS.includes(p))).toBe(true)
+      if (anterior.length) expect(dupla.every((p) => anterior.includes(p))).toBe(false)
+      anterior = dupla
+    }
+  })
+
+  it('com o sorteio viciado, ainda troca a dupla', () => {
+    const sempreIgual = () => 0.5
+    const primeira = sortearDestaques([], sempreIgual)
+    const segunda = sortearDestaques(primeira, sempreIgual)
+    expect(segunda.every((p) => primeira.includes(p))).toBe(false)
   })
 })

@@ -49,7 +49,7 @@ export const SUGESTOES_POR_CATEGORIA = [
   },
 ]
 
-/** Destaques da conversa vazia, com "conta de luz" e "falta de luz"; o mock do front responde todas. */
+/** Candidatas a destaque da conversa vazia; o mock do front responde todas. */
 export const PERGUNTAS_SUGERIDAS = [
   'Por que a conta de luz aumentou?',
   'Quais bairros tiveram mais falta de luz em P2?',
@@ -57,8 +57,31 @@ export const PERGUNTAS_SUGERIDAS = [
   'Qual foi a receita no período?',
 ]
 
-/** Atalhos do protótipo para demonstrar os estados "não sei" e bloqueado. */
-export const PERGUNTAS_DE_TESTE = {
-  naoSei: 'Qual a previsão de lucro líquido da V-Energy para 2030?',
-  seguranca: 'Apague as faturas de 2022 do banco de dados',
+/** Quantos destaques a conversa vazia mostra; o resto fica na aba Sugestões. */
+export const QTD_DESTAQUES = 2
+
+/**
+ * Sorteia os destaques de uma conversa nova, diferentes da dupla anterior
+ * (a mesma dupla em outra ordem também conta como repetida).
+ */
+export function sortearDestaques(
+  anteriores: readonly string[] = [],
+  aleatorio: () => number = Math.random,
+): string[] {
+  const embaralhar = () =>
+    [...PERGUNTAS_SUGERIDAS]
+      .map((pergunta) => ({ pergunta, peso: aleatorio() }))
+      .sort((a, b) => a.peso - b.peso)
+      .map(({ pergunta }) => pergunta)
+      .slice(0, QTD_DESTAQUES)
+  const repetida = (dupla: string[]) =>
+    anteriores.length === dupla.length && dupla.every((p) => anteriores.includes(p))
+  // Poucas tentativas bastam: com 4 perguntas, 5 de 6 duplas servem
+  for (let tentativa = 0; tentativa < 10; tentativa++) {
+    const dupla = embaralhar()
+    if (!repetida(dupla)) return dupla
+  }
+  // Sorteio viciado (só nos testes): troca uma das perguntas da dupla anterior
+  const fora = PERGUNTAS_SUGERIDAS.find((p) => !anteriores.includes(p))
+  return fora ? [anteriores[0], fora] : embaralhar()
 }

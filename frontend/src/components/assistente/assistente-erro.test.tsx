@@ -26,6 +26,12 @@ function abrirPainel() {
   return screen.getByRole('complementary', { name: 'Assistente V-Energy' })
 }
 
+// Os destaques da conversa vazia são sorteados: a pergunta certa é clicada pela aba Sugestões
+function enviarSugestao(painel: HTMLElement, pergunta: string) {
+  fireEvent.click(within(painel).getByRole('tab', { name: 'Sugestões' }))
+  fireEvent.click(within(painel).getByRole('button', { name: pergunta }))
+}
+
 describe('Tela 7 — erro e indisponibilidade', () => {
   it('agente indisponível (503) mostra a mensagem da API e tenta de novo', async () => {
     perguntar
@@ -38,7 +44,7 @@ describe('Tela 7 — erro e indisponibilidade', () => {
       )
       .mockResolvedValueOnce(resposta as RespostaIA)
     const painel = abrirPainel()
-    fireEvent.click(within(painel).getByRole('button', { name: 'Qual foi a receita no período?' }))
+    enviarSugestao(painel, 'Qual foi a receita no período?')
 
     expect(
       await within(painel).findByText(/O assistente está indisponível no momento\./),
@@ -57,9 +63,7 @@ describe('Tela 7 — erro e indisponibilidade', () => {
   it('sem conexão com a API mostra aviso próprio', async () => {
     perguntar.mockRejectedValueOnce(new ApiError(0, 'REDE_INDISPONIVEL', 'Failed to fetch'))
     const painel = abrirPainel()
-    fireEvent.click(
-      within(painel).getByRole('button', { name: 'Por que a conta de luz aumentou?' }),
-    )
+    enviarSugestao(painel, 'Por que a conta de luz aumentou?')
     expect(
       await within(painel).findByText(/falar com o servidor\. Verifique sua conexão/),
     ).toBeTruthy()

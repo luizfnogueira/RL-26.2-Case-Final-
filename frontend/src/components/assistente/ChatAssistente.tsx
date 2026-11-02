@@ -1,4 +1,4 @@
-import { ArrowRight, Lock, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Lock, Sparkles, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useId,
@@ -7,50 +7,29 @@ import {
   type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
-  type ReactNode,
 } from 'react'
 import { useIdentidade } from '@/auth/useIdentidade'
 import { cx } from '@/utils/cx'
 import { useAssistente } from './contexto'
 import MensagemAssistente from './MensagemAssistente'
-import { PERGUNTAS_DE_TESTE, PERGUNTAS_SUGERIDAS, SUGESTOES_POR_CATEGORIA } from './sugestoes'
+import { SUGESTOES_POR_CATEGORIA, sortearDestaques } from './sugestoes'
 
 const LIMITE = 2000
+
+// Última dupla mostrada, fora do componente: o painel e a tela /assistente montam de novo,
+// e cada conversa nova deve trazer outra dupla
+let ultimosDestaques: string[] = []
+
+function novosDestaques(): string[] {
+  ultimosDestaques = sortearDestaques(ultimosDestaques)
+  return ultimosDestaques
+}
 
 type Props = {
   /** Painel flutuante (estreito) ou tela /assistente (larga). */
   variante?: 'painel' | 'pagina'
   /** Foca o campo ao montar (abertura do painel). */
   focarAoAbrir?: boolean
-}
-
-function CartaoDeTeste({
-  icone,
-  titulo,
-  descricao,
-  aoClicar,
-  desabilitado,
-}: {
-  icone: ReactNode
-  titulo: string
-  descricao: string
-  aoClicar: () => void
-  desabilitado: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={aoClicar}
-      disabled={desabilitado}
-      className="flex w-full items-center gap-3 rounded-md border border-dashed border-borda px-3.5 py-2.5 text-left hover:bg-surface-sutil disabled:opacity-60"
-    >
-      <span aria-hidden="true">{icone}</span>
-      <span className="min-w-0">
-        <span className="block text-corpo font-medium">{titulo}</span>
-        <span className="block text-legenda text-ink-2">{descricao}</span>
-      </span>
-    </button>
-  )
 }
 
 function BotaoSugestao({
@@ -88,6 +67,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
   const { mensagens, enviando, perguntar, tentarNovamente, limpar } = useAssistente()
   const [texto, setTexto] = useState('')
   const [aba, setAba] = useState<Aba>('conversa')
+  const [destaques, setDestaques] = useState(novosDestaques)
   const idCampo = useId()
   const idAviso = useId()
   const idAbas = useId()
@@ -143,24 +123,11 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
 
   const podeEnviar = texto.trim().length > 0 && !enviando
 
-  const cartoesDeTeste = (
-    <div className={cx('grid gap-2', pagina && 'sm:grid-cols-2')}>
-      <CartaoDeTeste
-        icone={<TriangleAlert size={20} strokeWidth={1.5} className="text-alerta-escuro" />}
-        titulo='Testar "Não sei"'
-        descricao="Pergunta sem dados disponíveis"
-        aoClicar={() => enviar(PERGUNTAS_DE_TESTE.naoSei)}
-        desabilitado={enviando}
-      />
-      <CartaoDeTeste
-        icone={<Lock size={20} strokeWidth={1.5} className="text-perigo-escuro" />}
-        titulo="Testar segurança"
-        descricao="Comando destrutivo bloqueado"
-        aoClicar={() => enviar(PERGUNTAS_DE_TESTE.seguranca)}
-        desabilitado={enviando}
-      />
-    </div>
-  )
+  // Conversa nova: outra dupla de destaques
+  function limparConversa() {
+    limpar()
+    setDestaques(novosDestaques())
+  }
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
@@ -217,7 +184,6 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
                 </ul>
               </section>
             ))}
-            {cartoesDeTeste}
           </div>
         </div>
       )}
@@ -259,7 +225,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
                 aria-label="Perguntas sugeridas"
                 className={cx('grid gap-2', pagina && 'sm:grid-cols-2')}
               >
-                {PERGUNTAS_SUGERIDAS.map((pergunta) => (
+                {destaques.map((pergunta) => (
                   <li key={pergunta}>
                     <BotaoSugestao
                       pergunta={pergunta}
@@ -269,8 +235,6 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
                   </li>
                 ))}
               </ul>
-
-              {cartoesDeTeste}
 
               <div className="flex items-start gap-2.5">
                 <span
@@ -366,7 +330,7 @@ export default function ChatAssistente({ variante = 'pagina', focarAoAbrir = fal
           {!vazia && (
             <button
               type="button"
-              onClick={limpar}
+              onClick={limparConversa}
               className="inline-flex items-center gap-1 text-legenda text-teal-escuro hover:underline"
             >
               <Trash2 size={12} aria-hidden="true" />
