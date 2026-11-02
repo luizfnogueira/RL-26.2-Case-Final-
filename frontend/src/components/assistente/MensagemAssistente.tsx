@@ -70,15 +70,16 @@ function TextoComDestaques({ texto }: { texto: string }) {
   )
 }
 
+// O código do erro (AGENTE_INDISPONIVEL, ...) é para o log e o suporte, não para quem pergunta
 function textoDoErro(erro: ApiError): string {
   const mantida = 'Sua pergunta foi mantida — tente novamente em instantes.'
   if (erro.codigo === 'REDE_INDISPONIVEL' || erro.status === 0) {
-    return `Não foi possível falar com o servidor (REDE_INDISPONIVEL). ${mantida}`
+    return `Não foi possível falar com o servidor. Verifique sua conexão. ${mantida}`
   }
   if (erro.codigo === 'AGENTE_INDISPONIVEL' || erro.status === 503) {
-    return `O assistente está indisponível no momento (${erro.codigo}). ${mantida}`
+    return `O assistente está indisponível no momento. ${mantida}`
   }
-  return `Não foi possível responder agora (${erro.codigo}). ${mantida}`
+  return `Não foi possível responder agora. ${mantida}`
 }
 
 /** Último mês da Gold: o fim da janela atual do case (jun/2026). */

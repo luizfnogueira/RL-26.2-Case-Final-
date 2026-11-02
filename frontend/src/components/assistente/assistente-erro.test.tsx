@@ -41,9 +41,11 @@ describe('Tela 7 — erro e indisponibilidade', () => {
     fireEvent.click(within(painel).getByRole('button', { name: 'Qual foi a receita no período?' }))
 
     expect(
-      await within(painel).findByText(/indisponível no momento \(AGENTE_INDISPONIVEL\)/),
+      await within(painel).findByText(/O assistente está indisponível no momento\./),
     ).toBeTruthy()
     expect(within(painel).getByText(/Sua pergunta foi mantida/)).toBeTruthy()
+    // O código técnico não aparece para o usuário
+    expect(within(painel).queryByText(/AGENTE_INDISPONIVEL/)).toBeNull()
 
     fireEvent.click(within(painel).getByRole('button', { name: 'Tentar novamente' }))
     expect(await within(painel).findByRole('button', { name: 'Como cheguei nisso' })).toBeTruthy()
@@ -59,8 +61,9 @@ describe('Tela 7 — erro e indisponibilidade', () => {
       within(painel).getByRole('button', { name: 'Por que a conta de luz aumentou?' }),
     )
     expect(
-      await within(painel).findByText(/falar com o servidor \(REDE_INDISPONIVEL\)/),
+      await within(painel).findByText(/falar com o servidor\. Verifique sua conexão/),
     ).toBeTruthy()
+    expect(within(painel).queryByText(/REDE_INDISPONIVEL/)).toBeNull()
   })
 
   it('manda só a pergunta para o POST /ia na primeira vez', async () => {
