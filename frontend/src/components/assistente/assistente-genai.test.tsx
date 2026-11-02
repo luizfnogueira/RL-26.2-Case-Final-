@@ -204,7 +204,7 @@ describe('GENAI-16 — aba de sugestões', () => {
       const lista = within(painel).getByRole('list', { name: categoria })
       expect(within(lista).getAllByRole('button')).toHaveLength(perguntas.length)
     }
-    expect(within(painel).getByRole('button', { name: /Testar "Não sei"/ })).toBeTruthy()
+    expect(within(painel).queryByRole('button', { name: /Testar/ })).toBeNull()
 
     fireEvent.click(
       within(painel).getByRole('button', {

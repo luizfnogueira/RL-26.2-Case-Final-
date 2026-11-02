@@ -312,3 +312,21 @@ def test_t4_pergunta_plataforma_no_agente_de_dados_nao_executa_sql():
     assert resposta["status"] == "nao_sei"
     assert resposta["sql"] is None
     assert "plataforma" in resposta["resposta"].lower()
+
+
+@pytest.mark.parametrize("status, validada, confianca", [("ok", True, "alta"), ("nao_sei", True, None)])
+def test_t5_detalhes_tecnicos_do_guia_cabem_no_contrato(status, validada, confianca):
+    # Fora do contrato (confiança 1.0, justificativa None), a ponte descartava toda resposta do guia
+    # e o usuário via "assistente indisponível"
+    from app.ai.telemetria import construir_detalhes_tecnicos_guia
+    from app.schemas.ia import DetalhesTecnicos
+
+    detalhes = construir_detalhes_tecnicos_guia(
+        pergunta="Como gero uma ordem de inspeção?", status=status,
+        secoes_enviadas_ids=["ordens"], secoes_usadas_ids=["ordens"] if status == "ok" else [],
+        resultado_run=None, modelo_nome="teste", provedor_nome="teste",
+        latencia_total_ms=10, etapas_ms={}, resposta_validada=validada,
+    )
+    validado = DetalhesTecnicos.model_validate(detalhes)
+    assert validado.verificacoes.confianca == confianca
+    assert validado.estrutura_pensamento.justificativa == ""
