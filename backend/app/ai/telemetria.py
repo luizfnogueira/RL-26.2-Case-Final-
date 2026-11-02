@@ -236,7 +236,8 @@ def construir_detalhes_tecnicos_guia(
             "plano": None,
             "skills": ["guia_plataforma"],
             "premissas": premissas,
-            "justificativa": justificativa,
+            # O contrato (EstruturaPensamento.justificativa) exige texto: None derrubava a resposta
+            "justificativa": justificativa or "",
         },
         "acoes": [acao.model_dump() for acao in acoes],
         "consulta": {
@@ -259,7 +260,8 @@ def construir_detalhes_tecnicos_guia(
             "sql_validado": None,
             "numeros_conferidos": resposta_validada,
             "consumo_negativo_filtrado": True,
-            "confianca": 1.0 if status == "ok" and resposta_validada else None,
+            # O contrato aceita só 'alta', 'media' ou 'baixa'; o número 1.0 derrubava a resposta
+            "confianca": "alta" if status == "ok" and resposta_validada else None,
         },
         "avaliacao": carregar_resumo_avaliacao(),
     }
