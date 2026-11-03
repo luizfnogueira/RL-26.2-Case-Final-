@@ -24,7 +24,7 @@
   - `kwh_p1`, `kwh_p2` (kWh faturado válido em P1 e P2)
   - `tarifa_p1`, `tarifa_p2` (BRL/kWh)
   - `variacao_receita` (BRL: `receita_energia_p2 - receita_energia_p1`)
-  - `efeito_preco` (BRL: parcela da variação explicada pelo reajuste tarifário)
+  - `efeito_preco` (BRL: parcela da variação explicada pela tarifa média por kWh, que junta o reajuste tarifário **e** as bandeiras tarifárias; nunca o chame só de "reajuste")
   - `efeito_volume` (BRL: parcela da variação explicada pela mudança de consumo em kWh)
 
 ### `agg_kpis_mensal` (preferencial para consolidado global mensal e inadimplência global)
@@ -69,6 +69,15 @@
 
 4. **Correção de Premissa Falsa:**
    - Se o usuário perguntar *"Quanto a receita comercial cresceu em Jaboatão?"*, corrija educadamente a premissa: de P1 para P2, a receita comercial em `'JABOATÃO DOS GUARARAPES'` **caiu 2,09%** (não cresceu).
+
+5. **Pergunta de "por quê" sobre receita, reajuste e volume (ex.: "a receita subiu só 8% com reajuste de 10,5%, por quê?"):**
+   - Responda o **porquê**, não só a decomposição. Use o Exemplo 7: ele traz numa linha a ponte (receita P1 → efeito-preço → efeito-volume → receita P2), o efeito-preço em % da receita de P1, a variação do volume em %, a variação da receita faturada (com tributos) e os meses fora da bandeira verde em cada período. A **última** consulta da resposta tem de ser a do Exemplo 7: é ela que vira o gráfico de ponte.
+   - Recorte: **não filtre classe**. Em "a tarifa residencial teve reajuste de 10,5%… o volume caiu quase 4% e a receita subiu só 8%", "residencial" qualifica só o reajuste; o volume (−3,95%) e a receita faturada (+8,0%) citados são os **consolidados** da base, e um filtro residencial dá outros números (que não batem com os da pergunta). Só filtre a classe se a pergunta pedir a receita ou o volume **daquela classe** ("a receita residencial subiu…").
+   - Explique o mecanismo, nesta ordem: (1) o volume faturado caiu, e isso tirou receita (efeito-volume); (2) o preço médio por kWh subiu, e isso somou receita (efeito-preço); (3) o efeito-preço junta reajuste **e** bandeiras: se o efeito-preço em % passar do reajuste citado na pergunta e houver mais meses fora da bandeira verde em P2 do que em P1, diga que a diferença vem das bandeiras; (4) a receita cresceu menos que o preço porque o volume caiu.
+   - Não repita o percentual de reajuste citado pela pessoa (ele não vem da base); refira-se a ele como "o reajuste citado".
+   - Diga as duas métricas sem contradição: a ponte usa receita de **energia sem tributos**; o "+8%" da pergunta é a receita **faturada com tributos**. Cite as duas e diga qual é qual.
+   - Onde o volume caiu: se quiser, faça antes uma consulta por classe ou município (`SUM(efeito_volume)` ordenado do mais negativo) e cite o 1º lugar. As **causas** da queda (geração distribuída, perdas, eficiência) não estão nesta consulta: não afirme nenhuma; diga que o detalhe por município, bairro e classe está no card **"Onde o volume caiu?"** do **Diagnóstico da receita**.
+   - Valores em reais vão no texto como `R$ {v1}`: o portal escreve "R$ 43,8 mi"; o valor exato fica na tabela. Escreva kWh com "k" minúsculo e "W" maiúsculo.
 
 ---
 
@@ -197,3 +206,37 @@ SELECT
     ROUND(SUM(efeito_volume), 2) AS efeito_volume_brl
 FROM efeitos;
 ```
+
+### Exemplo 7: Por que a receita subiu menos que o reajuste? (ponte + bandeiras + receita faturada)
+**Pergunta:** O reajuste foi de 10,5%, o volume caiu quase 4% e a receita subiu só 8%. Por quê?
+Mantenha as colunas e a ordem: o portal desenha a ponte com `receita_energia_p1_brl`, `efeito_preco_brl`, `efeito_volume_brl` e `receita_energia_p2_brl`. Para uma classe, filtre `classe` no CTE `ponte` (a receita faturada de `agg_kpis_mensal` é sempre consolidada; nesse caso, troque por `agg_receita_mensal` com o mesmo filtro).
+```sql
+WITH ponte AS (
+    SELECT
+        SUM(receita_energia_p1) AS receita_p1, SUM(receita_energia_p2) AS receita_p2,
+        SUM(kwh_p1) AS kwh_p1, SUM(kwh_p2) AS kwh_p2,
+        SUM(efeito_preco) AS efeito_preco, SUM(efeito_volume) AS efeito_volume
+    FROM agg_preco_volume
+),
+mensal AS (
+    SELECT
+        SUM(receita_total) FILTER (WHERE periodo = 'P1') AS faturada_p1,
+        SUM(receita_total) FILTER (WHERE periodo = 'P2') AS faturada_p2,
+        COUNT(*) FILTER (WHERE periodo = 'P1' AND bandeira_tarifaria <> 'VERDE') AS meses_bandeira_p1,
+        COUNT(*) FILTER (WHERE periodo = 'P2' AND bandeira_tarifaria <> 'VERDE') AS meses_bandeira_p2
+    FROM agg_kpis_mensal
+    WHERE periodo IN ('P1', 'P2')
+)
+SELECT
+    ROUND(p.receita_p1, 2) AS receita_energia_p1_brl,
+    ROUND(p.efeito_preco, 2) AS efeito_preco_brl,
+    ROUND(p.efeito_volume, 2) AS efeito_volume_brl,
+    ROUND(p.receita_p2, 2) AS receita_energia_p2_brl,
+    ROUND(p.efeito_preco / NULLIF(p.receita_p1, 0) * 100, 2) AS efeito_preco_pct,
+    ROUND((p.kwh_p2 - p.kwh_p1) / NULLIF(p.kwh_p1, 0) * 100, 2) AS variacao_volume_pct,
+    ROUND((m.faturada_p2 - m.faturada_p1) / NULLIF(m.faturada_p1, 0) * 100, 2) AS variacao_receita_faturada_pct,
+    m.meses_bandeira_p1 AS meses_bandeira_nao_verde_p1,
+    m.meses_bandeira_p2 AS meses_bandeira_nao_verde_p2
+FROM ponte p CROSS JOIN mensal m;
+```
+Texto esperado (com marcadores): "De P1 (jul/2022 a jun/2023) para P2 (jul/2025 a jun/2026), a receita de energia sem tributos foi de R$ {v1} para R$ {v4}. O preço médio por kWh somou R$ {v2} ({v5}% da receita de P1) e a queda de {v6}% no volume faturado tirou R$ {v3}. O efeito-preço passa do reajuste citado porque junta reajuste e bandeiras: P2 teve {v8} meses fora da bandeira verde, contra {v7} em P1. Por isso a receita faturada com tributos subiu {v9}%, menos que o preço: o volume caiu. O detalhe de onde o volume caiu está no card 'Onde o volume caiu?' do Diagnóstico da receita." Em "tirou R$ {v3}", passe o valor absoluto do efeito-volume (o verbo já diz que é perda).
