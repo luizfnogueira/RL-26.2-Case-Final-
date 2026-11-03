@@ -8,7 +8,7 @@ import BlocoDiagnostico from './BlocoDiagnostico'
 import { BlocoMedidor } from './BlocosCadastrais'
 import { BlocoFaturas } from './BlocosHistorico'
 import { caminhoBarra, posicaoDica } from '@/components/graficos/geometria'
-import { formatarEnergiaCompleta } from '@/utils/formatacao'
+import { formatarEnergiaCompleta, formatarNome } from '@/utils/formatacao'
 import { mesesEstimados, pontosDoConsumo } from './consumo'
 import {
   estiloBandeira,
@@ -16,7 +16,9 @@ import {
   rotuloAssunto,
   rotuloCanal,
   rotuloModalidadeGd,
+  rotuloTipoMedidor,
 } from './rotulos'
+import ListaDados from './ListaDados'
 
 afterEach(cleanup)
 
@@ -136,7 +138,8 @@ describe('detalhe da unidade (/unidades/:id)', () => {
     expect(cadastro.getByText('00000-000')).toBeTruthy() // CEP com máscara
 
     const medidor = within(screen.getByRole('region', { name: 'Medidor' }))
-    expect(medidor.getByText('18.452 kWh em 28/06/2026')).toBeTruthy() // valor exato
+    expect(medidor.getByText('18.452 kWh')).toBeTruthy() // valor exato
+    expect(medidor.getByText('em 28/06/2026')).toBeTruthy()
     expect(medidor.getByText('Estimada')).toBeTruthy()
     // Leitura do registrador, não o consumo do mês.
     expect(medidor.getByText('Leitura acumulada')).toBeTruthy()
@@ -146,6 +149,13 @@ describe('detalhe da unidade (/unidades/:id)', () => {
     const gd = within(screen.getByRole('region', { name: 'Geração distribuída' }))
     expect(gd.getByText('5,0 kWp')).toBeTruthy()
     expect(gd.getByText('Geração na própria UC')).toBeTruthy()
+    // Número e unidade juntos, e a GD em uma coluna como o medidor
+    expect(gd.getByText('5,0 kWp').className).toContain('whitespace-nowrap')
+    const energia = gd.getByText('Energia injetada (média mensal)').nextElementSibling!
+    expect(energia.firstElementChild!.className).toContain('whitespace-nowrap')
+    expect(gd.getByText('5,0 kWp').closest('dl')!.className).not.toContain('sm:grid-cols-2')
+    // O cadastro continua com duas colunas
+    expect(cadastro.getByText('CEP').closest('dl')!.className).toContain('sm:grid-cols-2')
   })
 
   it('rótulo da modalidade de GD para as 3 da Gold; valor desconhecido aparece como veio', () => {
@@ -154,6 +164,15 @@ describe('detalhe da unidade (/unidades/:id)', () => {
     expect(rotuloModalidadeGd('GERACAO COMPARTILHADA')).toBe('Geração compartilhada')
     expect(rotuloModalidadeGd('MODALIDADE NOVA')).toBe('MODALIDADE NOVA')
     expect(rotuloModalidadeGd('toString')).toBe('toString')
+  })
+
+  it('rótulo do tipo de medidor para os 3 da Gold, com acento; desconhecido capitalizado, nunca vazio', () => {
+    expect(rotuloTipoMedidor('ELETRONICO')).toBe('Eletrônico')
+    expect(rotuloTipoMedidor('ELETROMECANICO')).toBe('Eletromecânico')
+    expect(rotuloTipoMedidor('SMART')).toBe('Smart')
+    // Fallback: o comportamento de antes do mapa (formatarNome); chave do protótipo não é do mapa
+    expect(rotuloTipoMedidor('HIBRIDO')).toBe('Hibrido')
+    expect(rotuloTipoMedidor('toString')).toBe(formatarNome('toString'))
   })
 
   it('UC sem GD mostra o estado próprio do bloco', async () => {
@@ -193,6 +212,11 @@ describe('diagnóstico "a conta veio alta?"', () => {
     expect(d.getByText('323 kWh')).toBeTruthy() // média 322,83
     expect(d.getByText('12 de 12 meses · Jun/2025 – Mai/2026')).toBeTruthy()
     expect(d.getByText('+38,3%')).toBeTruthy()
+    // "412" nunca longe do "kWh"; o valor quebra só como último recurso, como no ListaDados
+    const ultimo = d.getByText('412 kWh')
+    expect(ultimo.className).toContain('whitespace-nowrap')
+    expect(ultimo.parentElement!.className).toContain('break-words')
+    expect(d.getByText('12 de 12 meses · Jun/2025 – Mai/2026').className).toContain('break-words')
     expect(d.getByText(/^Leitura estimada em jun\/2026/)).toBeTruthy() // minúsculas no alerta
     expect(d.getByText('Saiba mais')).toBeTruthy()
     expect(d.getByText('Explicação geral')).toBeTruthy()
@@ -329,20 +353,81 @@ describe('medidor: selo só para leitura estimada', () => {
         dataLigacao="2018-03-12"
       />,
     )
-    expect(screen.getByText('18.452 kWh em 28/06/2026')).toBeTruthy()
+    expect(screen.getByText('18.452 kWh')).toBeTruthy()
     expect(screen.queryByText('Real')).toBeNull()
     expect(screen.queryByText('Estimada')).toBeNull()
   })
+})
 
-  it('a leitura acumulada não quebra linha', () => {
-    render(
-      <BlocoMedidor
-        medidor={unidadeFixture.medidor as Medidor}
-        periodo="2025-07/2026-06"
-        dataLigacao="2018-03-12"
-      />,
-    )
-    expect(screen.getByText('18.452 kWh em 28/06/2026').className).toContain('whitespace-nowrap')
+describe('medidor: valores que não vazam do card', () => {
+  const medidorBase = unidadeFixture.medidor as Medidor
+  const renderizar = (medidor: Medidor) =>
+    render(<BlocoMedidor medidor={medidor} periodo="2025-07/2026-06" dataLigacao="2018-03-12" />)
+  const valorDe = (rotulo: string) => screen.getByText(rotulo).nextElementSibling as HTMLElement
+
+  it('leitura acumulada em duas linhas: o valor sem separar do kWh e a data embaixo, em legenda', () => {
+    renderizar(medidorBase)
+    const valor = screen.getByText('18.452 kWh')
+    expect(valor.className).toContain('whitespace-nowrap')
+    const data = screen.getByText('em 28/06/2026')
+    expect(data.className).toContain('block')
+    expect(data.className).toContain('text-legenda')
+    expect(data.className).toContain('text-ink-2')
+    // Valor e data em elementos separados, ambos dentro do mesmo <dd>
+    expect(valor.contains(data)).toBe(false)
+    expect(valorDe('Leitura acumulada').contains(valor)).toBe(true)
+    expect(valorDe('Leitura acumulada').contains(data)).toBe(true)
+  })
+
+  it('sem data da leitura, mostra só o valor', () => {
+    renderizar({
+      ...medidorBase,
+      ultima_leitura: { ...medidorBase.ultima_leitura!, data: '' },
+    })
+    expect(screen.getByText('18.452 kWh')).toBeTruthy()
+    expect(valorDe('Leitura acumulada').textContent).toBe('18.452 kWhEstimada')
+    expect(screen.queryByText(/^em /)).toBeNull()
+  })
+
+  it('o código do modelo fica num elemento sem quebra; o tipo sai com acento pelo mapa', () => {
+    renderizar({ ...medidorBase, tipo: 'ELETROMECANICO', modelo: 'EM-1200' })
+    const modelo = screen.getByText('EM-1200')
+    expect(modelo.tagName).toBe('SPAN')
+    expect(modelo.className).toContain('whitespace-nowrap')
+    expect(valorDe('Tipo e modelo').textContent).toBe('Eletromecânico · EM-1200')
+  })
+
+  it('os itens da lista podem encolher e os valores quebram como último recurso', () => {
+    renderizar(medidorBase)
+    const valor = valorDe('Número')
+    expect(valor.className).toContain('break-words')
+    expect((valor.parentElement as HTMLElement).className).toContain('min-w-0')
+  })
+
+  it('o medidor fica em uma coluna', () => {
+    renderizar(medidorBase)
+    const lista = valorDe('Número').closest('dl') as HTMLElement
+    expect(lista.className).toContain('grid-cols-1')
+    expect(lista.className).not.toContain('sm:grid-cols-2')
+  })
+})
+
+describe('lista de dados: colunas por prop', () => {
+  const itens = [
+    { rotulo: 'A', valor: '1' },
+    { rotulo: 'B', valor: '2' },
+  ]
+  const lista = () => screen.getByText('A').closest('dl') as HTMLElement
+
+  it('por padrão, duas colunas a partir de sm (o Cadastro não muda)', () => {
+    render(<ListaDados itens={itens} />)
+    expect(lista().className).toContain('sm:grid-cols-2')
+  })
+
+  it('com colunas={1}, sem a classe de duas colunas', () => {
+    render(<ListaDados itens={itens} colunas={1} />)
+    expect(lista().className).toContain('grid-cols-1')
+    expect(lista().className).not.toContain('sm:grid-cols-2')
   })
 })
 

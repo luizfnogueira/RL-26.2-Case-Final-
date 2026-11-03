@@ -30,6 +30,10 @@ const PADROES: FiltrosUrl = {
   periodo_comparacao: PERIODO_COMPARACAO_PADRAO,
 }
 const LINHAS_POR_PAGINA = 10
+// Visão e página do ranking só mudam o card "Onde o volume caiu?": sem o preventScrollReset, o
+// ScrollRestoration do layout levaria a página ao topo a cada troca. O drill-down (região ou classe)
+// continua voltando ao topo: ele muda os filtros e, com eles, a análise, a ponte e a explicação.
+const SO_O_CARD = { replace: true, preventScrollReset: true } as const
 
 /** Tela 2: o que mudou na receita de energia entre dois períodos e onde o volume caiu. */
 export default function ReceitaPage() {
@@ -116,16 +120,13 @@ export default function ReceitaPage() {
   )
 
   const mudarVisao = (proxima: Visao) =>
-    setParams(
-      (atual) => {
-        const novo = new URLSearchParams(atual)
-        if (proxima === 'classe') novo.set('ver', 'classe')
-        else novo.delete('ver')
-        novo.delete('page')
-        return novo
-      },
-      { replace: true },
-    )
+    setParams((atual) => {
+      const novo = new URLSearchParams(atual)
+      if (proxima === 'classe') novo.set('ver', 'classe')
+      else novo.delete('ver')
+      novo.delete('page')
+      return novo
+    }, SO_O_CARD)
 
   // Clicar numa classe do ranking filtra por ela e volta para a região: onde essa classe perdeu volume
   const filtrarClasse = (classeEscolhida: string) =>
@@ -141,15 +142,12 @@ export default function ReceitaPage() {
     )
 
   const mudarPagina = (proxima: number) =>
-    setParams(
-      (atual) => {
-        const novo = new URLSearchParams(atual)
-        if (proxima > 1) novo.set('page', String(proxima))
-        else novo.delete('page')
-        return novo
-      },
-      { replace: true },
-    )
+    setParams((atual) => {
+      const novo = new URLSearchParams(atual)
+      if (proxima > 1) novo.set('page', String(proxima))
+      else novo.delete('page')
+      return novo
+    }, SO_O_CARD)
 
   const atualizando = dashboard.carregando && dados !== null
   const semDecomposicao = dados !== null && numerosDoInsight(dados) === null

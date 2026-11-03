@@ -1,4 +1,6 @@
-# Contrato da API — V-Energy — V2 (proposta para revisão; alinhada à Gold em 23/10)
+# Contrato da API — V-Energy — V2
+
+Versão em uso por todas as telas do portal, atualizada em 02/11/2026 com a autenticação, as ordens em lote, os indicadores das inspeções e a comparação de recortes. Mudanças seguem a seção 15.
 
 Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos completos usados no Swagger. Todos são **fictícios**. As ordens de inspeção (`GET/POST/PATCH /inspecoes`) persistem no PostgreSQL. Dashboard, filtros, fila de candidatos, unidades (Visão 360), Operação e números do insight de receita usam a fonte selecionada por `GOLD_SOURCE`: `seed` para desenvolvimento ou `real` para a Gold importada (no `seed`, unidades devolvem o exemplo fictício do contrato). A geração de texto da IA é configurada separadamente por `IA_MODO`.
 
@@ -9,8 +11,8 @@ Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos
 - JSON em `snake_case`. IDs de UC são strings; `id_ordem` e o `{id}` de PATCH são inteiros positivos, alinhados ao modelo do Gabriel.
 - Datas: `YYYY-MM-DD`; instantes: ISO 8601 com fuso. Valores são números JSON; dinheiro em BRL, energia em kWh, DEC em h/UC, FEC em interrupcoes/UC.
 - Indicadores: `{valor, unidade, periodo_referencia}`. `null` significa ausente; não converter ausência em zero.
-- `metadados.dados_ficticios=true` identifica o mock. `gold_atualizada_em` é timestamp da última carga **de dados**, distinto de `gerado_em` da IA. Neste stub ambos são fictícios; o front formata “hoje, 06:15” a partir do timestamp, sem texto fixo.
-- `page=1`, `page_size=20` por padrão; limites 1 e 100. Resposta paginada: `{items, page, page_size, total}`. `total` após filtros, antes da paginação; página além do fim retorna `items: []`.
+- `metadados.dados_ficticios=true` identifica dados fictícios (seed ou mock do front). `gold_atualizada_em` é o timestamp da última carga **de dados**, lido de `gold._carga_metadata` com `GOLD_SOURCE=real`, e é distinto de `gerado_em` da IA. O front formata “hoje, 06:15” a partir do timestamp, sem texto fixo.
+- `page=1`, `page_size=20` por padrão; limites 1 e 100, salvo onde a rota indicar outro (a fila de candidatos usa 50 por padrão e aceita até 200). Resposta paginada: `{items, page, page_size, total}`. `total` após filtros, antes da paginação; página além do fim retorna `items: []`.
 - Filtros geográficos combinam por AND; `bairro` exige `municipio`. Campos extras de escrita: 422.
 - As rotas de negócio e `GET /` exigem `Authorization: Bearer <access_token>`. Cadastro e login são públicos; `GET /health`, `/docs` e `/openapi.json` também não exigem token. As operações `/auth` estão detalhadas na seção 2.1 e persistem em `portal.usuarios`, independentemente de `GOLD_SOURCE` ou dos mocks de negócio do frontend.
 
@@ -18,7 +20,7 @@ Os arquivos JSON vinculados abaixo fazem parte deste contrato e são os exemplos
 
 `periodo_atual` e `periodo_comparacao`: string `YYYY-MM/YYYY-MM`, com início/fim **inclusivos**. Um mês também pode ser expresso como `YYYY-MM`. Validar meses, início ≤ fim e comparações de mesma duração, diferentes entre si.
 
-Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2023-06`. O formato de transporte é uma decisão desta proposta, não um nome de coluna da Gold.
+Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2023-06`. O formato de transporte é uma decisão deste contrato, não um nome de coluna da Gold.
 
 | Rota | Query ou corpo |
 | --- | --- |
@@ -31,19 +33,30 @@ Exemplo da tela: `periodo_atual=2025-07/2026-06` e `periodo_comparacao=2022-07/2
 | POST /inspecoes/lote | corpo `{"ordens": [...]}` com 1 a 200 itens no formato do POST /inspecoes |
 | GET /inspecoes/indicadores | periodo_conclusao opcional (data de conclusão); município, bairro, classe, alimentador |
 | GET /operacao | periodo_atual obrigatório; município, bairro, alimentador; ordenar_por=dec|fec|chi; nivel_regional=municipio|bairro; page, page_size |
-| POST /ia | pergunta |
+| POST /ia | pergunta; conversa_id opcional (o backend cria na primeira pergunta e o front reenvia) |
 | GET /filtros | sem parâmetros |
 | POST /ia/insight | contexto=receita|unidade; filtros; indicadores; id_uc para resumo da unidade |
+| POST /auth/register | corpo com nome, email, senha e convite (público) |
+| POST /auth/login | corpo com email e senha (público) |
+| GET /auth/me · PATCH /auth/me | sessão atual; o PATCH aceita só `cargo` |
+| GET /health | sem parâmetros (público) |
 
 Os parâmetros sem indicação de obrigatoriedade são opcionais. O filtro `classe` não é suportado por `GET /operacao`, pois a continuidade é agregada por alimentador, e retorna **422 `DADOS_INVALIDOS`** se enviado. Filtros de bairro em operação selecionam os alimentadores que atendem o bairro; não recalculam seu denominador.
 
-### Limites dos stubs
+### Períodos fora das janelas de exemplo
 
-Os cenários analíticos estão preparados para as duas janelas anuais acima. Outros intervalos sintaticamente válidos — inclusive um mês isolado (`YYYY-MM`) — retornam **422 `CENARIO_STUB_INDISPONIVEL`**, em vez de devolver números de outro período. Isso é limite do stub, não do formato: `YYYY-MM` continua válido no contrato (por exemplo, no filtro `periodo_atual` de GET /inspecoes, que não depende de cenário) e a integração real deverá atender os intervalos, mensais ou não, disponíveis na Gold.
+O formato aceita qualquer intervalo válido, inclusive um mês isolado (`YYYY-MM`). O que muda por rota é a cobertura da fonte:
 
-Esses limites de cenário não se aplicam a `GET /operacao`: a API consulta o PostgreSQL nos modos `seed` e `real`, aceita qualquer período válido e retorna apenas os meses disponíveis na fonte. Um recorte sem dados retorna 200 com séries e rankings vazios.
+| Rota | Períodos atendidos |
+| --- | --- |
+| GET /dashboard, GET /dashboard/comparacao | Qualquer intervalo válido: KPIs e série são calculados no banco. A ponte e o drill-down existem só para P1 × P2 (seção 3); fora disso vêm vazios, com o motivo em `metadados.observacoes` |
+| GET /operacao | Qualquer intervalo válido, com os meses disponíveis na fonte; um recorte sem dados retorna 200 com séries e rankings vazios |
+| GET /inspecoes, GET /inspecoes/indicadores | Qualquer intervalo válido (data de criação e de conclusão das ordens) |
+| GET /inspecoes/candidatos | Só a janela P2: a fila é uma foto da exportação da Gold. Outro período retorna **422 `CENARIO_STUB_INDISPONIVEL`** nos dois modos |
+| GET /unidades/{id} e POST /ia/insight de unidade com `GOLD_SOURCE=seed` | Só a janela do exemplo fictício; outro período retorna **422 `CENARIO_STUB_INDISPONIVEL`**. Com `GOLD_SOURCE=real`, qualquer janela de 12 meses |
+| POST /ia/insight de receita | Só P1 × P2, sem alimentador; fora disso, **422 `DECOMPOSICAO_INDISPONIVEL`** (seção 10) |
 
-Filtros e paginação dos mocks operam sobre exemplos locais. Dashboard possui recortes fictícios por município → bairro → classe; os valores regionais são distribuição ilustrativa do consolidado. Não representam metodologia ou diagnóstico real. As ordens na API persistem no schema `portal`, e `/auth` sempre usa contas persistidas em `portal.usuarios`; o comportamento de snapshot dos exemplos não se aplica à autenticação. A persistência das ordens não é um stub: o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes.
+O mock do front (`VITE_USE_MOCKS=true`) reproduz essas mesmas respostas sobre exemplos locais; os valores regionais do mock são distribuição ilustrativa e não representam diagnóstico real. As ordens persistem no schema `portal`, e o índice único parcial do banco garante uma única ordem ativa por UC mesmo em requisições concorrentes. `/auth` sempre usa contas de `portal.usuarios`, inclusive com o front em modo mock.
 
 ## 2. Erros
 
@@ -559,6 +572,20 @@ Campos da sprint de GenAI (GENAI-3), todos opcionais. O mock e respostas sem ele
 | `metadados.fonte` | `"dados"` (padrão) ou `"guia"` | De onde veio a resposta. Ausente vale como `"dados"`. |
 | `metadados.secoes_guia` | lista de `{id, titulo}` | Seções do guia da plataforma em que a resposta se apoiou; vazia em resposta de dados. |
 
+**Roteador de intenção (respostas sem chamar o modelo).** Com `IA_MODO=real`, antes de qualquer consulta, a API classifica a pergunta por código (`backend/app/ai/intencao.py`). Só a rota `consulta` chega ao agente; as demais respondem na hora, com zero tokens:
+
+| Rota | Quando | Resposta |
+| --- | --- | --- |
+| `seguranca` | Pedido de escrita (DROP, DELETE, UPDATE…), injeção de instruções, pedido do prompt ou de credenciais, dados pessoais | `bloqueado`. Escrita e injeção: “Ação de segurança bloqueada. Meu acesso é restrito apenas a consultas de leitura (SELECT) no banco de dados.” |
+| `apresentacao` | Saudação ou “o que você faz?” | `ok`, com a apresentação do assistente |
+| `plataforma` | Dúvida de uso das telas | `ok` pelo guia da plataforma (`metadados.fonte: "guia"`), descrito abaixo |
+| `fora_de_escopo` | Assunto alheio à V-Energy (piada, clima, figura histórica), quando a pergunta não cita termos do negócio | `nao_sei`: “Essa pergunta foge do meu domínio…” |
+| `esclarecimento` | Bairro em vários municípios ou “este ano” | `esclarecer`, descrito abaixo |
+| `dados_ausentes` | Todos os anos citados fora de jul/2022 a jun/2026; datas de cadastro (ligação, medidor, conexão) seguem para o agente | `nao_sei`: “Entendi sua pergunta, mas os dados atuais não me permitem confirmar esses números…” |
+| `consulta` | O restante | Agente; se ele não comprovar o número, `nao_sei` |
+
+Essas respostas trazem `sql: null`, `dados` vazios e, em `metadados.observacoes`, a regra que decidiu (por exemplo, “Respondido pelo roteador de intenção (regra: fora_da_base), sem chamar o modelo.”).
+
 **Pergunta sobre a plataforma.** Perguntas sobre o uso do portal ("O que é a aba Assistente V-Energy?", "Como gero uma ordem de inspeção?") são respondidas pelo [guia da plataforma](../backend/app/ai/guia/plataforma.md), não pela Gold. A resposta vem com `metadados.fonte: "guia"`, `sql: null`, `tabelas` e `dados` vazios, sem gráfico, e `status` `ok` ou `nao_sei`. Com `ok`, `metadados.secoes_guia` lista as seções usadas, e o bloco "Como cheguei nisso" mostra essas seções no lugar do SQL. O agente do guia só recebe as seções de nível público. O que não estiver no guia volta `nao_sei`. [Exemplo](../backend/app/services/fixtures/resposta_ia_guia.json).
 
 **Pedir esclarecimento.** Pergunta ambígua volta com `status: "esclarecer"`, sem consulta ao banco e sem chamar o modelo (zero tokens). A API detecta três casos:
@@ -815,7 +842,7 @@ GET /health
 {"status":"ok"}
 ```
 
-## 12. Migração V1 → V2
+## 12. Histórico de mudanças de formato
 
 Esta V2 altera o contrato: `EM_ANDAMENTO` → `EM_CAMPO`, IDs de ordens inteiros, campos das ordens/resultados no modelo do Gabriel; dashboard com seis KPIs, série e ponte; IA e insight com respostas distintas.
 
@@ -825,44 +852,41 @@ Visão 360 (V1a, 27/10), que muda formatos para o front: `diagnostico_conta` gan
 
 Veredito em três partes (V1b, 29/10), que muda formato para o front: `diagnostico_conta.veredito` deixa de ser texto e passa a ser `{titulo, detalhe, orientacao}` (null inteiro, como antes, quando a janela não tem dados); o detalhe traz o percentual de cada comparação em vez de "mais de 20%", e `orientacao` é anulável.
 
-Contrato, schemas, routers e fixtures do backend estão na mesma versão (V2). `backend/tests/test_stubs.py` compara a resposta de cada rota com o fixture vinculado neste documento; se um mudar sem o outro, o teste falha. Gheyson gera `types/` e mocks a partir desses fixtures (F3).
+Mudanças posteriores (30/10 a 02/11), que acrescentam rotas e campos:
 
-## 13. Diferenças em relação à Arquitetura V1
+- **Fila de candidatos:** `acao_recomendada` em cada item, filtro `sem_ordem_ativa`, `page_size` padrão 50 (até 200) e exclusão das UCs com ordem concluída nos últimos 6 meses.
+- **Ordens:** `POST /inspecoes/lote` (tudo ou nada, erro `LOTE_REJEITADO` com `detalhes.falhas`) e `GET /inspecoes/indicadores` (`ordens_comparadas`, `kwh_mes_campo`, `kwh_mes_fila`); `resultado.kwh_recuperado` passa a ser kWh por mês.
+- **Dashboard:** `GET /dashboard/comparacao`; `nivel=classe` aceita qualquer combinação de pais; o drill-down passa a ser ordenado pelo efeito-volume em BRL; o rótulo de `receita_faturada` passa a ser “Receita faturada (com tributos)”.
+- **Assistente:** `POST /ia` ganha `conversa_id`, `grafico`, `esclarecimento`, o status `esclarecer` e o roteador de intenção (respostas de segurança, fora de escopo, guia e dados ausentes sem chamar o modelo); `POST /ia/insight` de unidade passa a usar a Gold real.
+- **Autenticação:** rotas `/auth` (seção 2.1); todas as rotas de negócio passam a exigir token.
 
-Decisões propostas na seção 2 do cronograma (daily de 19/10) e aplicadas nesta V2. Precisam constar na ata de aprovação, porque contrariam o texto original da Arquitetura V1.
+Contrato, schemas, routers e fixtures do backend estão na mesma versão (V2). `backend/tests/test_stubs.py` compara a resposta de cada rota com o fixture vinculado neste documento; se um mudar sem o outro, o teste falha. O front copia os fixtures com `npm run mocks:sync`, e `frontend/src/types/verificacao-fixtures.ts` confere cada um contra os tipos.
 
-| # | Arquitetura V1 | Contrato V2 | Origem | Validar com |
-| --- | --- | --- | --- | --- |
-| 1 | POST /ia devolve só `{"resposta"}` | Resposta estendida: sql, tabelas, dados, status `ok`/`nao_sei`/`bloqueado` (Tela 7, “Como cheguei nisso”) | Cronograma, seção 2, item 1 | Equipe 3 (GenAI) |
-| 2 | 9 rotas | 10ª rota POST /ia/insight (bloco “Análise da IA” da Tela 2 e resumo da Tela 3) | Cronograma, seção 2, item 2 | Equipe 3 (GenAI) |
-| 3 | aberta → agendada → em execução → concluída | ABERTA → EM_CAMPO → CONCLUIDA; CANCELADA a partir de ABERTA/EM_CAMPO; “agendada” vira o campo `data_prevista` | Cronograma, seção 2, item 3 (fluxo do protótipo validado) | Gabriel (já implementado no service) |
 
-## 14. Regras provisórias e seus donos
+## 13. Regras definidas na implementação
 
-O stub precisa de números para o front trabalhar, mas as regras abaixo **não estão decididas por este contrato**. Pertencem aos donos das fatias, que podem trocá-las sem que isso conte como mudança de contrato, desde que mantenham os nomes e formatos dos campos. Se o formato mudar, atualize este documento e o fixture no mesmo PR.
+Regras que o contrato deixou para os donos de cada parte e que já estão implementadas. Podem evoluir sem contar como mudança de contrato, desde que mantenham os nomes e formatos dos campos; se o formato mudar, este documento e o fixture são atualizados no mesmo PR.
 
-| Regra | Onde aparece | Valor no stub | Dono | Quando |
-| --- | --- | --- | --- | --- |
-| Agregação regional de DEC/FEC por bairro (alimentadores que atendem o bairro, ponderados por UCs) | `ranking_regional` | Ilustrativa | Arthur (R1a) | 23/10 |
-| Nomes reais de tabelas Gold, SQL e auditoria do agente | `resposta_ia` (`gold_receita_demo`) | Ilustrativos | Equipe 3 (GenAI) | Contrato 20/10, módulo até 29/10 |
-| Timestamp de carga da Gold | `metadados.gold_atualizada_em` | Fixo | Dados | B2 (21/10) |
+| Regra | Onde aparece | Como ficou | Responsável |
+| --- | --- | --- | --- |
+| Agregação regional de DEC/FEC por bairro | `ranking_regional` de GET /operacao | Alimentadores que atendem o bairro, ponderados pelas UCs atendidas em cada mês; a tela explica que o valor é uma aproximação | Arthur (R1a) |
+| Tabelas, SQL e auditoria do agente | `resposta_ia` | O agente consulta views do schema `agente` sobre a Gold real, com usuário somente leitura; o exemplo do contrato continua fictício (`gold_receita_demo`) | Equipe 3 (GenAI) |
+| Timestamp de carga da Gold | `metadados.gold_atualizada_em` | Data da carga registrada em `gold._carga_metadata`; com `GOLD_SOURCE=seed`, valor fictício | Dados e backend |
 
-Fontes ausentes não devem virar valores fictícios em produção. Telefone permanece null até existir fonte.
+Fontes ausentes não viram valores fictícios em produção: o campo vem `null`. Telefone permanece null até existir fonte.
 
-P1/B1 entregam contratos e stubs; não substituem B2/B3/B4/B5, O1b, V1a ou R1a. A leitura real e a persistência seguem com os responsáveis do cronograma.
+## 14. Versão e manutenção
 
-## 15. Aprovação
+Este contrato é a versão vigente da API e está em uso por todas as telas. Toda mudança entra por PR e atualiza, juntos:
 
-Este documento fica como “proposta para revisão” até ser aprovado na daily. Para aprovar:
+- este documento (e, se o formato mudar, a seção 12);
+- o schema Pydantic e o router;
+- o fixture em `backend/app/services/fixtures/`;
+- o tipo em `frontend/src/types/` e o mock em `frontend/src/services/mock/`, depois de `npm run mocks:sync`.
 
-- [ ] Par A (Thiago + Gheyson): formato de período, nomes JSON e formatos dos fixtures.
-- [ ] Equipe 3: itens 1 e 2 da seção 13 e as linhas dela na seção 14.
-- [ ] Irvin Amilcar e Arthur: suas linhas da seção 14 (podem manter o valor ilustrativo até V1a/R1a).
-- [ ] Gabriel: item 3 da seção 13 e os adaptadores de `schemas/inspecoes.py`.
+`backend/tests/test_stubs.py` e o typecheck do front (`verificacao-fixtures.ts`) falham se o fixture sair do formato da rota ou do tipo.
 
-Depois da aprovação, troque o título para “V2 (aprovada em DD/MM)” e registre a data na ata da daily.
-
-## 16. Alinhamento com a Gold
+## 15. Alinhamento com a Gold
 
 A Gold não muda para atender o portal. Onde este contrato divergia dela, a API se adapta assim:
 

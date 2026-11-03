@@ -215,6 +215,41 @@
   --text-legenda--line-height: 16px;
   --text-micro: 10px;
   --text-micro--line-height: 12px;
+
+  /* Animações de entrada (Modal com `animado`); usadas com motion-safe: */
+  --animate-fundo-entrada: fundo-entrada 150ms ease-out;
+  --animate-modal-entrada: modal-entrada 200ms ease-out;
+
+  @keyframes fundo-entrada {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes modal-entrada {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+
+  /* Conteúdo que entra pelo lado da troca (seletor Região | Classes da Receita) */
+  --animate-entrada-direita: entrada-direita 180ms ease-out;
+  --animate-entrada-esquerda: entrada-esquerda 180ms ease-out;
+
+  @keyframes entrada-direita {
+    from {
+      opacity: 0;
+      transform: translateX(8px);
+    }
+  }
+
+  @keyframes entrada-esquerda {
+    from {
+      opacity: 0;
+      transform: translateX(-8px);
+    }
+  }
 }
 
 @utility bg-filo {
