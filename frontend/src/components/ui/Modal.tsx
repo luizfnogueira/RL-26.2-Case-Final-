@@ -13,6 +13,8 @@ type Props = {
   tamanho?: 'sm' | 'md' | 'lg'
   /** Clique no fundo escuro fecha. Desligue em formulários com dados a perder. */
   fecharAoClicarFora?: boolean
+  /** Entrada com fade no fundo e fade + leve scale na janela (só com movimento permitido). */
+  animado?: boolean
   children?: ReactNode
 }
 
@@ -40,6 +42,7 @@ function ModalAberto({
   rodape,
   tamanho = 'md',
   fecharAoClicarFora = true,
+  animado = false,
   children,
 }: Props) {
   const idTitulo = useId()
@@ -84,7 +87,10 @@ function ModalAberto({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-surface-tinta/60 p-4 backdrop-blur-[2px]"
+      className={cx(
+        'fixed inset-0 z-50 grid place-items-center bg-surface-tinta/60 p-4 backdrop-blur-[2px]',
+        animado && 'motion-safe:animate-fundo-entrada',
+      )}
       onMouseDown={(evento) => {
         if (fecharAoClicarFora && evento.target === evento.currentTarget) aoFechar()
       }}
@@ -100,6 +106,7 @@ function ModalAberto({
         className={cx(
           'flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-card border border-borda bg-surface-card shadow-modal outline-none',
           LARGURAS[tamanho],
+          animado && 'motion-safe:animate-modal-entrada',
         )}
       >
         <header className="flex items-start justify-between gap-3 border-b border-borda-leve px-6 py-5">

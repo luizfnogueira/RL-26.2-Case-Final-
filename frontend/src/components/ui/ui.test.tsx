@@ -105,6 +105,20 @@ describe('Modal', () => {
     expect(dialogo.getAttribute('aria-modal')).toBe('true')
   })
 
+  it('sem a prop animado, nem o fundo nem a janela recebem classes de animação', () => {
+    render(<Exemplo />)
+    const dialogo = screen.getByRole('dialog')
+    expect(dialogo.className).not.toContain('animate-')
+    expect(dialogo.parentElement?.className).not.toContain('animate-')
+  })
+
+  it('com animado, a entrada anima só com movimento permitido (motion-safe)', () => {
+    render(<Modal aberto animado aoFechar={() => undefined} titulo="Origem" />)
+    const dialogo = screen.getByRole('dialog')
+    expect(dialogo.className).toContain('motion-safe:animate-modal-entrada')
+    expect(dialogo.parentElement?.className).toContain('motion-safe:animate-fundo-entrada')
+  })
+
   it('fecha com Esc, com o botão e com clique no fundo, mas não com clique dentro', () => {
     const aoFechar = vi.fn()
     render(<Exemplo aoFechar={aoFechar} />)

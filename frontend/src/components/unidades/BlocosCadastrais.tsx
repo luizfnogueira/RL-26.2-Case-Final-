@@ -8,7 +8,7 @@ import { formatarData } from '@/utils/datas'
 import { formatarCep, formatarIndicador, formatarNome } from '@/utils/formatacao'
 import { limitesDoPeriodo } from '@/utils/periodos'
 import ListaDados from './ListaDados'
-import { rotuloModalidadeGd } from './rotulos'
+import { rotuloModalidadeGd, rotuloTipoMedidor } from './rotulos'
 
 const NAO_INFORMADO = 'Não informado'
 const leitura = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
@@ -83,23 +83,35 @@ export function BlocoMedidor({
   return (
     <Card titulo="Medidor" aria-label="Medidor">
       <ListaDados
-        className="sm:grid-cols-1"
+        colunas={1}
         itens={[
           { rotulo: 'Número', valor: medidor.id_medidor },
-          { rotulo: 'Tipo e modelo', valor: `${formatarNome(medidor.tipo)} · ${medidor.modelo}` },
+          {
+            rotulo: 'Tipo e modelo',
+            valor: (
+              <>
+                {rotuloTipoMedidor(medidor.tipo)} ·{' '}
+                {/* O código não quebra no hífen ("EM-" / "1200"): se não couber, desce inteiro. */}
+                <span className="whitespace-nowrap">{medidor.modelo}</span>
+              </>
+            ),
+          },
           { rotulo: 'Instalado em', valor: formatarData(medidor.data_instalacao) },
           {
             // Valor do registrador, não o consumo do mês: o nome evita a confusão.
             rotulo: 'Leitura acumulada',
             valor: ultima ? (
-              <span className="flex flex-wrap items-center gap-2">
-                {/* Valor exato do registrador, para conferir com o visor do medidor; sem quebra. */}
-                <span className="whitespace-nowrap">
-                  {`${leitura.format(ultima.leitura_kwh)} kWh em ${formatarData(ultima.data)}`}
+              <>
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {/* Valor exato do registrador, para conferir com o visor; o número não se separa do kWh. */}
+                  <span className="whitespace-nowrap">{`${leitura.format(ultima.leitura_kwh)} kWh`}</span>
+                  {/* Só a leitura estimada pede atenção; a real não leva selo. */}
+                  {ultima.tipo_leitura === 'ESTIMADA' && <Badge variante="alerta">Estimada</Badge>}
                 </span>
-                {/* Só a leitura estimada pede atenção; a real não leva selo. */}
-                {ultima.tipo_leitura === 'ESTIMADA' && <Badge variante="alerta">Estimada</Badge>}
-              </span>
+                {ultima.data && (
+                  <span className="block text-legenda text-ink-2">{`em ${formatarData(ultima.data)}`}</span>
+                )}
+              </>
             ) : (
               'Sem leitura registrada'
             ),
@@ -133,14 +145,24 @@ export function BlocoGeracao({ gd }: { gd: GeracaoDistribuida | null }) {
   return (
     <Card titulo="Geração distribuída" aria-label="Geração distribuída">
       <ListaDados
-        className="sm:grid-cols-1"
+        colunas={1}
         itens={[
-          { rotulo: 'Potência instalada', valor: `${potencia.format(gd.potencia_kwp)} kWp` },
+          {
+            rotulo: 'Potência instalada',
+            // Número e unidade juntos: "5,0" nunca numa linha e "kWp" na outra
+            valor: (
+              <span className="whitespace-nowrap">{`${potencia.format(gd.potencia_kwp)} kWp`}</span>
+            ),
+          },
           { rotulo: 'Modalidade', valor: rotuloModalidadeGd(gd.modalidade) },
           { rotulo: 'Conectada em', valor: formatarData(gd.data_conexao) },
           {
             rotulo: 'Energia injetada (média mensal)',
-            valor: formatarIndicador(gd.energia_injetada_media_mensal),
+            valor: (
+              <span className="whitespace-nowrap">
+                {formatarIndicador(gd.energia_injetada_media_mensal)}
+              </span>
+            ),
           },
         ]}
       />

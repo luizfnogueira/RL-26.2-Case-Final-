@@ -1,4 +1,5 @@
 import type { VarianteBadge } from '@/components/ui/Badge'
+import { formatarNome } from '@/utils/formatacao'
 
 /**
  * Modalidades de geração distribuída como estão na Gold (as 3 existentes em out/2026) e o rótulo
@@ -17,6 +18,18 @@ function rotuloDoMapa(mapa: Record<string, string>, valor: string): string {
 
 export function rotuloModalidadeGd(modalidade: string): string {
   return rotuloDoMapa(MODALIDADES_GD, modalidade)
+}
+
+/** Tipos de medidor da Gold (os 3 existentes em nov/2026), sem acento desde a Silver. */
+const TIPOS_MEDIDOR: Record<string, string> = {
+  ELETRONICO: 'Eletrônico',
+  ELETROMECANICO: 'Eletromecânico',
+  SMART: 'Smart',
+}
+
+/** Tipo fora do mapa: capitalizado como antes do mapa (`formatarNome`), nunca em branco. */
+export function rotuloTipoMedidor(tipo: string): string {
+  return Object.hasOwn(TIPOS_MEDIDOR, tipo) ? TIPOS_MEDIDOR[tipo] : formatarNome(tipo)
 }
 
 /** Canais de atendimento da Gold (os 5 existentes em out/2026). */

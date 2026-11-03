@@ -27,8 +27,11 @@ function Numero({ rotulo, valor, detalhe }: { rotulo: string; valor: string; det
   return (
     <div className="min-w-0 rounded-md bg-surface-alt p-3">
       <dt className="text-legenda text-ink-2">{rotulo}</dt>
-      <dd className="text-titulo-lg font-light tabular-nums">{valor}</dd>
-      <dd className="text-legenda text-ink-2">{detalhe}</dd>
+      {/* Como no ListaDados: quebra como último recurso, mas "412" nunca longe do "kWh" */}
+      <dd className="text-titulo-lg font-light break-words tabular-nums">
+        <span className="whitespace-nowrap">{valor}</span>
+      </dd>
+      <dd className="text-legenda break-words text-ink-2">{detalhe}</dd>
     </div>
   )
 }

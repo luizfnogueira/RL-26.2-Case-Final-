@@ -88,8 +88,9 @@ export default function DetalheUnidade({ id }: { id: string }) {
         periodo={dados.periodo_referencia}
       />
       {/*
-        Cadastro 40%, medidor e GD 30% cada: em xl (1280 px) a leitura acumulada mais longa da Gold
-        ("2.705.855 kWh em 28/06/2026") e "Geração na própria UC" cabem numa linha.
+        Cadastro 40% (dados em duas colunas), medidor e GD 30% cada (uma coluna): em xl (1280 px) a
+        leitura acumulada mais longa da Gold ("2.705.855 kWh", com a data embaixo) e "Geração na
+        própria UC" cabem numa linha.
       */}
       <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)]">
         <BlocoCadastro cadastro={dados.cadastro} />

@@ -1,4 +1,5 @@
 import { ChevronRight } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -129,6 +130,18 @@ export default function DrillDownReceita({
 }: Props) {
   const navigate = useNavigate()
 
+  // Visão dos dados recebidos, não a da URL: enquanto a nova consulta carrega, o conteúdo antigo
+  // fica esmaecido, e a entrada só anima quando o novo chega. Com bairro escolhido não há seletor.
+  const visaoDosDados: Visao = drill.nivel === 'classe' ? 'classe' : 'regiao'
+  const [visaoAnterior, setVisaoAnterior] = useState(visaoDosDados)
+  const [trocou, setTrocou] = useState(false)
+  if (visaoDosDados !== visaoAnterior) {
+    // Informação da renderização anterior guardada em estado: só as trocas animam, não a 1ª carga
+    setVisaoAnterior(visaoDosDados)
+    setTrocou(true)
+  }
+  const animarEntrada = Boolean(aoMudarVisao) && trocou
+
   // Leva os itens visíveis (de 2 a 4) para a aba de comparação
   const itensVisiveis = drill.items.slice(0, 4).map((l) => l.nome)
   // A API de comparação não aceita filtro de classe: com classe ativa, os números não bateriam com o card
@@ -237,6 +250,10 @@ export default function DrillDownReceita({
       acoes={
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-legenda text-ink-2">Ordenado pela perda de receita por volume</p>
+          {/* Sempre no DOM, para o leitor de tela anunciar; visível só durante a atualização */}
+          <span role="status" className={carregando ? 'text-legenda text-ink-2' : 'sr-only'}>
+            {carregando ? 'Atualizando…' : ''}
+          </span>
           {aoMudarVisao && (
             <div
               role="group"
@@ -291,6 +308,7 @@ export default function DrillDownReceita({
         </div>
       }
       className={carregando ? 'opacity-70 transition-opacity' : 'transition-opacity'}
+      aria-busy={carregando || undefined}
     >
       <nav aria-label="Caminho do drill-down" className="-mt-2 mb-4">
         <ol className="flex flex-wrap items-center gap-1 text-corpo">
@@ -318,28 +336,44 @@ export default function DrillDownReceita({
         </ol>
       </nav>
 
-      {drill.page === 1 && drill.items.length > 0 && <MaioresPerdas linhas={drill.items} />}
+      {/*
+        A key troca o conteúdo quando chega a outra visão: Classes (à direita no seletor) entra
+        pela direita e Região pela esquerda. Só o novo existe no DOM, então trocas rápidas nunca
+        deixam dois conteúdos visíveis.
+      */}
+      <div
+        key={visaoDosDados}
+        data-visao={visaoDosDados}
+        className={cx(
+          animarEntrada &&
+            (visaoDosDados === 'classe'
+              ? 'motion-safe:animate-entrada-direita'
+              : 'motion-safe:animate-entrada-esquerda'),
+        )}
+      >
+        {drill.page === 1 && drill.items.length > 0 && <MaioresPerdas linhas={drill.items} />}
 
-      <Tabela
-        legenda={`Variação de volume e efeitos por ${ROTULO_NIVEL[drill.nivel].toLowerCase()}`}
-        colunas={colunas}
-        linhas={drill.items}
-        chaveLinha={(l) => l.nome}
-        aoClicarLinha={podeDescer ? aoSelecionar : undefined}
-        carregando={carregando}
-        paginacao={{
-          page: drill.page,
-          pageSize: drill.page_size,
-          total: drill.total,
-          aoMudar: aoMudarPagina,
-        }}
-        vazio={
-          <EmptyState
-            titulo="Sem recortes neste nível"
-            descricao={motivoVazio ?? 'Nenhum recorte tem dados para os filtros escolhidos.'}
-          />
-        }
-      />
+        <Tabela
+          legenda={`Variação de volume e efeitos por ${ROTULO_NIVEL[drill.nivel].toLowerCase()}`}
+          colunas={colunas}
+          linhas={drill.items}
+          chaveLinha={(l) => l.nome}
+          aoClicarLinha={podeDescer ? aoSelecionar : undefined}
+          carregando={carregando}
+          paginacao={{
+            page: drill.page,
+            pageSize: drill.page_size,
+            total: drill.total,
+            aoMudar: aoMudarPagina,
+          }}
+          vazio={
+            <EmptyState
+              titulo="Sem recortes neste nível"
+              descricao={motivoVazio ?? 'Nenhum recorte tem dados para os filtros escolhidos.'}
+            />
+          }
+        />
+      </div>
     </Card>
   )
 }
