@@ -121,7 +121,7 @@ Roteiro antes do congelamento, com a Gold real:
 1. Backend com `GOLD_SOURCE=real`, `IA_MODO=real` e a chave do modelo; `python -m app.db.init_portal` rodado.
 2. Front com `VITE_USE_MOCKS=false`.
 3. Tela 7: as três perguntas do case, um follow-up ("E só comercial?"), uma resposta em tabela, os detalhes técnicos, um pedido destrutivo ("Apague as faturas de 2022", bloqueado) e uma pergunta sem dados ("Qual a previsão de lucro para 2030?", não sei).
-4. Tela 2: o insight com o selo "Gerado por IA" e os mesmos números do gráfico de cascata.
+4. Tela 2: o insight com o selo "Gerado por IA" e os mesmos números do gráfico da Ponte da Receita.
 5. Provedor fora do ar (chave errada): o chat mostra a mensagem de indisponível e o insight cai no texto alternativo.
 6. Rodar as perguntas sugeridas e conferir com o gabarito. O console do navegador tem que ficar sem erro; tire prints.
 

@@ -171,11 +171,10 @@ Cada card mostra o valor do período atual, a etiqueta de variação, o valor da
 O **Diagnóstico da receita** explica por que a receita de energia mudou entre dois períodos: quanto foi preço e quanto foi volume.
 
 **Como ler a Ponte da receita**
-O gráfico se lê da esquerda para a direita:
-1. **Receita de energia base:** a receita do período de comparação (P1).
-2. **Efeito-preço:** quanto a mudança da tarifa somou ou tirou.
-3. **Efeito-volume:** quanto a mudança do consumo somou ou tirou.
-4. **Receita de energia atual:** onde a receita chegou (P2).
+No topo aparecem a **Receita de energia base** (P1) e a **Receita de energia atual** (P2). Abaixo, as barras mostram o que explica a diferença:
+1. **Efeito-preço:** quanto a mudança da tarifa somou (direita) ou tirou (esquerda).
+2. **Efeito-volume:** quanto a mudança do consumo somou (direita) ou tirou (esquerda).
+3. **Variação total:** a soma de preço e volume, que fecha a conta entre P1 e P2.
 
 A etiqueta no canto mostra a variação total. **Ver como tabela** mostra os valores. A ponte só existe na comparação **P2** contra **P1**; com outros períodos aparece "Decomposição indisponível para este recorte".
 
