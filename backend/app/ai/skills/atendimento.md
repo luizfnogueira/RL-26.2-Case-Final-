@@ -24,8 +24,9 @@
 1. **Assunto não descreve a UC.** Um chamado de `'GERACAO DISTRIBUIDA'` não quer dizer que a UC tem painel solar. Para GD use `dim_uc.flag_tem_gd`.
 2. **Nota de satisfação:** nem todo protocolo foi avaliado. Use `AVG(nota_satisfacao)` (ignora NULL) e diga "entre os atendimentos avaliados".
 3. **Média de um período:** calcule a partir de `uc_atendimentos`. Nunca tire média de `satisfacao_media` mensal.
-4. **Mês e período:** use `TO_CHAR(data_abertura, 'YYYY-MM')`. P1 = `'2022-07'` a `'2023-06'`; P2 = `'2025-07'` a `'2026-06'`.
-5. **Tempo de atendimento** está em horas. Converta para dias (÷ 24) só se o usuário pedir.
+4. **Mês e período:** use `TO_CHAR(data_abertura, 'YYYY-MM')`. P1 = `'2022-07'` a `'2023-06'`; P2 = `'2025-07'` a `'2026-06'`. Nunca `data_abertura BETWEEN '2022-07-01' AND '2026-06-30'`: a coluna tem hora, e isso perde os atendimentos do último dia depois da meia-noite. Sem filtro de data, a consulta já cobre toda a base (jul/2022 a jun/2026), e a resposta deve dizer isso, não "P2".
+5. **Satisfação:** `AVG(nota_satisfacao)` já ignora quem não avaliou; diga quantos foram avaliados. As notas por canal e por assunto são praticamente iguais (diferença na 3ª casa decimal): não aponte canal "melhor" ou "pior". A média de um período pode mudar por causa de um único mês (ex.: julho/2025, com o triplo de atendimentos e nota bem mais baixa): em "por que a satisfação caiu", traga a série mensal (`TO_CHAR(data_abertura, 'YYYY-MM')`) antes de afirmar que a queda foi uniforme.
+6. **Tempo de atendimento** está em horas. Converta para dias (÷ 24) só se o usuário pedir.
 
 ---
 

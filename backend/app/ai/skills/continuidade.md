@@ -31,7 +31,7 @@
 5. **Contar interrupções em `uc_interrupcoes`:** oscilação não é interrupção. Filtre
    `flag_sem_interrupcao = FALSE AND flag_antes_ligacao = FALSE AND duracao_efetiva_min >= 3`
    e use `duracao_efetiva_min` para duração. O total oficial por mês é `agg_kpis_mensal.interrupcoes`.
-6. **Mês em `uc_interrupcoes`:** use `TO_CHAR(data_abertura, 'YYYY-MM')`. `periodo` é NULL fora de P1 e P2, então para outros intervalos filtre por `mes_referencia`.
+6. **Mês em `uc_interrupcoes`:** use `TO_CHAR(data_abertura, 'YYYY-MM')`, nunca `data_abertura BETWEEN '...' AND 'AAAA-MM-DD'` (a coluna tem hora e o último dia fica de fora). `periodo` é NULL fora de P1 e P2, então para outros intervalos filtre por `mes_referencia`.
 
 ---
 
