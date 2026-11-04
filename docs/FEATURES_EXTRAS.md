@@ -38,7 +38,7 @@ Tudo o que o time entregou além dos requisitos obrigatórios do case: o que cad
 
 ### Testes de qualidade no pipeline
 
-**O que faz:** cada notebook da Silver confere unicidade, nulos, domínios e a reconciliação das contagens **antes de gravar**, e para se uma garantia falhar. Toda execução grava um log com a contagem de cada problema. Na exportação, um manifesto registra linhas, colunas e hash SHA-256 de cada CSV.
+**O que faz:** cada notebook da Silver e da Gold confere unicidade, nulos, domínios e a reconciliação das contagens **antes de gravar**, e para se uma garantia falhar. Toda execução grava um log com a contagem de cada problema. Na exportação, um manifesto registra linhas, colunas e hash SHA-256 de cada CSV.
 
 **Por que:** dado errado não pode chegar em silêncio ao portal. Se uma regra quebra, o pipeline para em vez de gravar, e o log responde quantos registros cada regra afetou.
 
@@ -123,7 +123,7 @@ Nos dois casos, os números saem do back-end, os mesmos que a tela já mostra. A
 
 ### Resumo da conversa antiga
 
-**O que faz:** o agente recebe as 3 últimas trocas da conversa e uma lista curta com as perguntas anteriores, montada pelo código, sem chamar o modelo. "E só comercial?" herda o período e a métrica da pergunta anterior.
+**O que faz:** o agente recebe as 3 últimas trocas da conversa e uma lista curta com as perguntas anteriores, montada pelo código, sem chamar o modelo. "E só comercial?" herda o período e a métrica da pergunta anterior. Depois de 2 horas sem interação, a conversa recomeça com o contexto limpo.
 
 **Por que:** memória longa sem gastar tokens para resumir. O histórico fica no servidor, então ninguém consegue forjar uma conversa anterior.
 
@@ -147,7 +147,7 @@ Nos dois casos, os números saem do back-end, os mesmos que a tela já mostra. A
 
 ### Log com proteção de dados
 
-**O que faz:** toda pergunta, inclusive as bloqueadas e as sem resposta, fica no log de auditoria do schema `ia`, com SQL, status, tokens e latência. CPF, CNPJ e e-mails digitados são mascarados antes de gravar, e conversas com mais de 30 dias são apagadas.
+**O que faz:** toda pergunta, inclusive as bloqueadas e as sem resposta, fica no log de auditoria do schema `ia`, com SQL, status, tokens e latência. CPF, CNPJ e e-mails digitados são mascarados antes de gravar, e conversas com mais de 30 dias são apagadas quando a API sobe em modo real.
 
 **Por que:** o time consegue auditar o que o agente respondeu e ver as tentativas bloqueadas, sem que o próprio log vire um vazamento de dados pessoais.
 
