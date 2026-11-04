@@ -160,20 +160,22 @@ As principais decisões arquiteturais tomadas pelo time foram:
 
 ### 2.2 Diagnóstico Executivo da Receita (`P1 × P2`)
 
-> Documentação complementar detalhada do contrato e das regras: [`docs/api-contract.md`](docs/api-contract.md) e [`backend/app/ai/skills/receita.md`](backend/app/ai/skills/receita.md).
+> **Documento completo, com causas, hipóteses descartadas e recomendações com ordem de grandeza do impacto:** [`docs/diagnostico-receita.md`](docs/diagnostico-receita.md).
 
-A análise comparativa entre o primeiro ano da base (**`P1`: jul/2022 a jun/2023**) e os últimos 12 meses (**`P2`: jul/2025 a jun/2026**) revela um **crescimento aparente sustentado exclusivamente por tarifa, mascarando uma retração relevante de volume físico faturado**:
+Comparando o primeiro ano da base (**`P1`: jul/2022 a jun/2023**) com os últimos 12 meses (**`P2`: jul/2025 a jun/2026**), a receita subiu **pelo preço** (reajuste **e** bandeiras tarifárias) e o volume caiu **porque 3.510 unidades passaram a gerar a própria energia (GD)**:
 
-| Indicador Consolidado | Período Base (`P1`: jul/22–jun/23) | Período Atual (`P2`: jul/25–jun/26) | Variação Absoluta | Variação (%) |
-| :--- | ---: | ---: | ---: | ---: |
-| **Receita Faturada Total (com tributos)** | R$ 157,11 milhões | R$ 169,68 milhões | +R$ 12,58 milhões | **+8,00%** |
-| **Receita de Energia (sem tributos — Ponte)** | R$ 117,83 milhões | R$ 127,26 milhões | +R$ 9,43 milhões | **+8,00%** |
-| **Efeito-Preço (Reajuste Tarifário de +12,4%)** | — | — | **+R$ 14,43 milhões** | Impulsionou a alta |
-| **Efeito-Volume (Retração de −4,0% em kWh)** | — | — | **−R$ 4,99 milhões** | Freou o crescimento |
+| Indicador Consolidado | `P1` (jul/22–jun/23) | `P2` (jul/25–jun/26) | Variação |
+| :--- | ---: | ---: | ---: |
+| **Receita Faturada (com tributos)** | R$ 157,11 mi | R$ 169,68 mi | **+8,0%** |
+| **Receita de Energia (sem tributos, base da ponte)** | R$ 117,83 mi | R$ 127,26 mi | **+8,0%** |
+| **Efeito-Preço** (tarifa média +12,4%: reajuste ≈ R$ 9,9 mi + bandeiras ≈ R$ 4,2 mi) | | | **+R$ 14,43 mi** |
+| **Efeito-Volume** (227,05 → 218,08 GWh: −3,95%) | | | **−R$ 4,99 mi** |
 
-**Principais Conclusões do Diagnóstico:**
-1. **A receita subiu pelo preço, não pelo consumo:** O reajuste tarifário médio de **+12,4%** adicionou **+R$ 14,43 milhões** (`efeito_preco`) à receita de energia, compensando a perda de **−R$ 4,99 milhões** (`efeito_volume`) causada pela queda de **−4,0%** no volume de energia faturada (`consumo_kwh_valido`).
-2. **Focos críticos de perda de volume e receita:** Enquanto a receita total subiu no consolidado, segmentos específicos sofreram retração severa — por exemplo, a classe **Comercial em Jaboatão dos Guararapes recuou 2,09%** em receita de energia entre P1 e P2, e o avanço de **Geração Distribuída (GD / painéis solares)** combinado com **perdas não técnicas** e **leituras estimadas recorrentes** concentrou a queda de volume residencial e comercial nos bairros líderes do drill-down.
+**Principais conclusões:**
+1. **O preço subiu mais que o reajuste por causa das bandeiras.** P1 teve 12 meses de bandeira verde; P2 teve só 4 (5 vermelhas e 3 amarelas). Com P2 todo em bandeira verde, a receita de energia teria subido cerca de **4,4%**, não 8%.
+2. **A geração distribuída explica toda a queda de volume.** As 3.510 UCs que instalaram painel solar depois de P1 consumiram **61% menos** da rede (−11,2 GWh); as demais UCs **cresceram** (+2,2 GWh). A queda está nas classes residencial e comercial.
+3. **Hipóteses descartadas pelos dados:** crescimento da base (só +259 UCs), perdas não técnicas (a fila soma ≈ 0,3 GWh/ano, 3% do efeito da GD), troca de medidor (as UCs que trocaram consumiram +2,2%) e leituras estimadas (caíram de 19,0% para 15,8%).
+4. **Recomendações:** projetar a receita sem bandeiras (≈ R$ 4 mi/ano em risco), incluir a GD no planejamento de mercado (≈ R$ 2,4 mi/ano a menos a cada ano no ritmo atual de conexões), rever como a GD paga pelo uso da rede (Lei 14.300/2022) e não contar com o combate a perdas para recuperar o volume. Detalhes em [`docs/diagnostico-receita.md`](docs/diagnostico-receita.md).
 
 ---
 
@@ -272,6 +274,8 @@ Além de todos os requisitos obrigatórios do edital, o time projetou e implemen
 
 ### 2.6 Dicionário de Dados da Camada Gold (`14 Tabelas Oficiais`)
 
+> **Dicionário completo, com a definição de cada métrica (como `dec`, `fec`, `consumo_kwh_valido`, `efeito_preco` e `flag_conta_alta` são calculados) e as decisões de limpeza que afetam cada uma:** [`docs/dicionario-de-dados.md`](docs/dicionario-de-dados.md).
+>
 > O contrato estrutural de tipos e chaves encontra-se em [`backend/app/db/gold_contract.py`](backend/app/db/gold_contract.py), [`backend/app/db/gold_columns.json`](backend/app/db/gold_columns.json) e [`docs/api-contract.md`](docs/api-contract.md).
 
 | # | Tabela (`schema gold`) | Chave Primária (Grão) | Descrição e Principais Colunas |
@@ -343,9 +347,12 @@ RL-26.2-Case-Final-/
 │   ├── .env.example                     # Template documentado de variáveis de ambiente do backend
 │   ├── docker-compose.yml               # Orquestração dos containers PostgreSQL 16 e API FastAPI
 │   └── requirements.txt                 # Dependências Python do backend e GenAI
-├── data-engineering/                    # Notebooks e scripts do pipeline Medallion no Databricks (Bronze/Silver/Gold)
+├── data-engineering/                    # Notebooks do pipeline Medallion no Databricks (Bronze/Silver/Gold)
+│   └── v_energy_pipeline.yml            # Definição do Workflow (Job) do Databricks
 ├── docs/
-│   └── api-contract.md                  # Especificação completa do Contrato da API V2 e adaptações da Gold
+│   ├── api-contract.md                  # Especificação completa do Contrato da API V2 e adaptações da Gold
+│   ├── diagnostico-receita.md           # Diagnóstico da variação da receita (P1 × P2) e recomendações
+│   └── dicionario-de-dados.md           # Dicionário de dados da Gold: métricas e decisões de limpeza
 ├── frontend/
 │   ├── src/
 │   │   ├── auth/                        # Fluxo de autenticação JWT, guarda de rotas e armazenamento de sessão
@@ -480,7 +487,38 @@ O cadastro cria perfil `usuario`. O bootstrap de administrador é uma ação exp
 
 ---
 
-### 3.3 Carga de Dados com Docker Compose (Modo `real` ou `seed`)
+### 3.3 Pipeline de Dados no Databricks (Landing → Bronze → Silver → Gold → CSV)
+
+O pipeline roda no Databricks (serverless, catálogo `workspace`) como um único Job de 13 tarefas, definido em [`data-engineering/v_energy_pipeline.yml`](data-engineering/v_energy_pipeline.yml). O Job lê os notebooks direto deste repositório (`git_source`, branch `main`), então não é preciso importá-los.
+
+1. **Criar o Volume da landing e subir os arquivos do case.** Num notebook ou no SQL Editor:
+   ```sql
+   CREATE SCHEMA IF NOT EXISTS workspace.landing;
+   CREATE VOLUME IF NOT EXISTS workspace.landing.v_energy;
+   ```
+   Em **Catalog → workspace → landing → v_energy → Upload to this volume**, envie os 8 itens do `.zip` do case: `unidades_consumidoras.csv`, `faturas.csv`, `medidores.csv`, `ocorrencias_rede.csv`, `geracao_distribuida.csv`, `atendimentos.json`, `inspecoes.xlsx` e a pasta `leituras/` (5 CSVs). Subpastas são aceitas: o notebook de ingestão procura cada arquivo recursivamente em `/Volumes/workspace/landing/v_energy`. Os schemas `bronze`, `silver` e `gold` são criados pelo próprio pipeline.
+2. **Criar o Job a partir do YAML.** Em **Jobs & Pipelines → Create → Job**, abra a definição do Job em YAML (menu **⋮ → Edit as YAML**) e cole o conteúdo de `v_energy_pipeline.yml`. Pela CLI, o mesmo arquivo serve como recurso de um Databricks Asset Bundle (`databricks bundle deploy`). As tarefas e dependências ficam assim:
+   - `landing_to_bronze` → `silver_cadastro_` (base de todas as Silver) → `silver_medicao`, `silver_faturamento`, `silver_perdas` e `silver_rede_atendimento` **em paralelo**;
+   - `gold_fila_perdas` num ramo próprio (só medição e perdas) e `gold_base_` → `gold_receita`, `gold_kpis`, `gold_dec_fec` e `gold_visao_360` em paralelo;
+   - `exportar_gold` espera todas as Gold.
+3. **Executar** (**Run now**). A execução completa leva cerca de 18 minutos, contra cerca de 34 em sequência (ver o print na seção 1.7). Toda tarefa grava em `overwrite`, então o Job pode ser reexecutado de ponta a ponta. Qualquer checagem de qualidade que falhe para a tarefa **antes** de gravar.
+4. **Baixar a Gold.** Ao final, o `exportar_gold` grava em `/Volumes/workspace/gold/exportacao/` os **14 CSVs + `_manifesto.csv`** (linhas, colunas e SHA-256 de cada arquivo). Baixe-os pelo Catalog Explorer para `backend/data/gold/` e siga a **Opção A** da seção 3.4. Os CSVs contêm dados confidenciais e **nunca vão para o Git** (`.gitignore`).
+
+#### Estratégia de agendamento
+
+O dataset do case é uma extração única, por isso o Job está sem agendamento e roda por disparo manual. Em produção, a proposta é:
+
+- **Execução mensal, depois do fechamento do faturamento** (por exemplo, todo dia 5 às 6h, no fuso de Recife), porque leituras e faturas chegam por **competência mensal**. Rodar com mais frequência reprocessaria o mesmo mês sem dado novo; rodar antes do fechamento publicaria um mês incompleto no portal. No YAML, basta acrescentar ao Job:
+  ```yaml
+  schedule:
+    quartz_cron_expression: "0 0 6 5 * ?"
+    timezone_id: America/Recife
+  ```
+- **Disparo manual** para reprocessamentos (correção de regra ou reenvio de um arquivo). É seguro porque o Job é idempotente (`overwrite`).
+- **Sem execuções sobrepostas:** a fila de disparos (`queue.enabled`) faz um novo disparo esperar o anterior. Isso é exigido pela `gold_fila_perdas`, que lê a Silver numa versão fixa (Delta time travel) e faz RESTORE se a publicação falhar.
+- **Depois de cada execução:** importar os CSVs no PostgreSQL (`importar_gold_postgres` + `verificar_gold`). Como o cache de respostas da IA é indexado pela versão da Gold, ele é renovado automaticamente.
+
+### 3.4 Carga de Dados com Docker Compose (Modo `real` ou `seed`)
 
 #### Opção A: Execução com a Camada Gold Oficial (`GOLD_SOURCE=real` — Recomendado para Avaliação)
 
@@ -520,7 +558,7 @@ Após a carga do seed, `/dashboard` e `/filtros` usam os dados fictícios median
 
 ---
 
-### 3.4 Execução Local do Backend e Configuração do Agente GenAI (`.env`)
+### 3.5 Execução Local do Backend e Configuração do Agente GenAI (`.env`)
 
 Para habilitar o **Assistente de IA (`POST /ia`)** e o **Insight por IA (`POST /ia/insight`)** em modo real, configure o bloco de LLM no seu `backend/.env` (você pode usar **Google Gemini** ou **OpenRouter**):
 
@@ -561,7 +599,7 @@ cd backend
 
 ---
 
-### 3.5 Execução Local e Arquitetura do Frontend (React + Vite)
+### 3.6 Execução Local e Arquitetura do Frontend (React + Vite)
 
 Em um novo terminal, instale as dependências e inicie o servidor de desenvolvimento do Frontend:
 
@@ -591,7 +629,7 @@ O portal abre em **`http://localhost:5173/login`**. A API e o PostgreSQL são ne
 
 ---
 
-### 3.6 Suíte de Testes Automatizados e Avaliação (Golden Set)
+### 3.7 Suíte de Testes Automatizados e Avaliação (Golden Set)
 
 O projeto conta com uma ampla bateria de testes automatizados que utilizam `TestModel` e `FunctionModel` do PydanticAI, permitindo validar **toda a lógica dos agentes, guardrails, validadores SQL, guia da plataforma, autenticação e contratos da API de forma 100% offline e sem gastar tokens**:
 
