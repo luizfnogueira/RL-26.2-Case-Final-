@@ -1,5 +1,4 @@
 ![Banner V-Energy Grid 360](./readme_images/banner_venergy_grid360.png)
-<!-- Espaço reservado: adicione o banner principal do projeto em ./readme_images/banner_venergy_grid360.png -->
 
 ---
 
@@ -73,22 +72,30 @@ Acessível tanto em tela cheia (`/assistente`) quanto pelo botão flutuante **"P
 #### A) Consulta Analítica com Gráfico Dinâmico e Tabela Exportável (CSV)
 Ao perguntar sobre métricas de negócio ou pedir uma visualização (*"Mostre em gráfico de barras..."* ou rankings por bairro/município), o assistente executa o SQL validado, desenha o gráfico interativo no próprio chat e permite alternar para **Ver como tabela** ou **Exportar CSV**:
 
-![Assistente Consulta e Gráfico](./readme_images/06_assistente_grafico_tabela.png)
-<!-- Espaço reservado: print do Assistente V-Energy respondendo com gráfico/tabela e botão Exportar CSV -->
+![Prévia do assistente com gráfico de receita de energia por classe, P1 e P2, e botão Exportar CSV](./readme_images/06_assistente_grafico_demo.png)
+
+*Captura do modo de demonstração, com dados fictícios. O gráfico é um exemplo fixo por classe entre P1 e P2; não corresponde ao recorte por município solicitado no balão e não serve como validação dessa resposta.*
 
 #### B) Transparência Algorítmica: "Como cheguei nisso" & "Detalhes Técnicos"
 Abaixo de cada resposta, duas abas recolhíveis garantem rastreabilidade completa:
 1. **Como cheguei nisso (Auditoria):** exibe a query SQL somente leitura executada, as views da camada Gold consultadas e a amostra dos dados retornados (ou, em perguntas sobre o portal, as seções do **Guia da Plataforma** utilizadas).
 2. **Detalhes Técnicos:** expõe a pergunta interpretada, o plano estruturado, as *skills* ativadas, premissas assumidas, sequência de *tool calls* (`consultar_gold`), contagem de tokens, latência por etapa e métricas de qualidade do *Golden Set*:
 
-![Como Cheguei Nisso e Detalhes Técnicos](./readme_images/07_assistente_auditoria_detalhes.png)
-<!-- Espaço reservado: print das abas "Como cheguei nisso" e "Detalhes técnicos" abertas -->
+![Painel Como cheguei nisso aberto com SQL, fonte e tabela do exemplo de demonstração](./readme_images/07_assistente_auditoria_demo.png)
 
-#### C) Evidência de Segurança: Bloqueio de Injeção SQL, Escrita e Dados Pessoais (LGPD)
-Tentativas de apagar tabelas (`DELETE`/`DROP`), extrair o *system prompt* (*Jailbreak*), acessar o schema interno `portal` ou consultar CPF/nome de titulares são interceptadas pelas camadas de *Guardrails*, registrando o evento no log de auditoria (`ia.interacao`) e retornando status `bloqueado`:
+*Captura do modo de demonstração: o painel "Como cheguei nisso" está aberto, com a consulta e os dados do exemplo. "Detalhes técnicos" permanece recolhido nesta imagem.*
 
-![Bloqueio de Segurança no Assistente](./readme_images/08_assistente_bloqueio_seguranca.png)
-<!-- Espaço reservado: print do Assistente recusando tentativa de ataque/acesso a CPF ou escrita no banco -->
+#### C) Segurança: Bloqueio de Injeção SQL, Escrita e Dados Pessoais (LGPD)
+Tentativas de apagar tabelas (`DELETE`/`DROP`), extrair o *system prompt* (*Jailbreak*), acessar o schema interno `portal` ou consultar CPF/nome de titulares são interceptadas pelas camadas de *Guardrails*, registrando o evento no log de auditoria (`ia.interacao`) e retornando status `bloqueado`.
+
+<!-- Evidência visual pendente: capturar uma resposta com status bloqueado no agente real. -->
+
+#### D) Estado sem Resposta no Modo de Demonstração
+Quando não há resposta, o portal apresenta um aviso em vez de uma tabela ou gráfico:
+
+![Estado Não sei responder com os dados disponíveis no modo de demonstração](./readme_images/08_assistente_sem_resposta_demo.png)
+
+*Esta captura ilustra o estado "não sei" do exemplo simulado. Embora a pergunta solicite CPFs, a mensagem retornada menciona projeções de lucro; a imagem não comprova o bloqueio de dados pessoais descrito acima.*
 
 ---
 
