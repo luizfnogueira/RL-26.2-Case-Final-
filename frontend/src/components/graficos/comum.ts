@@ -73,6 +73,6 @@ export function dominioComZero(valores: (number | null)[]): [number, number] {
   return maximo === minimo ? [minimo, minimo + 1] : [minimo, maximo]
 }
 
-/** Tooltip escuro do portal, como o da cascata; o texto vem sempre como texto. */
+/** Tooltip escuro do portal; o texto vem sempre como texto. */
 export const CLASSE_TOOLTIP =
   'pointer-events-none absolute z-10 rounded-md bg-surface-tinta px-3 py-2 whitespace-nowrap text-ink-inverso shadow-flutuante'

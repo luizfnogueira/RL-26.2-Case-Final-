@@ -1,37 +1,9 @@
-/** Uma etapa da cascata: um total (parte do zero) ou uma variação (flutua sobre o acumulado). */
+/** Uma etapa da ponte: um total (parte do zero) ou uma variação (soma ou subtrai do total). */
 export interface EtapaCascata {
   id: string
   rotulo: string
   valor: number
   tipo: 'total' | 'variacao'
-}
-
-export interface BarraCascata {
-  etapa: EtapaCascata
-  /** Início e fim no eixo de valores, já ordenados (de ≤ ate). */
-  de: number
-  ate: number
-  /** Acumulado depois desta etapa (linha de ligação com a próxima). */
-  acumulado: number
-}
-
-/** Posiciona as barras: totais saem do zero; variações partem do acumulado anterior. */
-export function calcularBarras(etapas: readonly EtapaCascata[]): BarraCascata[] {
-  let acumulado = 0
-  return etapas.map((etapa) => {
-    if (etapa.tipo === 'total') {
-      acumulado = etapa.valor
-      return { etapa, de: Math.min(0, etapa.valor), ate: Math.max(0, etapa.valor), acumulado }
-    }
-    const inicio = acumulado
-    acumulado += etapa.valor
-    return {
-      etapa,
-      de: Math.min(inicio, acumulado),
-      ate: Math.max(inicio, acumulado),
-      acumulado,
-    }
-  })
 }
 
 /** Teto "redondo" para o eixo: 1, 2, 2,5, 5 ou 10 vezes uma potência de dez. */

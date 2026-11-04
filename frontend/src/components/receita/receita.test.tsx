@@ -1,14 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import Cascata from '@/components/graficos/Cascata'
-import {
-  calcularBarras,
-  marcasDoEixo,
-  quebrarRotulo,
-  tetoDoEixo,
-  type EtapaCascata,
-} from '@/components/graficos/geometria'
+import { marcasDoEixo, quebrarRotulo, tetoDoEixo } from '@/components/graficos/geometria'
 import type { ResultadoConsulta } from '@/hooks/useConsulta'
 import ReceitaPage from '@/pages/ReceitaPage'
 import { buscarDashboard, gerarInsight } from '@/services'
@@ -17,7 +10,6 @@ import AnaliseIA from './AnaliseIA'
 import DrillDownReceita from './DrillDownReceita'
 import PonteDaReceita from './PonteDaReceita'
 import { reiniciarOrdens } from '@/services/mock'
-import { formatarReais, formatarReaisCompleto } from '@/utils/formatacao'
 import { etapasDaPonte, explicarResultado, numerosDoInsight, variacaoDaReceita } from './explicacao'
 
 afterEach(cleanup)
@@ -27,25 +19,7 @@ const ATUAL = '2025-07/2026-06'
 const COMPARACAO = '2022-07/2023-06'
 const consolidado = () => buscarDashboard({ periodo_atual: ATUAL, periodo_comparacao: COMPARACAO })
 
-describe('geometria da cascata', () => {
-  const etapas: EtapaCascata[] = [
-    { id: 'a', rotulo: 'Base', valor: 100, tipo: 'total' },
-    { id: 'b', rotulo: 'Sobe', valor: 30, tipo: 'variacao' },
-    { id: 'c', rotulo: 'Cai', valor: -50, tipo: 'variacao' },
-    { id: 'd', rotulo: 'Atual', valor: 80, tipo: 'total' },
-  ]
-
-  it('totais saem do zero e variações flutuam sobre o acumulado', () => {
-    const barras = calcularBarras(etapas)
-    expect(barras.map((b) => [b.de, b.ate])).toEqual([
-      [0, 100],
-      [100, 130],
-      [80, 130],
-      [0, 80],
-    ])
-    expect(barras.map((b) => b.acumulado)).toEqual([100, 130, 80, 80])
-  })
-
+describe('geometria do eixo e dos rótulos', () => {
   it('arredonda o teto do eixo e quebra rótulos sem cortar palavras', () => {
     expect(tetoDoEixo(222.4)).toBe(250)
     expect(tetoDoEixo(0)).toBe(1)
@@ -55,54 +29,103 @@ describe('geometria da cascata', () => {
   })
 })
 
-describe('Cascata', () => {
-  const etapas: EtapaCascata[] = [
-    { id: 'base', rotulo: 'Receita base', valor: 205_900_000, tipo: 'total' },
-    { id: 'preco', rotulo: 'Efeito-preço', valor: 24_700_000, tipo: 'variacao' },
-    { id: 'volume', rotulo: 'Efeito-volume', valor: -8_200_000, tipo: 'variacao' },
-    { id: 'atual', rotulo: 'Receita atual', valor: 222_400_000, tipo: 'total' },
-  ]
-  const renderizar = () =>
+describe('PonteDaReceita (barras divergentes)', () => {
+  const renderizar = async () => {
+    const dashboard = await consolidado()
     render(
-      <Cascata
-        etapas={etapas}
-        formatarValor={(v, e) => formatarReais(v, { sinal: e?.tipo === 'variacao' })}
-        formatarValorCompleto={formatarReaisCompleto}
-        descricao="Ponte da receita"
-      />,
+      <MemoryRouter>
+        <PonteDaReceita dashboard={dashboard} />
+      </MemoryRouter>,
     )
+    return dashboard
+  }
 
-  it('desenha uma barra acessível por etapa, com o valor sinalizado', () => {
-    renderizar()
-    const barras = screen.getAllByRole('img')
-    expect(barras).toHaveLength(4)
-    expect(barras[2].getAttribute('aria-label')).toBe('Efeito-volume: −R$ 8.200.000,00')
+  const barraDa = (rotulo: string) => {
+    const linha = screen.getByText(rotulo).closest('li')
+    expect(linha).not.toBeNull()
+    const barra = linha?.querySelector<HTMLElement>('.inset-y-1')
+    expect(barra).not.toBeNull()
+    return barra as HTMLElement
+  }
+
+  it('mostra os totais em destaque e os três efeitos com os valores da API', async () => {
+    await renderizar()
+    expect(screen.getByText(/^Receita base ·/).textContent).toContain('Jul/2022 – Jun/2023')
+    expect(screen.getByText(/^Receita atual ·/).textContent).toContain('Jul/2025 – Jun/2026')
+    expect(screen.getByText('R$ 205,9 mi')).toBeTruthy()
+    expect(screen.getByText('R$ 222,4 mi')).toBeTruthy()
     expect(screen.getByText('+R$ 24,7 mi')).toBeTruthy()
     expect(screen.getByText('−R$ 8,2 mi')).toBeTruthy()
+    expect(screen.getByText('+R$ 16,5 mi')).toBeTruthy()
+    expect(screen.getByText('+8,0% total')).toBeTruthy()
+    expect(screen.getByText('mudança da tarifa média')).toBeTruthy()
+    expect(screen.getByText('mudança do consumo faturado')).toBeTruthy()
+    expect(screen.getByText('preço + volume')).toBeTruthy()
   })
 
-  it('mostra o tooltip ao focar a barra e some ao sair', () => {
-    renderizar()
-    expect(screen.queryByRole('status')).toBeNull()
-    const barra = screen.getAllByRole('img')[1]
-    fireEvent.focus(barra)
-    expect(screen.getByRole('status').textContent).toContain('+R$ 24.700.000,00')
-    fireEvent.blur(barra)
-    expect(screen.queryByRole('status')).toBeNull()
+  it('joga o efeito positivo para a direita, o negativo para a esquerda e fecha no total', async () => {
+    await renderizar()
+    const preco = barraDa('Efeito-preço')
+    expect(preco.classList.contains('left-1/2')).toBe(true)
+    expect(preco.classList.contains('bg-teal')).toBe(true)
+    expect(parseFloat(preco.style.width)).toBeCloseTo(50, 5)
+
+    const volume = barraDa('Efeito-volume')
+    expect(volume.classList.contains('right-1/2')).toBe(true)
+    expect(volume.classList.contains('bg-perigo')).toBe(true)
+    expect(parseFloat(volume.style.width)).toBeCloseTo(16.5708, 3)
+
+    const total = barraDa('Variação total')
+    expect(total.classList.contains('left-1/2')).toBe(true)
+    expect(total.classList.contains('bg-ink-3')).toBe(true)
+    expect(parseFloat(total.style.width)).toBeCloseTo(33.4292, 3)
   })
 
-  it('alterna para a visão em tabela com todos os valores', () => {
-    renderizar()
-    fireEvent.click(screen.getByRole('button', { name: 'Ver como tabela' }))
+  it('não divide por zero quando preço e volume são zero', async () => {
+    const dashboard = await consolidado()
+    const semVariacao = {
+      ...dashboard,
+      ponte_receita: {
+        ...dashboard.ponte_receita,
+        efeito_preco: { ...dashboard.ponte_receita.efeito_preco, valor: 0 },
+        efeito_volume: { ...dashboard.ponte_receita.efeito_volume, valor: 0 },
+        receita_energia_atual: {
+          ...dashboard.ponte_receita.receita_energia_atual,
+          valor: dashboard.ponte_receita.receita_energia_comparacao.valor,
+        },
+      },
+    }
+    render(
+      <MemoryRouter>
+        <PonteDaReceita dashboard={semVariacao} />
+      </MemoryRouter>,
+    )
+    for (const rotulo of ['Efeito-preço', 'Efeito-volume', 'Variação total']) {
+      expect(barraDa(rotulo).style.width).toBe('0%')
+    }
+  })
+
+  it('alterna para a visão em tabela com as quatro etapas completas', async () => {
+    await renderizar()
+    const alternar = screen.getByRole('button', { name: 'Ver como tabela' })
+    expect(alternar.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(alternar)
+
+    const verGrafico = screen.getByRole('button', { name: 'Ver gráfico' })
+    expect(verGrafico.getAttribute('aria-pressed')).toBe('true')
     const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
     expect(linhas.map((l) => l.textContent)).toEqual([
-      'Receita baseR$ 205.900.000,00',
-      'Efeito-preço+R$ 24.700.000,00',
-      'Efeito-volume−R$ 8.200.000,00',
-      'Receita atualR$ 222.400.000,00',
+      'Receita de energia baseR$ 205.937.500,00',
+      'Efeito-preço+R$ 24.655.666,05',
+      'Efeito-volume−R$ 8.171.291,05',
+      'Receita de energia atualR$ 222.421.875,00',
     ])
-    fireEvent.click(screen.getByRole('button', { name: 'Ver gráfico' }))
+
+    fireEvent.click(verGrafico)
     expect(screen.queryByRole('table')).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Ver como tabela' }).getAttribute('aria-pressed'),
+    ).toBe('false')
   })
 })
 
