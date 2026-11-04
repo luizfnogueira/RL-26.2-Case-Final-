@@ -1,0 +1,113 @@
+resources:
+  jobs:
+    v_energy_pipeline:
+      name: v_energy_pipeline
+      tasks:
+        - task_key: landing_to_bronze
+          notebook_task:
+            notebook_path: data-engineering/landing-to-bronze/01_landing_to_bronze
+            source: GIT
+          environment_key: Default
+        - task_key: silver_cadastro_
+          depends_on:
+            - task_key: landing_to_bronze
+          notebook_task:
+            notebook_path: data-engineering/bronze-to-silver/silver_cadastro
+            source: GIT
+          environment_key: Default
+        - task_key: silver_faturamento
+          depends_on:
+            - task_key: silver_cadastro_
+          notebook_task:
+            notebook_path: data-engineering/bronze-to-silver/silver_faturamento
+            source: GIT
+          environment_key: Default
+        - task_key: silver_medicao
+          depends_on:
+            - task_key: silver_cadastro_
+          notebook_task:
+            notebook_path: data-engineering/bronze-to-silver/silver_medicao
+            source: GIT
+          environment_key: Default
+        - task_key: silver_perdas
+          depends_on:
+            - task_key: silver_cadastro_
+          notebook_task:
+            notebook_path: data-engineering/bronze-to-silver/silver_perdas.ipynb
+            source: GIT
+          environment_key: Default
+        - task_key: gold_fila_perdas
+          depends_on:
+            - task_key: silver_medicao
+            - task_key: silver_perdas
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/gold_fila_perdas
+            source: GIT
+          environment_key: Default
+        - task_key: silver_rede_atendimento
+          depends_on:
+            - task_key: silver_cadastro_
+          notebook_task:
+            notebook_path: data-engineering/bronze-to-silver/silver_rede_atendimento
+            source: GIT
+          environment_key: Default
+        - task_key: gold_base_
+          depends_on:
+            - task_key: silver_medicao
+            - task_key: silver_faturamento
+            - task_key: silver_perdas
+            - task_key: silver_rede_atendimento
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/gold_base
+            source: GIT
+          environment_key: Default
+        - task_key: gold_dec_fec
+          depends_on:
+            - task_key: gold_base_
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/gold_dec_fec
+            source: GIT
+          environment_key: Default
+        - task_key: gold_kpis
+          depends_on:
+            - task_key: gold_base_
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/gold_kpis
+            source: GIT
+          environment_key: Default
+        - task_key: gold_receita
+          depends_on:
+            - task_key: gold_base_
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/gold_receita
+            source: GIT
+          environment_key: Default
+        - task_key: gold_visao_360
+          depends_on:
+            - task_key: gold_base_
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/gold_visao_360
+            source: GIT
+          environment_key: Default
+        - task_key: exportar_gold
+          depends_on:
+            - task_key: gold_visao_360
+            - task_key: gold_receita
+            - task_key: gold_dec_fec
+            - task_key: gold_fila_perdas
+            - task_key: gold_kpis
+          notebook_task:
+            notebook_path: data-engineering/silver-to-gold/exportar_gold
+            source: GIT
+          environment_key: Default
+      git_source:
+        git_url: https://github.com/luizfnogueira/RL-26.2-Case-Final-
+        git_provider: gitHub
+        git_branch: main
+      queue:
+        enabled: true
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "6"
+      performance_target: PERFORMANCE_OPTIMIZED
