@@ -1,5 +1,3 @@
-# V-Energy Grid 360 — Portal Analítico, Operacional & Assistente GenAI
-
 ![Banner V-Energy Grid 360](./readme_images/banner_venergy_grid360.png)
 <!-- Espaço reservado: adicione o banner principal do projeto em ./readme_images/banner_venergy_grid360.png -->
 
