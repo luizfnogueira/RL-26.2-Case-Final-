@@ -487,7 +487,38 @@ O cadastro cria perfil `usuario`. O bootstrap de administrador é uma ação exp
 
 ---
 
-### 3.3 Carga de Dados com Docker Compose (Modo `real` ou `seed`)
+### 3.3 Pipeline de Dados no Databricks (Landing → Bronze → Silver → Gold → CSV)
+
+O pipeline roda no Databricks (serverless, catálogo `workspace`) como um único Job de 13 tarefas, definido em [`data-engineering/v_energy_pipeline.yml`](data-engineering/v_energy_pipeline.yml). O Job lê os notebooks direto deste repositório (`git_source`, branch `main`), então não é preciso importá-los.
+
+1. **Criar o Volume da landing e subir os arquivos do case.** Num notebook ou no SQL Editor:
+   ```sql
+   CREATE SCHEMA IF NOT EXISTS workspace.landing;
+   CREATE VOLUME IF NOT EXISTS workspace.landing.v_energy;
+   ```
+   Em **Catalog → workspace → landing → v_energy → Upload to this volume**, envie os 8 itens do `.zip` do case: `unidades_consumidoras.csv`, `faturas.csv`, `medidores.csv`, `ocorrencias_rede.csv`, `geracao_distribuida.csv`, `atendimentos.json`, `inspecoes.xlsx` e a pasta `leituras/` (5 CSVs). Subpastas são aceitas: o notebook de ingestão procura cada arquivo recursivamente em `/Volumes/workspace/landing/v_energy`. Os schemas `bronze`, `silver` e `gold` são criados pelo próprio pipeline.
+2. **Criar o Job a partir do YAML.** Em **Jobs & Pipelines → Create → Job**, abra a definição do Job em YAML (menu **⋮ → Edit as YAML**) e cole o conteúdo de `v_energy_pipeline.yml`. Pela CLI, o mesmo arquivo serve como recurso de um Databricks Asset Bundle (`databricks bundle deploy`). As tarefas e dependências ficam assim:
+   - `landing_to_bronze` → `silver_cadastro_` (base de todas as Silver) → `silver_medicao`, `silver_faturamento`, `silver_perdas` e `silver_rede_atendimento` **em paralelo**;
+   - `gold_fila_perdas` num ramo próprio (só medição e perdas) e `gold_base_` → `gold_receita`, `gold_kpis`, `gold_dec_fec` e `gold_visao_360` em paralelo;
+   - `exportar_gold` espera todas as Gold.
+3. **Executar** (**Run now**). A execução completa leva cerca de 18 minutos, contra cerca de 34 em sequência (ver o print na seção 1.7). Toda tarefa grava em `overwrite`, então o Job pode ser reexecutado de ponta a ponta. Qualquer checagem de qualidade que falhe para a tarefa **antes** de gravar.
+4. **Baixar a Gold.** Ao final, o `exportar_gold` grava em `/Volumes/workspace/gold/exportacao/` os **14 CSVs + `_manifesto.csv`** (linhas, colunas e SHA-256 de cada arquivo). Baixe-os pelo Catalog Explorer para `backend/data/gold/` e siga a **Opção A** da seção 3.4. Os CSVs contêm dados confidenciais e **nunca vão para o Git** (`.gitignore`).
+
+#### Estratégia de agendamento
+
+O dataset do case é uma extração única, por isso o Job está sem agendamento e roda por disparo manual. Em produção, a proposta é:
+
+- **Execução mensal, depois do fechamento do faturamento** (por exemplo, todo dia 5 às 6h, no fuso de Recife), porque leituras e faturas chegam por **competência mensal**. Rodar com mais frequência reprocessaria o mesmo mês sem dado novo; rodar antes do fechamento publicaria um mês incompleto no portal. No YAML, basta acrescentar ao Job:
+  ```yaml
+  schedule:
+    quartz_cron_expression: "0 0 6 5 * ?"
+    timezone_id: America/Recife
+  ```
+- **Disparo manual** para reprocessamentos (correção de regra ou reenvio de um arquivo). É seguro porque o Job é idempotente (`overwrite`).
+- **Sem execuções sobrepostas:** a fila de disparos (`queue.enabled`) faz um novo disparo esperar o anterior. Isso é exigido pela `gold_fila_perdas`, que lê a Silver numa versão fixa (Delta time travel) e faz RESTORE se a publicação falhar.
+- **Depois de cada execução:** importar os CSVs no PostgreSQL (`importar_gold_postgres` + `verificar_gold`). Como o cache de respostas da IA é indexado pela versão da Gold, ele é renovado automaticamente.
+
+### 3.4 Carga de Dados com Docker Compose (Modo `real` ou `seed`)
 
 #### Opção A: Execução com a Camada Gold Oficial (`GOLD_SOURCE=real` — Recomendado para Avaliação)
 
@@ -527,7 +558,7 @@ Após a carga do seed, `/dashboard` e `/filtros` usam os dados fictícios median
 
 ---
 
-### 3.4 Execução Local do Backend e Configuração do Agente GenAI (`.env`)
+### 3.5 Execução Local do Backend e Configuração do Agente GenAI (`.env`)
 
 Para habilitar o **Assistente de IA (`POST /ia`)** e o **Insight por IA (`POST /ia/insight`)** em modo real, configure o bloco de LLM no seu `backend/.env` (você pode usar **Google Gemini** ou **OpenRouter**):
 
@@ -568,7 +599,7 @@ cd backend
 
 ---
 
-### 3.5 Execução Local e Arquitetura do Frontend (React + Vite)
+### 3.6 Execução Local e Arquitetura do Frontend (React + Vite)
 
 Em um novo terminal, instale as dependências e inicie o servidor de desenvolvimento do Frontend:
 
@@ -598,7 +629,7 @@ O portal abre em **`http://localhost:5173/login`**. A API e o PostgreSQL são ne
 
 ---
 
-### 3.6 Suíte de Testes Automatizados e Avaliação (Golden Set)
+### 3.7 Suíte de Testes Automatizados e Avaliação (Golden Set)
 
 O projeto conta com uma ampla bateria de testes automatizados que utilizam `TestModel` e `FunctionModel` do PydanticAI, permitindo validar **toda a lógica dos agentes, guardrails, validadores SQL, guia da plataforma, autenticação e contratos da API de forma 100% offline e sem gastar tokens**:
 
