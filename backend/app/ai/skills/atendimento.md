@@ -33,7 +33,8 @@
 ## 3. Glossário
 
 - **"chamado" / "reclamação" / "protocolo" / "atendimento":** uma linha de `uc_atendimentos`.
-- **"call center" / "ligação":** `canal = 'TELEFONE'`. **"zap":** `canal = 'WHATSAPP'`. **"loja" / "agência":** `canal = 'PRESENCIAL'`.
+- **"call center" / "central de atendimento":** a base inteira de `uc_atendimentos`, com todos os canais, como no case (os chamados do call center chegam por telefone, WhatsApp, app, site e presencial). **Não** filtre `canal`.
+- **"ligação" / "telefone":** `canal = 'TELEFONE'`. **"zap":** `canal = 'WHATSAPP'`. **"loja" / "agência":** `canal = 'PRESENCIAL'`.
 - **"satisfação" / "nota" / "avaliação":** `nota_satisfacao`.
 - **"conta veio alta" (como reclamação):** `assunto = 'FATURA' AND subassunto = 'VALOR ALTO'`.
 - **"tempo de resposta" / "demora":** `tempo_atendimento_h`.
