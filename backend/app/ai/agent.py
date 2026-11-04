@@ -342,9 +342,16 @@ def validar_regra_periodo_no_sql(sql: str, pergunta: str) -> None:
 
 
 # Colunas com data e hora (timestamp): BETWEEN ... AND '2026-06-30' para à meia-noite e perde o último dia
-_COLUNA_DATA_HORA = r"\b(?:data_abertura|data_fechamento|data_encerramento|executado_em_utc)\b(?!\s*::)"
+# Também pega `DATE '...'`, `'...'::date`, `'... 00:00:00'`, `col::timestamp` e a comparação invertida (`'...' >= col`);
+# só `col::date` (ou `CAST(col AS date)`) compara o dia inteiro e passa.
+_COLUNA_DATA_HORA = (r"\b(?:data_abertura|data_fechamento|data_encerramento|executado_em_utc)\b"
+                     r"(?!\s*::\s*date\b)(?:\s*::\s*timestamp(?:tz)?\b)?")
+_LITERAL_SO_DATA = r"(?:date\s+|timestamp\s+)?'(\d{4}-\d{2}-\d{2})(?:[ t]00:00(?::00)?)?'"
 _FIM_SO_DATA = re.compile(
-    _COLUNA_DATA_HORA + r"\s*(?:between\s+'[^']*'\s+and|<=)\s*'(\d{4}-\d{2}-\d{2})'", re.IGNORECASE)
+    r"(?:" + _COLUNA_DATA_HORA + r"\s*(?:not\s+)?between\s+(?:date\s+|timestamp\s+)?'[^']*'\s+and|"
+    + _COLUNA_DATA_HORA + r"\s*<=)\s*" + _LITERAL_SO_DATA + r"|"
+    r"(?:date\s+|timestamp\s+)?'(\d{4}-\d{2}-\d{2})(?:[ t]00:00(?::00)?)?'(?:\s*::\s*date)?\s*>=\s*"
+    + _COLUNA_DATA_HORA, re.IGNORECASE)
 
 
 def validar_regra_data_hora_no_sql(sql: str) -> None:
@@ -353,7 +360,7 @@ def validar_regra_data_hora_no_sql(sql: str) -> None:
     if achado:
         raise ErroConsulta(
             f"Regra de negócio violada: `{achado.group(0)}` compara uma coluna com data e hora com o dia "
-            f"'{achado.group(1)}' à meia-noite e deixa de fora o resto desse dia. Use "
+            f"'{achado.group(1) or achado.group(2)}' à meia-noite e deixa de fora o resto desse dia. Use "
             "`TO_CHAR(coluna, 'YYYY-MM') BETWEEN 'AAAA-MM' AND 'AAAA-MM'` ou `coluna >= 'início' AND coluna < 'dia seguinte'`."
         )
 

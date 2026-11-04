@@ -17,6 +17,12 @@ from app.ai.resposta import ViolacaoFidelidadeSaida
     "WHERE data_abertura BETWEEN '2022-07-01' AND '2026-06-30' GROUP BY canal",
     "SELECT COUNT(*) FROM uc_interrupcoes WHERE data_abertura >= '2025-07-01' AND data_abertura <= '2026-06-30'",
     "SELECT COUNT(*) FROM uc_atendimentos a WHERE a.data_fechamento between '2025-07-01' and '2025-07-31'",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura <= DATE '2026-06-30'",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura <= '2026-06-30'::date",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura BETWEEN DATE '2025-07-01' AND DATE '2026-06-30'",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura <= '2026-06-30 00:00:00'",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura::timestamp <= '2026-06-30'",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE '2026-06-30' >= data_abertura",
 ])
 def test_fim_do_intervalo_so_com_a_data_em_coluna_timestamp_e_barrado(sql):
     with pytest.raises(ErroConsulta, match="dia seguinte"):
@@ -29,6 +35,8 @@ def test_fim_do_intervalo_so_com_a_data_em_coluna_timestamp_e_barrado(sql):
     "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura::date BETWEEN '2025-07-01' AND '2026-06-30'",
     "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura BETWEEN '2025-07-01' AND '2026-06-30 23:59:59'",
     "SELECT COUNT(*) FROM dim_uc WHERE data_ligacao BETWEEN '2022-07-01' AND '2026-06-30'",  # coluna date
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura::date <= DATE '2026-06-30'",
+    "SELECT COUNT(*) FROM uc_atendimentos WHERE '2026-07-01' > data_abertura",
 ])
 def test_filtro_de_data_que_cobre_o_dia_inteiro_passa(sql):
     validar_regra_data_hora_no_sql(sql)
