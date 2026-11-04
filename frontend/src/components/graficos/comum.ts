@@ -47,17 +47,24 @@ const CORES: Cor[] = [
   },
   { preenchimento: 'fill-azul-400', traco: 'stroke-azul-400', fundo: 'bg-azul-400' },
 ]
-const CLARA: Cor = {
-  preenchimento: 'fill-azul-400',
-  traco: 'stroke-azul-400',
-  fundo: 'bg-azul-400',
+// P1 × P2 com as cores de período do portal (as mesmas das BarrasComparadas). Tons do mesmo teal não
+// servem: no tema escuro, teal-escuro e azul-400 são a mesma cor e P1 some ao lado de P2.
+const ANTERIOR: Cor = {
+  preenchimento: 'fill-grafico-anterior',
+  traco: 'stroke-grafico-anterior',
+  fundo: 'bg-grafico-anterior',
+}
+const ATUAL: Cor = {
+  preenchimento: 'fill-grafico-atual',
+  traco: 'stroke-grafico-atual',
+  fundo: 'bg-grafico-atual',
 }
 
-/** Uma cor por série só quando há mais de uma; P1 mais clara e P2 (o período atual) na cor principal. */
+/** Uma cor por série só quando há mais de uma; P1 e P2 nas cores de período anterior e atual do portal. */
 export function corDaSerie(nome: string, indice: number, total: number): Cor {
   if (total === 1) return PRINCIPAL
-  if (nome === 'P1') return CLARA
-  if (nome === 'P2') return PRINCIPAL
+  if (nome === 'P1') return ANTERIOR
+  if (nome === 'P2') return ATUAL
   return CORES[indice % CORES.length]
 }
 
