@@ -379,6 +379,18 @@ describe('ReceitaPage (com mocks)', () => {
     expect(screen.getByText('Gerado por IA')).toBeTruthy()
     expect(screen.getAllByText('Dado fictício').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: 'Ponte da receita' })).toBeTruthy()
+    // Totais em destaque e os efeitos em barras a partir do zero, fechando na variação total
+    expect(screen.getByText(/^Receita base ·/)).toBeTruthy()
+    expect(screen.getAllByText('Efeito-preço').length).toBeGreaterThan(0)
+    expect(screen.getByText('Variação total')).toBeTruthy()
+    // A tabela com os valores completos continua a um clique
+    const ponte = screen
+      .getByRole('heading', { name: 'Ponte da receita' })
+      .closest('section') as HTMLElement
+    fireEvent.click(within(ponte).getByRole('button', { name: 'Ver como tabela' }))
+    expect(within(ponte).getAllByRole('row')).toHaveLength(5)
+    fireEvent.click(within(ponte).getByRole('button', { name: 'Ver gráfico' }))
+    expect(within(ponte).queryByRole('table')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Preço foi o principal motor' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Município' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: 'Recife' })).toBeTruthy()
