@@ -16,40 +16,56 @@ A solução unifica **48 meses de histórico operacional e comercial** (`jul/202
 ### 1.1 Painel Executivo & Comparador Lado a Lado (`Tela 1`)
 O **Painel Executivo** (`/painel`) consolida os 6 KPIs estratégicos da distribuidora (**Receita Faturada**, **Energia Faturada**, **UCs Ativas**, **Valor em Aberto / Inadimplência**, **DEC** e **FEC**), acompanhados da série histórica de 48 meses (`jul/2022` a `jun/2026`) e de um **Comparador de Recortes** que coloca de 2 a 4 municípios, bairros ou classes lado a lado:
 
-![Painel Executivo](./readme_images/01_painel_executivo.png)
-<!-- Espaço reservado: print da Tela 1 (/painel) com os 6 KPIs, série histórica e comparador de recortes -->
+Os seis indicadores exibem o valor atual, a base de comparação e a variação entre os períodos selecionados:
+
+![Painel Executivo com os seis KPIs e comparação entre períodos](./readme_images/01_painel_executivo.png)
+
+A evolução histórica mostra receita faturada e volume de energia ao longo dos 48 meses, com escalas e legendas próprias:
+
+![Histórico executivo de receita e volume de energia em 48 meses](./readme_images/01b_historico_executivo.png)
+<!-- Print da aba Comparar pendente: mostrar de 2 a 4 recortes selecionados. -->
 
 ---
 
 ### 1.2 Diagnóstico da Receita: Ponte Preço × Volume & Insight por IA (`Tela 2`)
 A tela de **Diagnóstico da Receita** (`/receita`) responde à pergunta central da diretoria (*"Por que a receita mudou entre P1 e P2?"*). Apresenta a **Ponte da Receita** em barras divergentes (totais em destaque e efeito-preço × efeito-volume), o resumo executivo redigido por IA com **marcadores numéricos auditados** (`POST /ia/insight`), o seletor **"Ver por: Região | Classes"** (`ver=classe`) e o **drill-down encadeado** (`Município → Bairro → Classe`) ordenado pelo efeito-volume em R$ com as 5 maiores perdas destacadas em barras:
 
-![Diagnóstico da Receita](./readme_images/02_diagnostico_receita.png)
-<!-- Espaço reservado: print da Tela 2 (/receita) destacando o card "Análise da IA (Gerado por IA)", a Ponte da Receita e a tabela de drill-down -->
+![Diagnóstico da Receita com análise da IA, ponte de preço e volume e explicação do resultado](./readme_images/02_diagnostico_receita.png)
+<!-- Print complementar do drill-down pendente: manter nomes, valores e controles completos no enquadramento. -->
 
 ---
 
 ### 1.3 Visão 360 da Unidade Consumidora & Diagnóstico de Conta Alta (`Tela 3`)
 Projetada para a operação de atendimento comercial (`/unidades` e `/unidades/:id`), reúne em uma única tela os dados cadastrais, medidor ativo, geração distribuída (GD / painel solar), histórico de 12 meses de consumo, faturas pagas e em aberto, interrupções e chamados. Conta com um **Diagnóstico Automático de Conta Alta** com veredito em 3 partes (*Título, Detalhe e Orientação*) e **Resumo executivo da UC gerado por IA**:
 
-![Visão 360 da UC](./readme_images/03_visao_360_uc.png)
-<!-- Espaço reservado: print da Tela 3 (/unidades/:id) mostrando o diagnóstico de conta alta, resumo IA e histórico da UC -->
+A busca por código ou nome do titular apresenta os resultados e permite abrir a ficha da unidade consumidora:
+
+![Busca de unidades consumidoras com resultados por código, titular, município, bairro, classe e situação](./readme_images/03_busca_unidades.png)
+<!-- Print complementar da ficha (/unidades/:id) pendente: mostrar diagnóstico de conta alta, resumo IA e histórico da UC. -->
 
 ---
 
 ### 1.4 Inteligência de Perdas: Fila Priorizada & Gestão de Ordens de Inspeção (`Telas 4 e 5`)
 Na frente de **Combate a Perdas Não Técnicas**, a **Fila de Inspeção** (`/perdas/fila`) ranqueia as unidades suspeitas por **score operacional (0 a 100)**, **confiança da evidência**, **motivos analíticos** e **potencial de recuperação (`kwh_estimado`)**, permitindo selecionar UCs e abrir ordens em lote. A tela de **Ordens de Inspeção** (`/perdas/ordens`) gerencia todo o ciclo de vida operacional (`ABERTA → EM_CAMPO → CONCLUIDA / CANCELADA`) persistido transacionalmente no schema `portal`:
 
-![Fila e Ordens de Inspeção](./readme_images/04_fila_e_ordens_inspecao.png)
-<!-- Espaço reservado: print das Telas 4 e 5 (/perdas/fila e /perdas/ordens) -->
+<a id="fila-inspecao"></a>
+
+![Fila de inspeção com indicadores, motivos da suspeita e ranking priorizado e botão Exportar CSV](./readme_images/04_fila_inspecao.png)
+<!-- Print complementar da Tela 5 pendente: mostrar ordens e seus estados preenchidos. -->
 
 ---
 
 ### 1.5 Continuidade Operacional DEC / FEC & Efeito do Dia Crítico (`Tela 6`)
 O painel de **Continuidade Operacional** (`/operacao`) monitora a duração (`DEC`) e a frequência (`FEC`) equivalente de interrupções por alimentador e por região, destacando o impacto do **evento climático extremo de julho de 2025 (Dia Crítico)** e permitindo comparar os indicadores oficiais com e sem o expurgo do dia crítico:
 
-![Continuidade DEC e FEC](./readme_images/05_continuidade_dec_fec.png)
-<!-- Espaço reservado: print da Tela 6 (/operacao) com o ranking de alimentadores e comparativo DEC/FEC -->
+Os indicadores do alimentador em análise incluem DEC, FEC, interrupções e consumidor-hora interrompido (CHI):
+
+![Indicadores de continuidade do alimentador, incluindo DEC e FEC com e sem dias críticos](./readme_images/05_continuidade_dec_fec.png)
+
+O histórico permite alternar entre DEC e FEC e comparar as séries com e sem dias críticos:
+
+![Histórico mensal de DEC por alimentador com e sem dias críticos](./readme_images/05b_historico_dec_fec.png)
+<!-- Print complementar do ranking de alimentadores e regiões pendente. -->
 
 ---
 
@@ -82,7 +98,8 @@ Tentativas de apagar tabelas (`DELETE`/`DROP`), extrair o *system prompt* (*Jail
 Todo o processamento de engenharia de dados foi orquestrado em **Databricks Workflows**, estruturado na arquitetura **Medallion (`Bronze → Silver → Gold`)** com verificações de qualidade, tratamento de anomalias, cálculo da ponte de receita e geração determinística dos **14 arquivos CSV + `_manifesto.csv`** da camada Gold:
 
 ![Execução Bem-Sucedida do Workflow no Databricks](./readme_images/09_databricks_workflow_sucesso.png)
-<!-- OBRIGATÓRIO PELO CASE: coloque aqui o print da execução bem-sucedida (verde) do Workflow no Databricks -->
+
+Execução concluída com sucesso nas etapas de ingestão Bronze, tratamento Silver, construção da Gold e exportação dos dados.
 
 ---
 
@@ -244,7 +261,7 @@ Além de todos os requisitos obrigatórios do edital, o time projetou e implemen
 | **14** | **Filtros Sincronizados na URL (`useFiltrosUrl`) & Gráficos Nativos** | Todos os filtros de período, município, bairro, classe e alimentador ficam refletidos na query string da URL; a Ponte da Receita usa barras divergentes com visão tabular, e os demais gráficos são SVG nativo customizado. | Permite que um analista copie o link do navegador e envie para um diretor no WhatsApp/Teams abrindo **exatamente o mesmo recorte analítico**, sem dependências pesadas de bibliotecas externas de gráficos. |
 | **15** | **Trava de Concorrência no Banco para Ordens de Inspeção (`portal.ordens_inspecao`)** | Índice único parcial no PostgreSQL garante que uma mesma Unidade Consumidora (`id_uc`) nunca tenha duas ordens ativas (`ABERTA` ou `EM_CAMPO`) simultaneamente, mesmo sob cliques duplos ou requisições paralelas (retornando `409 ORDEM_ATIVA_EXISTENTE`). | Evita o desperdício operacional real de despachar duas equipes de campo diferentes para inspecionar o mesmo medidor. |
 | **16** | **Importador Canônico da Gold com Manifesto e Verificador (`importar_gold_postgres.py` + `verificar_gold.py`)** | Valida chaves primárias, chaves estrangeiras, precisão decimal exata (`Numeric`), máscara obrigatória de `cpf_cnpj` e contagens do `_manifesto.csv` antes de comitar a carga via `COPY`. | Garante reprodutibilidade ponta a ponta entre a saída do Databricks e o banco PostgreSQL da API, barrando qualquer CSV corrompido ou com documento desmascarado antes de entrar no ar. |
-| **17** | **Exportação da Fila de Inspeção em CSV (`exportarCandidatos.ts` + `GET /inspecoes/fila`)** | O botão **"Exportar CSV"** da Fila busca **todas as páginas** do recorte atual em lotes de 200 (não apenas a página visível), confere se o `total` e a unicidade das UCs se mantêm durante a coleta e gera um CSV com **BOM UTF-8 + CRLF**, cabeçalho em português, números em `pt-BR` e neutralização de injeção de fórmula (`=`, `+`, `-`, `@`). O nome do arquivo diferencia `fila-inspecao-mock.csv` de `fila-inspecao.csv`, o toast informa a quantidade exportada e o botão fica desabilitado sem UCs ou durante a atualização. | O case pede que a fila seja entregue à equipe de campo. Exportar só a página visível produziria um recorte incompleto; por isso o botão coleta a fila inteira e **falha de propósito** se a fila mudar no meio da exportação, em vez de entregar um arquivo parcial. O BOM/CRLF garante abertura correta no Excel e a proteção contra fórmula evita que um motivo ou nome de bairro iniciado por `=` seja executado como fórmula. |
+| **17** | **Exportação da Fila de Inspeção em CSV (`exportarCandidatos.ts` + `GET /inspecoes/candidatos`)** | O botão **"Exportar CSV"**, visível no [print da fila](#fila-inspecao), busca todas as páginas do recorte atual em lotes de 200, confere a contagem e a unicidade das UCs e gera um CSV com BOM UTF-8, CRLF, cabeçalho em português, score em `pt-BR` e proteção contra injeção de fórmula (`=`, `+`, `-`, `@`). O nome do arquivo distingue dados reais de demonstração, e o portal informa a quantidade exportada. | Atende ao diferencial do case de enviar a fila à equipe de campo. A exportação inclui todo o recorte e é interrompida se detectar mudança no total ou UCs duplicadas, evitando um arquivo incompleto. O BOM/CRLF facilita a abertura no Excel, e a proteção contra fórmulas mantém os campos textuais como texto. |
 
 ---
 
