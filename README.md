@@ -16,16 +16,22 @@ A solução unifica **48 meses de histórico operacional e comercial** (`jul/202
 ### 1.1 Painel Executivo & Comparador Lado a Lado (`Tela 1`)
 O **Painel Executivo** (`/painel`) consolida os 6 KPIs estratégicos da distribuidora (**Receita Faturada**, **Energia Faturada**, **UCs Ativas**, **Valor em Aberto / Inadimplência**, **DEC** e **FEC**), acompanhados da série histórica de 48 meses (`jul/2022` a `jun/2026`) e de um **Comparador de Recortes** que coloca de 2 a 4 municípios, bairros ou classes lado a lado:
 
-![Painel Executivo](./readme_images/01_painel_executivo.png)
-<!-- Espaço reservado: print da Tela 1 (/painel) com os 6 KPIs, série histórica e comparador de recortes -->
+Os seis indicadores exibem o valor atual, a base de comparação e a variação entre os períodos selecionados:
+
+![Painel Executivo com os seis KPIs e comparação entre períodos](./readme_images/01_painel_executivo.png)
+
+A evolução histórica mostra receita faturada e volume de energia ao longo dos 48 meses, com escalas e legendas próprias:
+
+![Histórico executivo de receita e volume de energia em 48 meses](./readme_images/01b_historico_executivo.png)
+<!-- Print da aba Comparar pendente: mostrar de 2 a 4 recortes selecionados. -->
 
 ---
 
 ### 1.2 Diagnóstico da Receita: Ponte Preço × Volume & Insight por IA (`Tela 2`)
 A tela de **Diagnóstico da Receita** (`/receita`) responde à pergunta central da diretoria (*"Por que a receita mudou entre P1 e P2?"*). Apresenta a **Ponte da Receita** em barras divergentes (totais em destaque e efeito-preço × efeito-volume), o resumo executivo redigido por IA com **marcadores numéricos auditados** (`POST /ia/insight`), o seletor **"Ver por: Região | Classes"** (`ver=classe`) e o **drill-down encadeado** (`Município → Bairro → Classe`) ordenado pelo efeito-volume em R$ com as 5 maiores perdas destacadas em barras:
 
-![Diagnóstico da Receita](./readme_images/02_diagnostico_receita.png)
-<!-- Espaço reservado: print da Tela 2 (/receita) destacando o card "Análise da IA (Gerado por IA)", a Ponte da Receita e a tabela de drill-down -->
+![Diagnóstico da Receita com análise da IA, ponte de preço e volume e explicação do resultado](./readme_images/02_diagnostico_receita.png)
+<!-- Print complementar do drill-down pendente: manter nomes, valores e controles completos no enquadramento. -->
 
 ---
 
@@ -40,16 +46,22 @@ Projetada para a operação de atendimento comercial (`/unidades` e `/unidades/:
 ### 1.4 Inteligência de Perdas: Fila Priorizada & Gestão de Ordens de Inspeção (`Telas 4 e 5`)
 Na frente de **Combate a Perdas Não Técnicas**, a **Fila de Inspeção** (`/perdas/fila`) ranqueia as unidades suspeitas por **score operacional (0 a 100)**, **confiança da evidência**, **motivos analíticos** e **potencial de recuperação (`kwh_estimado`)**, permitindo selecionar UCs e abrir ordens em lote. A tela de **Ordens de Inspeção** (`/perdas/ordens`) gerencia todo o ciclo de vida operacional (`ABERTA → EM_CAMPO → CONCLUIDA / CANCELADA`) persistido transacionalmente no schema `portal`:
 
-![Fila e Ordens de Inspeção](./readme_images/04_fila_e_ordens_inspecao.png)
-<!-- Espaço reservado: print das Telas 4 e 5 (/perdas/fila e /perdas/ordens) -->
+![Fila de inspeção com indicadores, motivos da suspeita e ranking priorizado](./readme_images/04_fila_inspecao.png)
+<!-- Print complementar da Tela 5 pendente: mostrar ordens e seus estados preenchidos. -->
 
 ---
 
 ### 1.5 Continuidade Operacional DEC / FEC & Efeito do Dia Crítico (`Tela 6`)
 O painel de **Continuidade Operacional** (`/operacao`) monitora a duração (`DEC`) e a frequência (`FEC`) equivalente de interrupções por alimentador e por região, destacando o impacto do **evento climático extremo de julho de 2025 (Dia Crítico)** e permitindo comparar os indicadores oficiais com e sem o expurgo do dia crítico:
 
-![Continuidade DEC e FEC](./readme_images/05_continuidade_dec_fec.png)
-<!-- Espaço reservado: print da Tela 6 (/operacao) com o ranking de alimentadores e comparativo DEC/FEC -->
+Os indicadores do alimentador em análise incluem DEC, FEC, interrupções e consumidor-hora interrompido (CHI):
+
+![Indicadores de continuidade do alimentador, incluindo DEC e FEC com e sem dias críticos](./readme_images/05_continuidade_dec_fec.png)
+
+O histórico permite alternar entre DEC e FEC e comparar as séries com e sem dias críticos:
+
+![Histórico mensal de DEC por alimentador com e sem dias críticos](./readme_images/05b_historico_dec_fec.png)
+<!-- Print complementar do ranking de alimentadores e regiões pendente. -->
 
 ---
 
