@@ -43,7 +43,7 @@ const CAMPOS: readonly CampoFiltro[] = [
 const PADROES: FiltrosUrl = {
   periodo_atual: PERIODO_ATUAL_PADRAO,
 }
-const LINHAS_POR_PAGINA = 50
+const LINHAS_POR_PAGINA = 20
 const ACAO_RECOMENDADA = {
   INSPECAO_PRIORITARIA: { rotulo: 'Inspeção prioritária', variante: 'sucesso' as const },
   VALIDACAO_DOCUMENTAL: { rotulo: 'Validação documental', variante: 'alerta' as const },

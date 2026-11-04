@@ -173,6 +173,22 @@ describe('FilaPage', () => {
     })
   })
 
+  it('carrega a fila com 20 UCs por página', async () => {
+    vi.mocked(buscarCandidatos).mockResolvedValue(candidatosFixture as Candidatos)
+
+    render(
+      <MemoryRouter initialEntries={['/perdas/fila']}>
+        <FilaPage />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('UC-DEMO-001')
+    expect(buscarCandidatos).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, page_size: 20 }),
+      expect.anything(),
+    )
+  })
+
   it('indica quando mantém resultados antigos enquanto os novos filtros carregam', async () => {
     const todos = candidatosFixture as Candidatos
     const filtrados: Candidatos = {
