@@ -237,8 +237,9 @@ ROTULOS_DA_PONTE = ("Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2"
 def _colunas_da_ponte(nomes: list[str]) -> list[int] | None:
     """Posições de receita P1, efeito-preço, efeito-volume e receita P2 entre as colunas em R$, ou None."""
     def periodo(nome: str) -> str | None:
+        # Só a receita de energia (sem tributos): é a base dos efeitos; a faturada não fecha a ponte
         marca = _PAR_PERIODO.search(nome)
-        return marca.group(2) if marca and "receita" in nome else None
+        return marca.group(2) if marca and "receita_energia" in nome else None
 
     def achar(teste) -> int | None:
         return next((i for i, nome in enumerate(nomes) if teste(nome.lower())), None)
@@ -326,10 +327,13 @@ def montar_grafico(pergunta: str, resposta: dict) -> tuple[dict | None, str | No
     em_reais = [j for j in numericas if unidade_da_coluna(colunas[j]) == "brl"]
     if len(linhas) == 1 and categoria is None:
         ponte = _colunas_da_ponte([colunas[j] for j in em_reais])
-        if ponte:
-            js = [em_reais[i] for i in ponte]
+        js = [em_reais[i] for i in ponte] if ponte else []
+        valores = [_numero(linhas[0][j]) for j in js]
+        fecha = bool(js) and None not in valores and (
+            abs(valores[0] + valores[1] + valores[2] - valores[3]) <= max(1.0, abs(valores[3]) * 0.005))
+        if fecha:
             return pronto(_grafico("barras", titulo, "categoria", list(ROTULOS_DA_PONTE),
-                                   [{"nome": "Valor", "valores": [_numero(linhas[0][j]) for j in js]}],
+                                   [{"nome": "Valor", "valores": valores}],
                                    "brl", pedido, orientacao="vertical", nota=nota_do_tipo(NOTA_PIZZA_PONTE)))
 
     # 1. Formato largo: receita_p1 e receita_p2 na mesma linha (comparação P1 × P2)

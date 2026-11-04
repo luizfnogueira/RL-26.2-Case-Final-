@@ -72,6 +72,22 @@ def test_ponte_da_receita_desenha_os_efeitos_na_ordem_da_ponte():
     assert g["nota"] is None
 
 
+def test_ponte_usa_a_receita_de_energia_mesmo_com_a_faturada_antes():
+    """A receita faturada (com tributos) não é a base dos efeitos: na ponte, as barras não fechariam."""
+    colunas = ["receita_faturada_p1_brl", "receita_faturada_p2_brl", "receita_energia_p1_brl", "efeito_preco_brl",
+               "efeito_volume_brl", "receita_energia_p2_brl"]
+    g, _ = grafico("A receita subiu só 8%, por quê?", colunas,
+                   [[150000000.0, 162000000.0, 117830394.38, 14425857.02, -4993655.75, 127262595.65]])
+    assert g["categorias"] == ["Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2"]
+    assert g["series"][0]["valores"] == [117830394.38, 14425857.02, -4993655.75, 127262595.65]
+
+
+def test_ponte_que_nao_fecha_nao_vira_grafico_de_ponte():
+    colunas = ["receita_energia_p1_brl", "efeito_preco_brl", "efeito_volume_brl", "receita_energia_p2_brl"]
+    g, _ = grafico("A receita subiu só 8%, por quê?", colunas, [[150000000.0, 14425857.02, -4993655.75, 127262595.65]])
+    assert g is None or g["categorias"] != ["Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2"]
+
+
 def test_rotulo_escreve_kwh_com_k_minusculo():
     assert grafico_ia.rotulo_da_coluna("kwh_p1") == "kWh P1"
     assert grafico_ia.rotulo_da_coluna("consumo_kwh_p2_kwh") == "Consumo kWh P2"
