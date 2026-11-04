@@ -344,8 +344,13 @@ def validar_regra_periodo_no_sql(sql: str, pergunta: str) -> None:
 # Colunas com data e hora (timestamp): BETWEEN ... AND '2026-06-30' para à meia-noite e perde o último dia
 # Também pega `DATE '...'`, `'...'::date`, `'... 00:00:00'`, `col::timestamp` e a comparação invertida (`'...' >= col`);
 # só `col::date` (ou `CAST(col AS date)`) compara o dia inteiro e passa.
-_COLUNA_DATA_HORA = (r"\b(?:data_abertura|data_fechamento|data_encerramento|executado_em_utc)\b"
-                     r"(?!\s*::\s*date\b)(?:\s*::\s*timestamp(?:tz)?\b)?")
+_NOME_COLUNA_DATA_HORA = r"(?:data_abertura|data_fechamento|data_encerramento|executado_em_utc)"
+# Aspas e aliases não mudam o tipo timestamp da coluna.
+_COLUNA_DATA_HORA = (
+    r'(?<![\w"])(?:(?:"[^"]+"|[a-z_]\w*)\s*\.\s*)?'
+    rf'(?:"{_NOME_COLUNA_DATA_HORA}"|{_NOME_COLUNA_DATA_HORA}\b)'
+    r"(?!\s*::\s*date\b)(?:\s*::\s*timestamp(?:tz)?\b)?"
+)
 _LITERAL_SO_DATA = r"(?:date\s+|timestamp\s+)?'(\d{4}-\d{2}-\d{2})(?:[ t]00:00(?::00)?)?'"
 _FIM_SO_DATA = re.compile(
     r"(?:" + _COLUNA_DATA_HORA + r"\s*(?:not\s+)?between\s+(?:date\s+|timestamp\s+)?'[^']*'\s+and|"

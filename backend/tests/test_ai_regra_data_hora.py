@@ -23,6 +23,14 @@ from app.ai.resposta import ViolacaoFidelidadeSaida
     "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura <= '2026-06-30 00:00:00'",
     "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura::timestamp <= '2026-06-30'",
     "SELECT COUNT(*) FROM uc_atendimentos WHERE '2026-06-30' >= data_abertura",
+    # Identificadores SQL entre aspas continuam sendo colunas timestamp, inclusive com alias e cast.
+    """SELECT COUNT(*) FROM uc_atendimentos WHERE "data_abertura" BETWEEN '2025-07-01' AND '2026-06-30'""",
+    """SELECT COUNT(*) FROM uc_atendimentos a WHERE a."data_fechamento" <= DATE '2026-06-30'""",
+    """SELECT COUNT(*) FROM uc_interrupcoes "i" WHERE "i"."data_encerramento" """
+    "BETWEEN TIMESTAMP '2025-07-01' AND TIMESTAMP '2026-06-30'",
+    """SELECT COUNT(*) FROM tb_fila_perdas WHERE "executado_em_utc"::timestamp <= '2026-06-30'""",
+    """SELECT COUNT(*) FROM uc_atendimentos WHERE "data_abertura"::timestamptz <= '2026-06-30 00:00:00'""",
+    '''SELECT COUNT(*) FROM uc_atendimentos a WHERE DATE '2026-06-30' >= a."data_abertura"''',
 ])
 def test_fim_do_intervalo_so_com_a_data_em_coluna_timestamp_e_barrado(sql):
     with pytest.raises(ErroConsulta, match="dia seguinte"):
@@ -37,6 +45,14 @@ def test_fim_do_intervalo_so_com_a_data_em_coluna_timestamp_e_barrado(sql):
     "SELECT COUNT(*) FROM dim_uc WHERE data_ligacao BETWEEN '2022-07-01' AND '2026-06-30'",  # coluna date
     "SELECT COUNT(*) FROM uc_atendimentos WHERE data_abertura::date <= DATE '2026-06-30'",
     "SELECT COUNT(*) FROM uc_atendimentos WHERE '2026-07-01' > data_abertura",
+    # A citação do identificador não deve barrar filtros que incluem o dia inteiro.
+    """SELECT COUNT(*) FROM uc_atendimentos a WHERE a."data_abertura"::date <= DATE '2026-06-30'""",
+    """SELECT COUNT(*) FROM uc_atendimentos WHERE CAST("data_abertura" AS date) """
+    "BETWEEN '2025-07-01' AND '2026-06-30'",
+    """SELECT COUNT(*) FROM uc_atendimentos WHERE "data_abertura" >= '2025-07-01' """
+    """AND "data_abertura" < '2026-07-01'""",
+    """SELECT COUNT(*) FROM uc_atendimentos a WHERE TO_CHAR(a."data_abertura", 'YYYY-MM') """
+    "BETWEEN '2025-07' AND '2026-06'",
 ])
 def test_filtro_de_data_que_cobre_o_dia_inteiro_passa(sql):
     validar_regra_data_hora_no_sql(sql)
