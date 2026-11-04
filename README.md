@@ -112,6 +112,8 @@ Execução concluída com sucesso nas etapas de ingestão Bronze, tratamento Sil
 
 ### 2.1 Decisões Arquiteturais do Time
 
+> **Todas as decisões do projeto (Dados, Dev, GenAI e segurança), com o porquê de cada uma:** [`docs/decisoes.md`](docs/decisoes.md).
+
 ```mermaid
 flowchart LR
     subgraph Databricks["1. Databricks Lakehouse (Medallion)"]
@@ -189,7 +191,7 @@ Durante a exploração e engenharia de dados no Databricks, o time identificou a
 | **2. Interrupções Sobrepostas, Oscilações (< 3 min) e Antigas à Ligação da UC** | Na base bruta de ocorrências (`uc_interrupcoes`), havia eventos de oscilação (`< 3 min`), ocorrências abertas antes da `data_ligacao` da UC, durações acima do teto de 48h e interrupções simultâneas no mesmo alimentador/UC (que inflariam o DEC se somadas de forma bruta). Criamos **`duracao_efetiva_min`** (descontando interseções temporais) e as flags **`flag_sem_interrupcao`**, **`flag_antes_ligacao`**, **`flag_sobreposicao`** e **`flag_duracao_teto`**. | Seguindo o **PRODIST Módulo 8**, tanto a API (`GET /operacao` e `GET /unidades/{id}`) quanto o Agente GenAI (`validar_regra_interrupcoes_no_sql`) filtram obrigatoriamente `flag_sem_interrupcao = FALSE AND flag_antes_ligacao = FALSE AND duracao_efetiva_min >= 3`. |
 | **3. Outlier Climático de Julho de 2025 ("Dia Crítico" no DEC/FEC)** | Em **julho de 2025**, um evento climático extremo concentrou **58,4% de todo o DEC do período P2**, distorcendo a comparação estrutural entre P1 e P2. Na Gold (`agg_kpis_mensal` e `agg_dec_fec_mensal`), mantivemos o `dec`/`fec` oficial e criamos **`dec_sem_dia_critico`**, **`fec_sem_dia_critico`** e **`flag_dia_critico`**. | A Tela 6 (`/operacao`) exibe os dois indicadores lado a lado, e o Agente de IA anexa automaticamente a **Nota Metodológica do Dia Crítico (58,4% em jul/2025)** sempre que o usuário consulta o DEC de P2/2025. |
 | **4. Falso Positivo de Fraude por Painel Solar (GD), Troca de Medidor ou Leitura Estimada** | Uma queda abrupta de consumo faturado pode parecer furto de energia ("gato"), mas ser causada pela conexão de **Geração Distribuída (GD)**, **troca de medidor** ou **leituras estimadas recorrentes**. Na `tb_fila_perdas` e `tb_fila_perdas_auditoria`, criamos flags de atenuantes (`possui_gd`, `gd_apos_base`, `houve_troca_na_janela`, `tem_arredondamento_pareado`, `proporcao_pares_estimados`) que aplicam **penalidades no `score_bruto`** e separam a ação recomendada entre `INSPECAO_PRIORITARIA` e `VALIDACAO_DOCUMENTAL`. | Na Tela 4 (`/perdas/fila`) e nas respostas do Agente de IA, o sistema exibe os motivos e fatores atenuantes e anexa a nota metodológica de que o **`score` (0 a 100) é prioridade operacional, e não probabilidade estatística de fraude**. |
-| **5. Cidades/Bairros Homônimos e Grafia sem Acento** | O bairro **`CENTRO`** existe em **8 municípios diferentes** da base, e valores categóricos no banco estão em maiúsculas (`JABOATÃO DOS GUARARAPES`, `PODER PUBLICO` sem acento). | No portal, o filtro de `Bairro` só habilita após escolher o `Município`. No chat de IA, perguntar por um bairro ambíguo (ex.: *"Consumo do bairro Centro"*) aciona o **Pedido de Esclarecimento** antes de gastar tokens, oferecendo botões com os municípios candidatos. |
+| **5. Cidades/Bairros Homônimos e Grafia sem Acento** | O bairro **`CENTRO`** existe em **10 municípios diferentes** da base, e valores categóricos no banco estão em maiúsculas (`JABOATÃO DOS GUARARAPES`, `PODER PUBLICO` sem acento). | No portal, o filtro de `Bairro` só habilita após escolher o `Município`. No chat de IA, perguntar por um bairro ambíguo (ex.: *"Consumo do bairro Centro"*) aciona o **Pedido de Esclarecimento** antes de gastar tokens, oferecendo botões com os municípios candidatos. |
 
 ---
 
@@ -241,6 +243,8 @@ sequenceDiagram
 
 ### 2.5 Catálogo de Features Extras e Diferenciais do Projeto (Dev, Dados & GenAI)
 
+> **Descrição de cada funcionalidade extra (o que faz e por que foi criada):** [`docs/FEATURES_EXTRAS.md`](docs/FEATURES_EXTRAS.md).
+
 Além de todos os requisitos obrigatórios do edital, o time projetou e implementou um conjunto de **features extras** focadas em experiência executiva, economia de tokens, auditabilidade e operação real:
 
 #### A) Features Extras — Frente de IA Generativa (GenAI)
@@ -248,7 +252,7 @@ Além de todos os requisitos obrigatórios do edital, o time projetou e implemen
 | # | Feature Extra (GenAI) | O que ela faz | Por que foi criada (Motivação de Produto & Engenharia) |
 | :-: | :--- | :--- | :--- |
 | **1** | **Gráficos Dinâmicos na Conversa (`app/services/grafico_ia.py`)** | Desenha automaticamente gráficos interativos de **barras**, **linhas** ou **pizza** dentro da própria conversa do chat quando o usuário pede um gráfico, escolhendo a visualização compatível com a geometria dos dados (e avisando quando o tipo pedido não cabe, ex.: pizza com números negativos), com botão **"Ver como tabela"** trazendo 100% das linhas sem o corte de 50 registros. | Diretores e analistas frequentemente querem enxergar tendências mensais ou participação por classe visualmente no chat, sem precisar exportar os dados para outra ferramenta. Além disso, a decisão e montagem do gráfico são 100% determinísticas em código (**0 tokens extras**). |
-| **2** | **Pedido de Esclarecimento Proativo (`app/services/esclarecimento_ia.py`)** | Detecta perguntas ambíguas antes de chamar o LLM — como bairros que existem em mais de um município (ex.: *"Centro"* existe em 8 municípios) ou períodos abertos como *"no último ano"* / *"este ano"* — e devolve botões clicáveis no chat para o usuário escolher a opção exata em 1 clique. | Evita que a IA "chute" um município errado ou gaste chamadas de LLM e queries SQL em uma pergunta com duplo sentido, melhorando a precisão percebida e economizando cota de API. |
+| **2** | **Pedido de Esclarecimento Proativo (`app/services/esclarecimento_ia.py`)** | Detecta perguntas ambíguas antes de chamar o LLM — como bairros que existem em mais de um município (ex.: *"Centro"* existe em 10 municípios) ou períodos abertos como *"no último ano"* / *"este ano"* — e devolve botões clicáveis no chat para o usuário escolher a opção exata em 1 clique. | Evita que a IA "chute" um município errado ou gaste chamadas de LLM e queries SQL em uma pergunta com duplo sentido, melhorando a precisão percebida e economizando cota de API. |
 | **3** | **Resumo da Conversa Antiga / Memória em 2 Camadas (`interacao_repository.py`)** | Mantém as **3 últimas trocas completas** (pergunta, resumo da resposta e SQL executado) para *follow-ups* diretos (*"E só comercial?"*) e, em conversas longas, comprime as **10 perguntas anteriores** em uma lista leve (~20 tokens por pergunta). Após 13 trocas, se o usuário perguntar sobre o início da conversa, responde honestamente que saiu da janela de memória. | Mandar o histórico inteiro estouraria a janela de tokens e degradaria a atenção do modelo; mandar só 3 trocas faria o assistente esquecer o começo da sessão. O resumo determinístico entrega memória de 13 turnos com custo quase zero de tokens e **nenhuma chamada extra ao modelo**. |
 | **4** | **Respostas Pré-Calculadas e Cache em 2 Níveis (`cache_respostas.py` + `ia.resposta_cache`)** | Armazena respostas validadas tanto em memória quanto na tabela `ia.resposta_cache` do PostgreSQL, indexadas por uma assinatura canônica da pergunta (normalizando sinônimos, municípios e versão `gold_atualizada_em`). Perguntas iguais ou equivalentes retornam em milissegundos. | Garante resposta instantânea (**< 50 ms e 0 tokens**) para as perguntas mais frequentes da operação e da banca avaliadora, sobrevivendo a reinícios do servidor e invalidando automaticamente se a camada Gold for atualizada. |
 | **5** | **Tabela Interativa no Chat com Ordenação e Exportação CSV** | Quando a consulta retorna rankings ou múltiplas colunas/linhas, o chat renderiza uma tabela interativa com ordenação por coluna ao clicar no cabeçalho, formatação numérica `pt-BR` e botão **"Exportar CSV"**. | Permite que o analista de perdas ou faturamento leve imediatamente o resultado de uma consulta ad-hoc do chat (ex.: *"Top 20 UCs da fila em Recife"*) direto para o Excel. |
@@ -350,7 +354,9 @@ RL-26.2-Case-Final-/
 ├── data-engineering/                    # Notebooks do pipeline Medallion no Databricks (Bronze/Silver/Gold)
 │   └── v_energy_pipeline.yml            # Definição do Workflow (Job) do Databricks
 ├── docs/
+│   ├── FEATURES_EXTRAS.md               # Funcionalidades extras: o que cada uma faz e por que
 │   ├── api-contract.md                  # Especificação completa do Contrato da API V2 e adaptações da Gold
+│   ├── decisoes.md                      # Decisões do projeto por frente (Dados, Dev, GenAI, segurança)
 │   ├── diagnostico-receita.md           # Diagnóstico da variação da receita (P1 × P2) e recomendações
 │   └── dicionario-de-dados.md           # Dicionário de dados da Gold: métricas e decisões de limpeza
 ├── frontend/
