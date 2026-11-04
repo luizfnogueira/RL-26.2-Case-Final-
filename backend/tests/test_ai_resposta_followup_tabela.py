@@ -21,6 +21,25 @@ def test_formatacao_marcadores_pt_br() -> None:
     )
 
 
+def test_reais_acima_de_um_milhao_saem_em_mi_no_texto() -> None:
+    """Diretor lê "R$ 43,8 mi", não centavos; o exato fica na tabela. kWh e reais pequenos ficam completos."""
+    texto = "Foi de R$ {v1} para R$ {v2}, com perda de R$ {v3}; {v4} kWh; tarifa de R$ {v5}; total R$ {v6}."
+    marcadores = {"v1": 43771914.63, "v2": 46812578.17, "v3": 2345774.51, "v4": 1234567.8, "v5": 0.95,
+                  "v6": 1_300_000_000}
+    assert substituir_marcadores_pt_br(texto, marcadores) == (
+        "Foi de R$ 43,8 mi para R$ 46,8 mi, com perda de R$ 2,3 mi; 1.234.567,80 kWh; tarifa de R$ 0,95; "
+        "total R$ 1,3 bi."
+    )
+
+
+def test_palavra_de_perda_tira_o_sinal_do_numero() -> None:
+    """"perda de R$ -2,3 mi" vira "perda de R$ 2,3 mi"; sem palavra de perda, o sinal fica."""
+    texto = "Perda de R$ {v1} pela queda de {v2}% no volume; efeito-volume de R$ {v1}."
+    assert substituir_marcadores_pt_br(texto, {"v1": -2345774.51, "v2": -5.36}) == (
+        "Perda de R$ 2,3 mi pela queda de 5,36% no volume; efeito-volume de R$ -2,3 mi."
+    )
+
+
 def test_output_validator_rejeita_numero_inventado_e_corrige_com_model_retry() -> None:
     """GENAI-10.2: Se o modelo inventar um número que não veio do banco, sofre ModelRetry (1x) e corrige."""
     sql_exec = "SELECT SUM(receita_total) AS receita_brl FROM agg_kpis_mensal WHERE periodo = 'P2'"
@@ -192,7 +211,7 @@ def test_correcao_de_premissa_falsa_jaboatao() -> None:
 
     assert resp["status"] == "ok"
     assert "caiu" in resp["resposta"].lower()
-    assert "-2,09%" in resp["resposta"]
+    assert "caiu 2,09%" in resp["resposta"]  # "caiu" já dá o sinal: nada de "caiu -2,09%"
 
 
 @pytest.mark.parametrize(

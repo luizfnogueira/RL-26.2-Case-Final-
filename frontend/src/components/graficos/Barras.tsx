@@ -198,15 +198,17 @@ function BarrasVerticais({ grafico, formatos, descricao }: Props) {
   // Valor escrito na barra quando cabe; se não couber, o eixo com linhas de grade volta
   const comRotulos = (faixaEstimada * 0.9) / n >= Math.max(40, larguraTexto)
   const margem = { esq: comRotulos ? 8 : 56, dir: 8, topo: 24, base: 40 }
+  const [minimo, maximoBruto] = dominioComZero(grafico.series.flatMap((s) => s.valores))
+  // O valor de uma barra negativa fica abaixo da ponta: sem essa folga, cai em cima do nome da categoria
+  const folgaNegativo = comRotulos && minimo < 0 ? 18 : 0
   const larguraPlot = largura - margem.esq - margem.dir
-  const alturaPlot = ALTURA_VERTICAL - margem.topo - margem.base
+  const alturaPlot = ALTURA_VERTICAL - margem.topo - margem.base - folgaNegativo
   const faixa = larguraPlot / Math.max(1, quantidade)
   const larguraBarra = Math.min(LARGURA_MAX_BARRA, (faixa * 0.7) / n)
   // Distância entre as barras de um grupo: com rótulo, a do texto, para um valor não cobrir o vizinho
   const passoBarra = comRotulos
     ? Math.max(larguraBarra, Math.min(larguraTexto, (faixa * 0.9) / n))
     : larguraBarra
-  const [minimo, maximoBruto] = dominioComZero(grafico.series.flatMap((s) => s.valores))
   const maximo = comRotulos ? maximoBruto : tetoDoEixo(maximoBruto)
   const y = (valor: number) => margem.topo + alturaPlot * (1 - (valor - minimo) / (maximo - minimo))
   const centro = (i: number) => margem.esq + faixa * (i + 0.5)

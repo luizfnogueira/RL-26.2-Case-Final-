@@ -98,8 +98,29 @@ def formatar_numero_pt_br(valor: int | float | Decimal) -> str:
     return f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+# "R$ {v1}" logo antes do marcador e nenhuma escala logo depois ("R$ {v1} mi" já vem escalado)
+_REAIS_ANTES = re.compile(r"R\$\s*$")
+# "perda de R$ {v3}" / "queda de {v6}%": a palavra já diz o sinal, então o número sai sem "-" ("perda de R$ -2,3 mi")
+_PERDA_ANTES = re.compile(
+    r"\b(?:perda|queda|redu[çc][ãa]o|retra[çc][ãa]o|recuo|tirou|caiu|caindo|perdeu|reduziu|recuou|diminui[çc][ãa]o)"
+    r"(?:\s+(?:de|em|foi\s+de))?\s*(?:R\$\s*)?$", re.IGNORECASE)
+_ESCALA_DEPOIS = re.compile(r"\s*(?:mi\b|mil\b|bi\b|milh|bilh)", re.IGNORECASE)
+
+
+def formatar_reais_compacto(valor: int | float | Decimal) -> str:
+    """Valor em reais para quem lê a resposta: 43771914.63 -> '43,8 mi'; abaixo de 1 milhão, completo."""
+    num = float(valor)
+    for limite, sufixo in ((1e9, "bi"), (1e6, "mi")):
+        if abs(num) >= limite:
+            return f"{num / limite:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".") + f" {sufixo}"
+    return formatar_numero_pt_br(valor)
+
+
 def substituir_marcadores_pt_br(texto: str, marcadores: dict[str, str | int | float]) -> str:
-    """Preenche os marcadores `{v1}`, `{v2}` no texto com valores formatados em pt-BR (GENAI-10.1)."""
+    """Preenche os marcadores `{v1}`, `{v2}` no texto com valores formatados em pt-BR (GENAI-10.1).
+
+    Reais a partir de 1 milhão saem em "mi"/"bi" com uma casa (como no portal); o valor exato fica na tabela.
+    """
     if not texto or not marcadores:
         return texto
 
@@ -110,6 +131,11 @@ def substituir_marcadores_pt_br(texto: str, marcadores: dict[str, str | int | fl
             return marcador.group(0)
         valor = valores[marcador.group(1)]
         if isinstance(valor, (int, float, Decimal)) and not isinstance(valor, bool):
+            if valor < 0 and _PERDA_ANTES.search(texto, 0, marcador.start()):
+                valor = abs(valor)
+            em_reais = _REAIS_ANTES.search(texto, 0, marcador.start())
+            if em_reais and not _ESCALA_DEPOIS.match(texto, marcador.end()):
+                return formatar_reais_compacto(valor)
             return formatar_numero_pt_br(valor)
         return str(valor)
 

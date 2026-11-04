@@ -39,6 +39,7 @@ from app.ai.contratos import (
 )
 from app.ai.modelo import criar_modelo, obter_model_settings, obter_nome_modelo, obter_provedor_configurado
 from app.ai.resposta import (
+    REGEX_MARCADOR_NO_TEXTO,
     ViolacaoFidelidadeSaida,
     complementar_texto_para_tabela,
     decidir_modo_apresentacao,
@@ -115,6 +116,12 @@ REGRAS_CRITICAS_TOPO = """
    - O gráfico não muda a pergunta: traga só a métrica e os agrupamentos pedidos. Não acrescente outra métrica (ex.: receita de energia quando pediram "receita") nem um agrupamento que a pergunta não pediu (classe, município, mês) só para ter o que desenhar. Se a resposta for um número só, devolva o número; o portal explica que não há gráfico.
    - Em série no tempo ou lista completa ("por mês", "por município", "mês a mês"), não use `LIMIT`: o gráfico precisa de todas as linhas. `LIMIT` só em ranking pedido ("top 5", "os 10 maiores").
    - Na `pergunta_interpretada`, descreva os dados, sem citar o gráfico (nada de "formatado para gráfico de pizza").
+11. LEITURA HONESTA DE COMPARAÇÕES:
+   - Diga o recorte que a consulta realmente usou. Se o SQL não filtrou período, a resposta é sobre toda a base (jul/2022 a jun/2026): nunca a chame de P1, P2 ou "último ano".
+   - Diferença menor que a precisão mostrada não é diferença: notas 4,04 e 4,04 (ou 3,90 e 3,89) são "praticamente iguais", sem apontar um vencedor. Não suavize mudança clara ("leve redução") quando ela atinge todos os grupos.
+   - Ao comparar crescimento ou queda entre grupos de tamanhos diferentes, traga o percentual junto do valor absoluto (`variacao_pct`) e diga qual dos dois sustenta a conclusão.
+   - Uma média de período que muda pode vir de um único mês: quando a pergunta for "por que caiu/subiu", olhe a série mensal antes de afirmar que a mudança foi uniforme.
+   - Colunas com data e hora (`data_abertura`, `data_fechamento`, `data_encerramento`): filtre por `TO_CHAR(coluna, 'YYYY-MM')` ou com `<` o dia seguinte; `BETWEEN ... AND '2026-06-30'` perde o último dia.
 """.strip()
 
 REGRAS_CRITICAS_RODAPE = """
@@ -334,6 +341,89 @@ def validar_regra_periodo_no_sql(sql: str, pergunta: str) -> None:
             )
 
 
+# Colunas com data e hora (timestamp): BETWEEN ... AND '2026-06-30' para à meia-noite e perde o último dia
+# Também pega `DATE '...'`, `'...'::date`, `'... 00:00:00'`, `col::timestamp` e a comparação invertida (`'...' >= col`);
+# só `col::date` (ou `CAST(col AS date)`) compara o dia inteiro e passa.
+_NOME_COLUNA_DATA_HORA = r"(?:data_abertura|data_fechamento|data_encerramento|executado_em_utc)"
+# Aspas e aliases não mudam o tipo timestamp da coluna.
+_COLUNA_DATA_HORA = (
+    r'(?<![\w"])(?:(?:"[^"]+"|[a-z_]\w*)\s*\.\s*)?'
+    rf'(?:"{_NOME_COLUNA_DATA_HORA}"|{_NOME_COLUNA_DATA_HORA}\b)'
+    r"(?!\s*::\s*date\b)(?:\s*::\s*timestamp(?:tz)?\b)?"
+)
+_LITERAL_SO_DATA = r"(?:date\s+|timestamp\s+)?'(\d{4}-\d{2}-\d{2})(?:[ t]00:00(?::00)?)?'"
+_FIM_SO_DATA = re.compile(
+    r"(?:" + _COLUNA_DATA_HORA + r"\s*(?:not\s+)?between\s+(?:date\s+|timestamp\s+)?'[^']*'\s+and|"
+    + _COLUNA_DATA_HORA + r"\s*<=)\s*" + _LITERAL_SO_DATA + r"|"
+    r"(?:date\s+|timestamp\s+)?'(\d{4}-\d{2}-\d{2})(?:[ t]00:00(?::00)?)?'(?:\s*::\s*date)?\s*>=\s*"
+    + _COLUNA_DATA_HORA, re.IGNORECASE)
+
+
+def validar_regra_data_hora_no_sql(sql: str) -> None:
+    """Em coluna timestamp, o fim do intervalo só com a data corta o último dia: use `<` o dia seguinte."""
+    achado = _FIM_SO_DATA.search(sql or "")
+    if achado:
+        raise ErroConsulta(
+            f"Regra de negócio violada: `{achado.group(0)}` compara uma coluna com data e hora com o dia "
+            f"'{achado.group(1) or achado.group(2)}' à meia-noite e deixa de fora o resto desse dia. Use "
+            "`TO_CHAR(coluna, 'YYYY-MM') BETWEEN 'AAAA-MM' AND 'AAAA-MM'` ou `coluna >= 'início' AND coluna < 'dia seguinte'`."
+        )
+
+
+_ROTULO_PERIODO = re.compile(r"\bP([12])\b")
+# Fim de cada período também como o 1º dia do mês seguinte (`data_abertura < '2026-07-01'`)
+_FIM_SEGUINTE = {"p1": "2023-07-01", "p2": "2026-07-01"}
+
+
+TODA_A_BASE = "toda a base (jul/2022 a jun/2026)"
+_ALGUM_ANO = re.compile(r"'20\d\d")
+
+
+def _periodos_sem_filtro(texto: str, sqls: list[str]) -> list[str]:
+    """P1/P2 citados no texto que nenhuma consulta da rodada filtrou."""
+    if not sqls or any("agg_preco_volume" in s for s in sqls):  # a ponte já vem com colunas _p1 e _p2
+        return []
+    faltando = []
+    for numero in sorted(set(_ROTULO_PERIODO.findall(REGEX_MARCADOR_NO_TEXTO.sub("", texto or "")))):
+        periodo = f"p{numero}"
+        inicio, fim = MESES_DOS_PERIODOS[periodo]
+        if not any(f"'{periodo}'" in s or re.search(rf"_{periodo}\b", s)
+                   or (inicio in s and (fim in s or _FIM_SEGUINTE[periodo] in s)) for s in sqls):
+            faltando.append(periodo)
+    return faltando
+
+
+def _sqls_da_rodada(deps: DepsAgente) -> list[str]:
+    return [(r.sql_executado or "").lower() for r in deps.historico_resultados if not r.bloqueado]
+
+
+def corrigir_periodo_do_plano(deps: DepsAgente, saida: RespostaAgente) -> RespostaAgente:
+    """O período do plano vira "Período considerado: …" nas respostas em tabela; o modelo às vezes o preenche
+    com P2 sem filtrar. O código corrige para o recorte real, sem gastar outra chamada."""
+    if saida.status != "ok" or not saida.plano:
+        return saida
+    sqls = _sqls_da_rodada(deps)
+    if not _periodos_sem_filtro(saida.plano.periodo, sqls):
+        return saida
+    real = "" if any(_ALGUM_ANO.search(s) for s in sqls) else TODA_A_BASE
+    return saida.model_copy(update={"plano": saida.plano.model_copy(update={"periodo": real})})
+
+
+def validar_rotulo_de_periodo(deps: DepsAgente, saida: RespostaAgente) -> None:
+    """O texto só chama o resultado de P1/P2 se alguma consulta da rodada filtrou esse período.
+
+    Caso real: o agente consultou o histórico inteiro e escreveu "em P2" (investigação de 03/11).
+    """
+    if saida.status != "ok":
+        return
+    for periodo in _periodos_sem_filtro(saida.texto, _sqls_da_rodada(deps)):
+        inicio, fim = MESES_DOS_PERIODOS[periodo]
+        raise ViolacaoFidelidadeSaida(
+            f"O texto chama o resultado de {periodo.upper()}, mas nenhuma consulta filtrou {inicio} a {fim}. "
+            f"Filtre o período no SQL ou descreva o recorte que a consulta usou (ex.: {TODA_A_BASE})."
+        )
+
+
 def descrever_tabela_padrao(tabela: str) -> str:
     """Retorna as colunas e chaves da tabela a partir do contrato oficial da Gold."""
     nome_limpo = tabela.strip().lower().removeprefix("gold.").removeprefix("agente.")
@@ -443,6 +533,7 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
             validar_regra_dec_fec_no_sql(sql, ctx.deps.pergunta_original)
             validar_regra_interrupcoes_no_sql(sql, ctx.deps.pergunta_original)
             validar_regra_periodo_no_sql(sql, ctx.deps.pergunta_original)
+            validar_regra_data_hora_no_sql(sql)
             if ctx.deps.executar_sql_fn is None:
                 raise ErroConsulta("Função de consulta ao banco não configurada.")
             resultado = ctx.deps.executar_sql_fn(sql)
@@ -502,6 +593,8 @@ def construir_agente_sql(modelo: Model | None = None) -> Agent[DepsAgente, Respo
     def _validar_saida(ctx: RunContext[DepsAgente], saida: RespostaAgente) -> RespostaAgente:
         """Valida marcadores, números e regras de domínio (GENAI-10.2)."""
         try:
+            saida = corrigir_periodo_do_plano(ctx.deps, saida)
+            validar_rotulo_de_periodo(ctx.deps, saida)
             return validar_fidelidade_saida(ctx.deps, saida)
         except ViolacaoFidelidadeSaida as exc:
             ctx.deps.tentativas_validacao_saida += 1

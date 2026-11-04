@@ -52,6 +52,8 @@ NOTA_PIZZA_PERIODOS = (_PEDIU_PIZZA + "períodos (P1 e P2, meses) não são part
                        "comparação fica clara.")
 NOTA_PIZZA_COLUNAS = (_PEDIU_PIZZA + "indicadores diferentes (como receita total e receita de energia, que está "
                       "dentro dela) não são partes de um mesmo todo.")
+NOTA_PIZZA_PONTE = (_PEDIU_PIZZA + "a ponte vai da receita de P1 à de P2 somando o efeito-preço e o "
+                    "efeito-volume, que pode ser negativo; não são partes de um todo.")
 NOTA_LINHAS_SEM_TEMPO = ("Você pediu linhas, mas o gráfico está em barras: linhas são para séries no tempo, "
                          "e estas categorias não seguem uma ordem no tempo.")
 NOTA_UM_NUMERO = "Gráfico: com um número só, a resposta fica em texto."
@@ -99,7 +101,9 @@ def rotulo_da_coluna(coluna: str) -> str:
     """"receita_energia_p2_brl" → "Receita energia p2"; o sufixo de unidade sai."""
     base = re.sub(r"_(brl|kwh|pct|h)$", "", coluna.lower())
     texto = _PAR_PERIODO.sub(lambda m: f"{m.group(1)}P{m.group(2)}", base).replace("_", " ").strip()
-    return texto[:1].upper() + texto[1:]
+    texto = texto[:1].upper() + texto[1:]
+    # "kwh_p1" → "kWh P1", nunca "Kwh"
+    return re.sub(r"\bkwh\b", "kWh", texto, flags=re.IGNORECASE)
 
 
 def _somavel(coluna: str) -> bool:
@@ -227,6 +231,24 @@ def _lista(nomes: list[str]) -> str:
     return nomes[0] if len(nomes) == 1 else ", ".join(nomes[:-1]) + " e " + nomes[-1]
 
 
+ROTULOS_DA_PONTE = ("Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2")
+
+
+def _colunas_da_ponte(nomes: list[str]) -> list[int] | None:
+    """Posições de receita P1, efeito-preço, efeito-volume e receita P2 entre as colunas em R$, ou None."""
+    def periodo(nome: str) -> str | None:
+        # Só a receita de energia (sem tributos): é a base dos efeitos; a faturada não fecha a ponte
+        marca = _PAR_PERIODO.search(nome)
+        return marca.group(2) if marca and "receita_energia" in nome else None
+
+    def achar(teste) -> int | None:
+        return next((i for i, nome in enumerate(nomes) if teste(nome.lower())), None)
+
+    posicoes = [achar(lambda n: periodo(n) == "1"), achar(lambda n: "efeito_preco" in n),
+                achar(lambda n: "efeito_volume" in n), achar(lambda n: periodo(n) == "2")]
+    return None if None in posicoes else posicoes
+
+
 def _nome_das_categorias(coluna: str) -> str:
     return next((plural for chave, plural in _NOMES_DAS_CATEGORIAS.items() if chave in coluna.lower()), "itens")
 
@@ -299,6 +321,20 @@ def montar_grafico(pergunta: str, resposta: dict) -> tuple[dict | None, str | No
 
     def nota_do_tipo(nota_pizza: str) -> str | None:
         return {"pizza": nota_pizza, "linhas": NOTA_LINHAS_SEM_TEMPO}.get(tipo_pedido)
+
+    # 0. Ponte da receita numa linha (receita P1, efeito-preço, efeito-volume, receita P2): os efeitos são a
+    # resposta, então entram no desenho na ordem da ponte, em vez de virar só P1 × P2
+    em_reais = [j for j in numericas if unidade_da_coluna(colunas[j]) == "brl"]
+    if len(linhas) == 1 and categoria is None:
+        ponte = _colunas_da_ponte([colunas[j] for j in em_reais])
+        js = [em_reais[i] for i in ponte] if ponte else []
+        valores = [_numero(linhas[0][j]) for j in js]
+        fecha = bool(js) and None not in valores and (
+            abs(valores[0] + valores[1] + valores[2] - valores[3]) <= max(1.0, abs(valores[3]) * 0.005))
+        if fecha:
+            return pronto(_grafico("barras", titulo, "categoria", list(ROTULOS_DA_PONTE),
+                                   [{"nome": "Valor", "valores": valores}],
+                                   "brl", pedido, orientacao="vertical", nota=nota_do_tipo(NOTA_PIZZA_PONTE)))
 
     # 1. Formato largo: receita_p1 e receita_p2 na mesma linha (comparação P1 × P2)
     pares: dict[str, dict[str, int]] = {}

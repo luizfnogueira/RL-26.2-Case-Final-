@@ -59,6 +59,40 @@ def test_p1_p2_numa_linha_vira_barras_verticais_na_ordem_dos_periodos():
     assert g["unidade"] == "brl"
 
 
+def test_ponte_da_receita_desenha_os_efeitos_na_ordem_da_ponte():
+    """Os efeitos são a resposta do "por quê": não podem ficar fora como P1 × P2 (revisão da Tela 7)."""
+    colunas = ["receita_energia_p1_brl", "efeito_preco_brl", "efeito_volume_brl", "receita_energia_p2_brl",
+               "efeito_preco_pct", "variacao_volume_pct", "meses_bandeira_nao_verde_p1",
+               "meses_bandeira_nao_verde_p2"]
+    g, _ = grafico("A receita subiu só 8%, por quê?", colunas,
+                   [[117830394.38, 14425857.02, -4993655.75, 127262595.65, 12.24, -3.95, 0, 8]])
+    assert (g["tipo"], g["orientacao"], g["unidade"]) == ("barras", "vertical", "brl")
+    assert g["categorias"] == ["Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2"]
+    assert g["series"][0]["valores"] == [117830394.38, 14425857.02, -4993655.75, 127262595.65]
+    assert g["nota"] is None
+
+
+def test_ponte_usa_a_receita_de_energia_mesmo_com_a_faturada_antes():
+    """A receita faturada (com tributos) não é a base dos efeitos: na ponte, as barras não fechariam."""
+    colunas = ["receita_faturada_p1_brl", "receita_faturada_p2_brl", "receita_energia_p1_brl", "efeito_preco_brl",
+               "efeito_volume_brl", "receita_energia_p2_brl"]
+    g, _ = grafico("A receita subiu só 8%, por quê?", colunas,
+                   [[150000000.0, 162000000.0, 117830394.38, 14425857.02, -4993655.75, 127262595.65]])
+    assert g["categorias"] == ["Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2"]
+    assert g["series"][0]["valores"] == [117830394.38, 14425857.02, -4993655.75, 127262595.65]
+
+
+def test_ponte_que_nao_fecha_nao_vira_grafico_de_ponte():
+    colunas = ["receita_energia_p1_brl", "efeito_preco_brl", "efeito_volume_brl", "receita_energia_p2_brl"]
+    g, _ = grafico("A receita subiu só 8%, por quê?", colunas, [[150000000.0, 14425857.02, -4993655.75, 127262595.65]])
+    assert g is None or g["categorias"] != ["Receita P1", "Efeito-preço", "Efeito-volume", "Receita P2"]
+
+
+def test_rotulo_escreve_kwh_com_k_minusculo():
+    assert grafico_ia.rotulo_da_coluna("kwh_p1") == "kWh P1"
+    assert grafico_ia.rotulo_da_coluna("consumo_kwh_p2_kwh") == "Consumo kWh P2"
+
+
 def test_p1_p2_por_classe_vira_barras_agrupadas_ordenadas_pelo_p2():
     g, _ = grafico("Compare P1 e P2 por classe", ["classe", "kwh_p1", "kwh_p2"],
                    [["RURAL", 10.0, 12.0], ["RESIDENCIAL", 90.0, 95.0], ["COMERCIAL", 60.0, 55.0]])

@@ -154,12 +154,11 @@ perguntas:
   pergunta: Quais os assuntos mais frequentes no call center em P2?
   status_esperado: ok
   apresentacao_esperada: tabela
-  observacao: Call center = canal TELEFONE.
+  observacao: Call center = todos os canais de uc_atendimentos (o case chama os atendimentos de chamados do call center); telefone é só um dos canais.
   sql_referencia: |
     SELECT assunto, COUNT(*) AS atendimentos
     FROM uc_atendimentos
-    WHERE canal = 'TELEFONE'
-      AND TO_CHAR(data_abertura, 'YYYY-MM') BETWEEN '2025-07' AND '2026-06'
+    WHERE TO_CHAR(data_abertura, 'YYYY-MM') BETWEEN '2025-07' AND '2026-06'
     GROUP BY assunto
     ORDER BY atendimentos DESC
 

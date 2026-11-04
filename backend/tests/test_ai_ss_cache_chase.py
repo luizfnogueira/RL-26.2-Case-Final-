@@ -176,7 +176,7 @@ def test_self_consistency_chase_sql_maioria_vence_quando_confianca_baixa() -> No
             ),
             premissas=["Contagem de UCs na fila de perdas em P2."],
             marcadores={"v1": valor},
-            texto="Existem {v1} UCs na fila de perdas em P2.",
+            texto="Existem {v1} UCs na fila de perdas.",
             justificativa="Votação CHASE-SQL.",
             confianca="baixa",
         )
@@ -230,7 +230,7 @@ def test_self_consistency_chase_sql_sem_maioria_vira_nao_sei() -> None:
             sql=sql,
             premissas=[],
             marcadores={"v1": val},
-            texto="O valor é {v1} em P2.",
+            texto="O valor é {v1}.",
             justificativa="Ambíguo.",
             confianca="baixa",
         )
