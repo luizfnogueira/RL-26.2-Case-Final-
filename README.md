@@ -274,6 +274,8 @@ Além de todos os requisitos obrigatórios do edital, o time projetou e implemen
 
 ### 2.6 Dicionário de Dados da Camada Gold (`14 Tabelas Oficiais`)
 
+> **Dicionário completo, com a definição de cada métrica (como `dec`, `fec`, `consumo_kwh_valido`, `efeito_preco` e `flag_conta_alta` são calculados) e as decisões de limpeza que afetam cada uma:** [`docs/dicionario-de-dados.md`](docs/dicionario-de-dados.md).
+>
 > O contrato estrutural de tipos e chaves encontra-se em [`backend/app/db/gold_contract.py`](backend/app/db/gold_contract.py), [`backend/app/db/gold_columns.json`](backend/app/db/gold_columns.json) e [`docs/api-contract.md`](docs/api-contract.md).
 
 | # | Tabela (`schema gold`) | Chave Primária (Grão) | Descrição e Principais Colunas |
@@ -345,9 +347,12 @@ RL-26.2-Case-Final-/
 │   ├── .env.example                     # Template documentado de variáveis de ambiente do backend
 │   ├── docker-compose.yml               # Orquestração dos containers PostgreSQL 16 e API FastAPI
 │   └── requirements.txt                 # Dependências Python do backend e GenAI
-├── data-engineering/                    # Notebooks e scripts do pipeline Medallion no Databricks (Bronze/Silver/Gold)
+├── data-engineering/                    # Notebooks do pipeline Medallion no Databricks (Bronze/Silver/Gold)
+│   └── v_energy_pipeline.yml            # Definição do Workflow (Job) do Databricks
 ├── docs/
-│   └── api-contract.md                  # Especificação completa do Contrato da API V2 e adaptações da Gold
+│   ├── api-contract.md                  # Especificação completa do Contrato da API V2 e adaptações da Gold
+│   ├── diagnostico-receita.md           # Diagnóstico da variação da receita (P1 × P2) e recomendações
+│   └── dicionario-de-dados.md           # Dicionário de dados da Gold: métricas e decisões de limpeza
 ├── frontend/
 │   ├── src/
 │   │   ├── auth/                        # Fluxo de autenticação JWT, guarda de rotas e armazenamento de sessão
