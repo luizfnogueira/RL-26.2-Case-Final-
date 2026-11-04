@@ -160,20 +160,22 @@ As principais decisões arquiteturais tomadas pelo time foram:
 
 ### 2.2 Diagnóstico Executivo da Receita (`P1 × P2`)
 
-> Documentação complementar detalhada do contrato e das regras: [`docs/api-contract.md`](docs/api-contract.md) e [`backend/app/ai/skills/receita.md`](backend/app/ai/skills/receita.md).
+> **Documento completo, com causas, hipóteses descartadas e recomendações com ordem de grandeza do impacto:** [`docs/diagnostico-receita.md`](docs/diagnostico-receita.md).
 
-A análise comparativa entre o primeiro ano da base (**`P1`: jul/2022 a jun/2023**) e os últimos 12 meses (**`P2`: jul/2025 a jun/2026**) revela um **crescimento aparente sustentado exclusivamente por tarifa, mascarando uma retração relevante de volume físico faturado**:
+Comparando o primeiro ano da base (**`P1`: jul/2022 a jun/2023**) com os últimos 12 meses (**`P2`: jul/2025 a jun/2026**), a receita subiu **pelo preço** (reajuste **e** bandeiras tarifárias) e o volume caiu **porque 3.510 unidades passaram a gerar a própria energia (GD)**:
 
-| Indicador Consolidado | Período Base (`P1`: jul/22–jun/23) | Período Atual (`P2`: jul/25–jun/26) | Variação Absoluta | Variação (%) |
-| :--- | ---: | ---: | ---: | ---: |
-| **Receita Faturada Total (com tributos)** | R$ 157,11 milhões | R$ 169,68 milhões | +R$ 12,58 milhões | **+8,00%** |
-| **Receita de Energia (sem tributos — Ponte)** | R$ 117,83 milhões | R$ 127,26 milhões | +R$ 9,43 milhões | **+8,00%** |
-| **Efeito-Preço (Reajuste Tarifário de +12,4%)** | — | — | **+R$ 14,43 milhões** | Impulsionou a alta |
-| **Efeito-Volume (Retração de −4,0% em kWh)** | — | — | **−R$ 4,99 milhões** | Freou o crescimento |
+| Indicador Consolidado | `P1` (jul/22–jun/23) | `P2` (jul/25–jun/26) | Variação |
+| :--- | ---: | ---: | ---: |
+| **Receita Faturada (com tributos)** | R$ 157,11 mi | R$ 169,68 mi | **+8,0%** |
+| **Receita de Energia (sem tributos, base da ponte)** | R$ 117,83 mi | R$ 127,26 mi | **+8,0%** |
+| **Efeito-Preço** (tarifa média +12,4%: reajuste ≈ R$ 9,9 mi + bandeiras ≈ R$ 4,2 mi) | | | **+R$ 14,43 mi** |
+| **Efeito-Volume** (227,05 → 218,08 GWh: −3,95%) | | | **−R$ 4,99 mi** |
 
-**Principais Conclusões do Diagnóstico:**
-1. **A receita subiu pelo preço, não pelo consumo:** O reajuste tarifário médio de **+12,4%** adicionou **+R$ 14,43 milhões** (`efeito_preco`) à receita de energia, compensando a perda de **−R$ 4,99 milhões** (`efeito_volume`) causada pela queda de **−4,0%** no volume de energia faturada (`consumo_kwh_valido`).
-2. **Focos críticos de perda de volume e receita:** Enquanto a receita total subiu no consolidado, segmentos específicos sofreram retração severa — por exemplo, a classe **Comercial em Jaboatão dos Guararapes recuou 2,09%** em receita de energia entre P1 e P2, e o avanço de **Geração Distribuída (GD / painéis solares)** combinado com **perdas não técnicas** e **leituras estimadas recorrentes** concentrou a queda de volume residencial e comercial nos bairros líderes do drill-down.
+**Principais conclusões:**
+1. **O preço subiu mais que o reajuste por causa das bandeiras.** P1 teve 12 meses de bandeira verde; P2 teve só 4 (5 vermelhas e 3 amarelas). Com P2 todo em bandeira verde, a receita de energia teria subido cerca de **4,4%**, não 8%.
+2. **A geração distribuída explica toda a queda de volume.** As 3.510 UCs que instalaram painel solar depois de P1 consumiram **61% menos** da rede (−11,2 GWh); as demais UCs **cresceram** (+2,2 GWh). A queda está nas classes residencial e comercial.
+3. **Hipóteses descartadas pelos dados:** crescimento da base (só +259 UCs), perdas não técnicas (a fila soma ≈ 0,3 GWh/ano, 3% do efeito da GD), troca de medidor (as UCs que trocaram consumiram +2,2%) e leituras estimadas (caíram de 19,0% para 15,8%).
+4. **Recomendações:** projetar a receita sem bandeiras (≈ R$ 4 mi/ano em risco), incluir a GD no planejamento de mercado (≈ R$ 2,4 mi/ano a menos a cada ano no ritmo atual de conexões), rever como a GD paga pelo uso da rede (Lei 14.300/2022) e não contar com o combate a perdas para recuperar o volume. Detalhes em [`docs/diagnostico-receita.md`](docs/diagnostico-receita.md).
 
 ---
 
