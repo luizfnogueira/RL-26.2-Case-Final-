@@ -109,6 +109,8 @@ Nos dois casos, os números saem do back-end, os mesmos que a tela já mostra. A
 
 ## GenAI
 
+> O detalhamento de cada funcionalidade de IA, com os commits e as atualizações depois de 30/10, está em [`features-extras-ia.md`](features-extras-ia.md).
+
 ### Gráficos na conversa
 
 **O que faz:** o assistente responde com barras, pizza ou linhas, escolhidos pelo código pela forma dos dados. A ponte da receita aparece como P1, efeito-preço, efeito-volume e P2, e o gráfico avisa o que ficou de fora.
